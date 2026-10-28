@@ -137,7 +137,7 @@ dialog h3{margin:0 0 4px;font-size:18px}
 <div id="auth"><form id="aForm" class="card"><h3 style="font-size:20px">Entrar no PEP</h3><p style="color:var(--mut);margin:0">Acesso restrito. Seus dados ficam na sua conta.</p>
   <label>E-mail</label><input id="aEmail" type="email" required autocomplete="username"><label>Senha</label><input id="aPass" type="password" required minlength="8" autocomplete="current-password">
   <div id="aMsg" style="color:var(--bad);min-height:20px;margin-top:8px"></div>
-  <div class="bar" style="justify-content:space-between"><button type="button" class="btn ghost" id="aSign">Criar conta</button><button class="btn">Entrar</button></div></form></div>
+  <div class="bar"><button class="btn">Entrar</button></div></form></div>
 <dialog id="dlg"></dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <div id="toast"></div>
@@ -148,7 +148,7 @@ dialog h3{margin:0 0 4px;font-size:18px}
 "use strict";
 /* =============== constantes =============== */
 const KEY="pep-demo-v1";
-/* Supabase: preencha as duas linhas abaixo (Project Settings → API). Vazio = modo local (navegador). */
+/* Supabase: preencha as duas linhas abaixo (Project Settings → API). Vazio = modo local (só para desenvolvimento). */
 const SUPABASE_URL="https://joygodczajayygjxerno.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpveWdvZGN6YWpheXlnanhlcm5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxODI5MjMsImV4cCI6MjEwODc1ODkyM30.D5WdaqV6k1oN19TTffLPQ1NQejBFu91p9nlT2kV51Rs";   // chave "anon public" (a service_role NUNCA entra aqui)
 const SB_ON=!!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);
@@ -443,13 +443,16 @@ $("#impFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;
 const cred=()=>({email:$("#aEmail").value.trim(),password:$("#aPass").value});
 async function enter(user){UID=user.id;$("#auth").style.display="none";$("#out").style.display="";try{await loadRemote()}catch(e){toast("Erro ao carregar: "+(e.message||e))}render()}
 $("#aForm").onsubmit=async e=>{e.preventDefault();const {data,error}=await sb.auth.signInWithPassword(cred());if(error)return void($("#aMsg").textContent=error.message);enter(data.user)};
-$("#aSign").onclick=async()=>{const {data,error}=await sb.auth.signUp(cred());if(error)return void($("#aMsg").textContent=error.message);if(data.session)enter(data.user);else $("#aMsg").textContent="Conta criada. Confirme o e-mail e depois entre."};
 $("#out").onclick=async()=>{await sb.auth.signOut();location.reload()};
+/* Com Supabase configurado, o app NUNCA cai para o modo local: sem a biblioteca ou sem conexão, trava com erro. */
+function lockApp(msg){const a=$("#auth");a.innerHTML=`<div class="card" style="width:min(440px,100%)"><h3 style="font-size:20px;color:var(--bad)">Não foi possível iniciar o sistema</h3><p>${msg}</p><p style="color:var(--mut)">Verifique sua conexão com a internet e recarregue a página. Nenhum dado é exibido sem login.</p><div class="bar"><button class="btn" onclick="location.reload()">Recarregar</button></div></div>`;a.style.display="grid"}
 (async function boot(){
-  if(!SB_ON){if(SUPABASE_URL&&!window.supabase)toast("Supabase não carregou; usando armazenamento local");render();return}
+  if(SUPABASE_URL&&SUPABASE_ANON_KEY&&!window.supabase){lockApp("A biblioteca de autenticação (Supabase) não carregou.");return}
+  if(!SB_ON){render();return}
   $("#reset").style.display="none";
-  const {data}=await sb.auth.getSession();
-  if(data.session)enter(data.session.user);else $("#auth").style.display="grid";
+  try{const {data,error}=await sb.auth.getSession();if(error)throw error;
+    if(data.session)enter(data.session.user);else $("#auth").style.display="grid"}
+  catch(e){lockApp("Falha ao verificar a sessão: "+esc(e.message||e))}
 })();
 </script>
 </body>
