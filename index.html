@@ -3,19 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0f1b2d">
 <title>PEP – Prontuário Eletrônico</title>
 <style>
 :root{
-  color-scheme:light dark;
+  color-scheme:dark;
   --bg:#f5f7fb;--panel:#fff;--side:#0f1b2d;--side2:#18283f;--ink:#152033;--mut:#6b7a90;--line:#e5eaf2;
   --pri:#2563eb;--pri-soft:#e8efff;--ok:#12805c;--ok-soft:#dcf5ea;--warn:#a85a00;--warn-soft:#fff0d6;--bad:#c62828;--bad-soft:#fde4e4;
   --r:14px;--sh:0 1px 2px #0b1a3012,0 4px 16px #0b1a300a
 }
-@media (prefers-color-scheme:dark){:root{
+/* tema escuro fixo, independente do modo do aparelho */
+:root{
   --bg:#0b1220;--panel:#141d2e;--side:#0e1729;--side2:#17233a;--ink:#e6ecf5;--mut:#8b9bb3;--line:#223049;
-  --pri:#5b8cff;--pri-soft:#1b2a4d;--ok:#4cd2a1;--ok-soft:#10372c;--warn:#ffbf5c;--warn-soft:#3b2a0c;--bad:#ff7b7b;--bad-soft:#3d1717;--sh:none}}
+  --pri:#5b8cff;--pri-soft:#1b2a4d;--ok:#4cd2a1;--ok-soft:#10372c;--warn:#ffbf5c;--warn-soft:#3b2a0c;--bad:#ff7b7b;--bad-soft:#3d1717;--sh:none}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
