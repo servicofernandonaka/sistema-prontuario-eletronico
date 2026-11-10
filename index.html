@@ -265,13 +265,23 @@ function boot(){
   if(!window.supabase||!window.supabase.createClient){ show('login'); toast('Falha ao carregar o Supabase',true); return; }
   if(!SUPABASE_ANON_KEY||SUPABASE_ANON_KEY.startsWith('COLE_')){ show('login'); $('cfg').classList.remove('hidden'); $('cfg').textContent='Configure SUPABASE_URL e SUPABASE_ANON_KEY.'; $('li-btn').disabled=true; return; }
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  sb.auth.getSession().then(({data})=> data.session?enter(data.session):show('login'));
-  sb.auth.onAuthStateChange((_e,s)=> s?enter(s):show('login'));
+  // IMPORTANTE: nunca chamar o Supabase de dentro do callback de autenticação — a biblioteca
+  // trava (deadlock) e nada mais responde. Por isso o tratamento é adiado com setTimeout.
+  sb.auth.onAuthStateChange((_e,s)=> setTimeout(()=>aplicarSessao(s),0));
+  sb.auth.getSession().then(({data})=> aplicarSessao(data.session));
+}
+let usuarioAtual=null;
+function aplicarSessao(s){
+  if(s){ if(usuarioAtual!==s.user.id){ usuarioAtual=s.user.id; enter(s); } }
+  else { usuarioAtual=null; pacienteSel=null; atendAtual=null; show('login'); }
 }
 async function enter(session){ $('who').innerHTML='<b>'+esc(session.user.email||'Profissional')+'</b> · Clínica Médica'; show('app'); await carregarPacientes(); renderMain(); }
 $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({email:$('li-email').value.trim(),password:$('li-pass').value}); if(error) toast(error.message,true); };
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
-$('btn-logout').onclick=()=>{ pacienteSel=null; sb.auth.signOut(); };
+$('btn-logout').onclick=async()=>{
+  try{ await sb.auth.signOut(); }catch(e){}
+  aplicarSessao(null);   // volta para o login mesmo se a rede falhar
+};
 
 // ---------- pacientes ----------
 async function carregarPacientes(q){
