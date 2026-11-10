@@ -145,6 +145,25 @@
   .toast.err{border-color:var(--err);color:#ffb4ac}
   .cfg{background:var(--warn-bg);border:1px solid var(--warn-br);color:var(--warn-fg);padding:11px 13px;border-radius:9px;font-size:13px;margin-bottom:14px}
 
+  /* ---------- impressão ---------- */
+  #print-area{display:none}
+  @media print{
+    @page{size:A4;margin:16mm 14mm}
+    body>*{display:none!important}
+    #print-area{display:block!important;background:#fff;color:#000;font-family:Georgia,'Times New Roman',serif;font-size:12pt;line-height:1.45}
+    #print-area .pr-cab{text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:14px}
+    #print-area .pr-un{font-size:12pt;letter-spacing:.06em;text-transform:uppercase}
+    #print-area h1{font-size:15pt;letter-spacing:.12em;margin:6px 0 0;text-transform:uppercase}
+    #print-area .pr-pac{display:flex;flex-wrap:wrap;gap:4px 26px;margin-bottom:16px;font-size:11pt}
+    #print-area .pr-corpo{min-height:95mm}
+    #print-area .it{margin-bottom:13px;page-break-inside:avoid}
+    #print-area .it .n{font-weight:bold}
+    #print-area .it .d{padding-left:17px;font-size:11pt}
+    #print-area .pr-obs{margin-top:14px;font-size:11pt;border-top:1px dotted #555;padding-top:8px}
+    #print-area .pr-ass{margin-top:26mm;text-align:center;page-break-inside:avoid}
+    #print-area .pr-linha{border-top:1px solid #000;width:72mm;margin:0 auto 5px}
+    #print-area .pr-data{margin-top:12px;font-size:11pt}
+  }
   @media (max-width:760px){
     .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
     .sidebar.open{transform:none}
@@ -178,6 +197,7 @@
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
+      <button class="btn ghost" id="btn-prof">Dados para impressão</button>
       <button class="btn ghost" id="btn-sigtap" title="Carrega o pacote oficial do DATASUS (.zip)">Importar tabela SIGTAP</button>
       <input type="file" id="sigtap-file" accept=".zip" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
@@ -243,6 +263,21 @@
     <label style="display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:500"><input type="checkbox" id="pr-cont" style="width:auto"> Uso contínuo</label>
   </div>
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pr-add">Adicionar à prescrição</button></div>
+</div></div>
+
+<div id="print-area"></div>
+
+<div class="overlay" id="m-prof"><div class="modal">
+  <div class="mh"><span>Dados para impressão</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" style="margin-bottom:12px">Aparecem no cabeçalho e na assinatura da receita e da solicitação de exames. Ficam salvos neste navegador.</div>
+    <div class="field"><label>Nome do profissional *</label><input id="pf-nome" class="f" placeholder="Dr(a). Nome Sobrenome"></div>
+    <div class="grid">
+      <div class="field"><label>CRM</label><input id="pf-crm" class="f" placeholder="SP 000000"></div>
+      <div class="field"><label>Unidade / consultório</label><input id="pf-unidade" class="f" placeholder="UBS ..."></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pf-save">Salvar</button></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -348,10 +383,56 @@ async function renderFichaPaciente(c){
   const tipos={no_dia:'Consulta no dia',agendada:'Consulta agendada',cuidado_continuado:'Cuidado continuado',urgencia:'Urgência'};
   data.forEach(a=>{
     const r=el('div','atd-row click');
-    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a.subjetivo||'').slice(0,90)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span><span style="color:var(--muted)">›</span>';
-    r.onclick=()=>{ atendAtual={id:a.id}; renderMain(); };
+    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a.subjetivo||'').slice(0,90)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span>';
+    const bAbrir=el('button','btn ghost sm','Abrir'); r.appendChild(bAbrir);
+    const abrir=()=>{ atendAtual={id:a.id}; renderMain(); };
+    r.onclick=abrir; bAbrir.onclick=e=>{ e.stopPropagation(); abrir(); };
     card.appendChild(r);
   });
+}
+
+// ---------- dados do profissional (ficam neste navegador) ----------
+function dadosProf(){ let d={nome:'',crm:'',unidade:''};
+  try{ d=Object.assign(d,JSON.parse(localStorage.getItem('pep_prof')||'{}')); }catch(e){}
+  return d; }
+$('btn-prof').onclick=()=>{ const d=dadosProf(); $('pf-nome').value=d.nome; $('pf-crm').value=d.crm; $('pf-unidade').value=d.unidade; openM('m-prof'); };
+$('pf-save').onclick=()=>{
+  const d={nome:$('pf-nome').value.trim(),crm:$('pf-crm').value.trim(),unidade:$('pf-unidade').value.trim()};
+  if(!d.nome){ toast('Informe o nome do profissional',true); return; }
+  try{ localStorage.setItem('pep_prof',JSON.stringify(d)); }catch(e){ toast('Não foi possível salvar neste navegador',true); return; }
+  closeM('m-prof'); toast('Dados salvos ✓');
+};
+
+// ---------- impressão (receita / solicitação de exames) ----------
+function dataBRsimples(iso){ if(!iso) return ''; const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso+'T12:00:00':iso); return d.toLocaleDateString('pt-BR'); }
+function imprimirDoc(titulo,itensHTML,obsHTML,quando){
+  const pr=dadosProf(), p=pacienteSel||{};
+  if(!pr.nome){ toast('Preencha os dados para impressão primeiro',true); $('btn-prof').click(); return; }
+  const ident=[['Paciente',p.nome],['Nascimento',p.data_nascimento?dataBRsimples(p.data_nascimento)+' ('+idade(p.data_nascimento)+')':''],
+               ['CPF',p.cpf],['CNS',p.cns]].filter(x=>x[1]);
+  $('print-area').innerHTML=
+    '<div class="pr-cab">'+(pr.unidade?'<div class="pr-un">'+esc(pr.unidade)+'</div>':'')+'<h1>'+esc(titulo)+'</h1></div>'+
+    '<div class="pr-pac">'+ident.map(x=>'<div><b>'+esc(x[0])+':</b> '+esc(x[1])+'</div>').join('')+'</div>'+
+    '<div class="pr-corpo">'+itensHTML+'</div>'+(obsHTML||'')+
+    '<div class="pr-ass"><div class="pr-linha"></div><div>'+esc(pr.nome)+'</div>'+
+      (pr.crm?'<div>CRM '+esc(pr.crm)+'</div>':'')+
+      '<div class="pr-data">'+esc(dataBRsimples(quando||new Date().toISOString()))+'</div></div>';
+  window.print();
+}
+function imprimirReceita(meds,quando){
+  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return; }
+  imprimirDoc('Receituário', meds.map((m,i)=>{
+    const pos=[m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(', ');
+    return '<div class="it"><div class="n">'+(i+1)+'. '+esc(m.medicamento)+(m.quantidade?' &mdash; '+esc(m.quantidade):'')+
+           (m.uso_continuo?' (uso contínuo)':'')+'</div>'+(pos?'<div class="d">'+esc(pos)+'</div>':'')+'</div>';
+  }).join(''), '', quando);
+}
+function imprimirExames(exames,cab,quando){
+  if(!exames||!exames.length){ toast('Não há exames nesta solicitação',true); return; }
+  const obs=[cab&&cab.cid10?'<b>CID-10:</b> '+esc(cab.cid10):'',cab&&cab.justificativa?'<b>Justificativa:</b> '+esc(cab.justificativa):''].filter(Boolean).join('<br>');
+  imprimirDoc('Solicitação de exames',
+    exames.map((e,i)=>'<div class="it"><div class="n">'+(i+1)+'. '+esc(e.no_procedimento)+'</div><div class="d">Código SIGTAP '+esc(e.co_procedimento)+'</div></div>').join(''),
+    obs?'<div class="pr-obs">'+obs+'</div>':'', quando);
 }
 
 // ---------- ver um atendimento já salvo (somente leitura) ----------
@@ -402,6 +483,12 @@ async function renderAtendimentoSalvo(c){
             esc([m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td></tr>').join('')+'</tbody></table>'
         : '<div class="muted">Nenhum medicamento prescrito.</div>')+
     '</div></div>';
+
+  const acoes=el('div','', '');
+  acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
+  if(exames.length){ const b=el('button','btn ghost','Imprimir solicitação de exames'); b.onclick=()=>imprimirExames(exames,cab,a.data_atendimento); acoes.appendChild(b); }
+  if(meds.length){ const b=el('button','btn primary','Imprimir receita'); b.onclick=()=>imprimirReceita(meds,a.data_atendimento); acoes.appendChild(b); }
+  if(acoes.children.length) box.appendChild(acoes);
 }
 
 // ---------- atendimento (SOAP) ----------
@@ -543,7 +630,7 @@ async function finalizar(){
       const {error:e5}=await sb.from('pep_prescricao_itens').insert(prescItens.map((m,i)=>({prescricao_id:rec.id,...m,ordem:i+1})));
       if(e5) throw e5;
     }
-    toast('Atendimento salvo ✓'); atendAtual=null; renderMain();
+    toast('Atendimento salvo ✓'); atendAtual={id:at.id}; renderMain();
   }catch(err){ toast('Erro ao salvar: '+(err.message||err),true); }
   finally{ btn.disabled=false; btn.textContent='Finalizar e salvar atendimento'; }
 }
