@@ -87,6 +87,10 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
   .atd-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
   .atd-row:last-child{border-bottom:0}
+  .atd-row.click{cursor:pointer}
+  .atd-row.click:hover{background:var(--panel-2)}
+  .ro{white-space:pre-wrap;font-size:14px}
+  .ro.vazio{color:var(--muted);font-style:italic}
   .atd-row .dt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 150px}
   .atd-row .tp{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
   .chip{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line)}
@@ -215,6 +219,7 @@
     <div class="field"><label>Exames (busca na SIGTAP)</label>
       <div class="ta"><input id="ex-search" class="f" placeholder="Digite: hemo, glicose, tsh, ultrassom…" autocomplete="off"><div class="ta-list" id="ex-list"></div></div>
       <div class="chips" id="ex-chips"></div>
+      <div id="ex-diag" class="muted" style="display:none;margin-top:8px"></div>
     </div>
     <div class="field"><label>CID 10 (opcional)</label><input id="ex-cid" class="f" placeholder="Ex.: E11"></div>
     <div class="field"><label>Justificativa</label><textarea id="ex-just" class="f" placeholder="Justificativa do procedimento"></textarea></div>
@@ -321,7 +326,7 @@ $('np-save').onclick=async()=>{
 function renderMain(){
   const c=$('main-content'); c.innerHTML='';
   if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
-  if(atendAtual){ renderAtendimento(c); return; }
+  if(atendAtual){ atendAtual.id?renderAtendimentoSalvo(c):renderAtendimento(c); return; }
   renderFichaPaciente(c);
 }
 
@@ -342,10 +347,61 @@ async function renderFichaPaciente(c){
   if(!data||!data.length){ card.appendChild(el('div','',' <div style="padding:22px;text-align:center" class="muted">Nenhum atendimento ainda.</div>')); return; }
   const tipos={no_dia:'Consulta no dia',agendada:'Consulta agendada',cuidado_continuado:'Cuidado continuado',urgencia:'Urgência'};
   data.forEach(a=>{
-    const r=el('div','atd-row');
-    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a.subjetivo||'').slice(0,90)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span>';
+    const r=el('div','atd-row click');
+    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a.subjetivo||'').slice(0,90)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span><span style="color:var(--muted)">›</span>';
+    r.onclick=()=>{ atendAtual={id:a.id}; renderMain(); };
     card.appendChild(r);
   });
+}
+
+// ---------- ver um atendimento já salvo (somente leitura) ----------
+async function renderAtendimentoSalvo(c){
+  const p=pacienteSel, tipos={no_dia:'Consulta no dia',agendada:'Consulta agendada',cuidado_continuado:'Cuidado continuado',urgencia:'Urgência'};
+  const head=el('div','phead');
+  head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">Atendimento registrado</div></div><div class="sp"></div>';
+  const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
+  c.appendChild(head);
+  const box=el('div','soap'); c.appendChild(box);
+  box.appendChild(el('div','muted','Carregando…'));
+
+  const {data:a,error}=await sb.from('pep_atendimentos').select('*').eq('id',atendAtual.id).maybeSingle();
+  if(error||!a){ box.innerHTML=''; box.appendChild(el('div','empty', error?('Erro ao abrir: '+esc(error.message)):'Atendimento não encontrado.')); return; }
+
+  let exames=[], meds=[], cab=null;
+  const {data:sols}=await sb.from('pep_solicitacoes_exames').select('id,cid10,justificativa').eq('atendimento_id',a.id);
+  if(sols&&sols.length){ cab=sols[0];
+    const {data:it}=await sb.from('pep_solicitacao_itens').select('co_procedimento,no_procedimento').in('solicitacao_id',sols.map(x=>x.id));
+    exames=it||[]; }
+  const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',a.id);
+  if(recs&&recs.length){
+    const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(x=>x.id)).order('ordem',{ascending:true});
+    meds=mi||[]; }
+
+  const txt=v=>v&&String(v).trim()?'<div class="ro">'+esc(v)+'</div>':'<div class="ro vazio">Não preenchido.</div>';
+  const sinais=[['PA',(a.pa_sistolica&&a.pa_diastolica)?a.pa_sistolica+'/'+a.pa_diastolica+' mmHg':null],['FC',a.fc?a.fc+' bpm':null],
+    ['Peso',a.peso_kg?a.peso_kg+' kg':null],['Altura',a.altura_cm?a.altura_cm+' cm':null],['Glicemia',a.glicemia_capilar?a.glicemia_capilar+' mg/dL':null]]
+    .filter(x=>x[1]).map(x=>'<b>'+x[0]+':</b> '+esc(x[1])).join(' &nbsp;·&nbsp; ');
+
+  box.innerHTML=
+    '<div class="sbox"><div class="h">'+esc(dataBR(a.data_atendimento))+' · '+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</div></div>'+
+    '<div class="sbox s"><div class="h"><span class="bdg">S</span> Subjetivo</div><div class="bd">'+txt(a.subjetivo)+'</div></div>'+
+    '<div class="sbox o"><div class="h"><span class="bdg">O</span> Objetivo</div><div class="bd">'+txt(a.objetivo)+
+      (sinais?'<div class="muted" style="margin-top:10px">'+sinais+'</div>':'')+'</div></div>'+
+    '<div class="sbox a"><div class="h"><span class="bdg">A</span> Avaliação</div><div class="bd">'+txt(a.avaliacao)+'</div></div>'+
+    '<div class="sbox p"><div class="h"><span class="bdg">P</span> Plano</div><div class="bd">'+txt(a.plano)+
+      '<h3 style="font-size:14px;margin:18px 0 8px">Exames solicitados</h3>'+
+      (exames.length
+        ? '<table><thead><tr><th>Exame</th><th>Código SIGTAP</th></tr></thead><tbody>'+
+          exames.map(e=>'<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+'</span></td></tr>').join('')+'</tbody></table>'+
+          ((cab&&(cab.cid10||cab.justificativa))?'<div class="muted" style="margin-top:8px">'+[cab.cid10?'CID-10 '+esc(cab.cid10):'',cab.justificativa?esc(cab.justificativa):''].filter(Boolean).join(' · ')+'</div>':'')
+        : '<div class="muted">Nenhum exame solicitado.</div>')+
+      '<h3 style="font-size:14px;margin:18px 0 8px">Prescrição</h3>'+
+      (meds.length
+        ? '<table><thead><tr><th>Medicamento</th><th>Posologia</th><th>Qtd.</th></tr></thead><tbody>'+
+          meds.map(m=>'<tr><td>'+esc(m.medicamento)+(m.uso_continuo?' <span class="chip">contínuo</span>':'')+'</td><td class="muted">'+
+            esc([m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td></tr>').join('')+'</tbody></table>'
+        : '<div class="muted">Nenhum medicamento prescrito.</div>')+
+    '</div></div>';
 }
 
 // ---------- atendimento (SOAP) ----------
@@ -411,7 +467,7 @@ function renderAtendimento(c){
     c.querySelectorAll('.ptab').forEach(x=>x.classList.toggle('active',x===t));
     c.querySelectorAll('[data-panel]').forEach(pn=>pn.classList.toggle('hidden',pn.dataset.panel!==t.dataset.pt));
   });
-  $('open-exam').onclick=()=>{ renderExChips(); openM('m-exam'); };
+  $('open-exam').onclick=()=>{ renderExChips(); exDiag(''); openM('m-exam'); };
   $('open-presc').onclick=()=> openM('m-presc');
   $('btn-cancelar').onclick=()=>{ atendAtual=null; renderMain(); };
   $('btn-finalizar').onclick=finalizar;
@@ -430,10 +486,23 @@ function renderExTable(){
   tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ examItens.splice(+b.dataset.i,1); renderExTable(); });
 }
 $('ex-add').onclick=()=>{ renderExTable(); closeM('m-exam'); };
+const exDiag=m=>{ const d=$('ex-diag'); if(d){ d.textContent=m||''; d.style.display=m?'block':'none'; } };
 taBind($('ex-search'),$('ex-list'),async q=>{
   const {data,error}=await sb.rpc('buscar_exames',{p_termo:q});
-  if(error){ toast('Erro na busca de exames: '+error.message,true); return []; }
-  return (data||[]).map(e=>({label:e.no_procedimento,sub:'Código '+e.co_procedimento,value:e}));
+  if(error){
+    exDiag(/function|does not exist|schema cache/i.test(error.message||'')
+      ? 'A busca de exames ainda não existe no banco. Rode o complemento_medicamentos_exames.sql no Supabase.'
+      : 'Erro na busca: '+error.message);
+    return [];
+  }
+  if(!data||!data.length){
+    const {count}=await sb.from('sigtap_procedimento').select('co_procedimento',{count:'exact',head:true});
+    exDiag(count ? 'Nenhum exame com esse termo (catálogo com '+count+' exames). Tente outra palavra, ou use "Importar tabela SIGTAP" para a tabela completa.'
+                 : 'O catálogo de exames está vazio. Rode o SQL no Supabase ou use "Importar tabela SIGTAP".');
+    return [];
+  }
+  exDiag('');
+  return data.map(e=>({label:e.no_procedimento,sub:'Código '+e.co_procedimento,value:e}));
 },opt=>{ const e=opt.value; if(!examItens.find(x=>x.co_procedimento===e.co_procedimento)) examItens.push({co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento}); $('ex-search').value=''; renderExChips(); });
 
 // ---------- prescrição ----------
