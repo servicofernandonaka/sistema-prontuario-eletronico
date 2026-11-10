@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEP Clínico</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --bg:#0b1220; --panel:#111c2e; --panel-2:#16233a; --card:#152238; --line:#243246;
@@ -173,6 +174,9 @@
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
+      <button class="btn ghost" id="btn-sigtap" title="Carrega o pacote oficial do DATASUS (.zip)">Importar tabela SIGTAP</button>
+      <input type="file" id="sigtap-file" accept=".zip" class="hidden">
+      <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
     </div>
   </aside>
@@ -222,7 +226,8 @@
 <div class="overlay" id="m-presc"><div class="modal">
   <div class="mh"><span>Prescrição de medicamento</span><button class="x" data-close>✕</button></div>
   <div class="mb">
-    <div class="field"><label>Medicamento *</label><input id="pr-med" class="f" placeholder="Ex.: Losartana 50 mg"></div>
+    <div class="field"><label>Medicamento * <span style="font-weight:400">(busque no catálogo ou digite livremente)</span></label>
+      <div class="ta"><input id="pr-med" class="f" placeholder="Digite: losartana, amoxicilina, metformina 850…" autocomplete="off"><div class="ta-list" id="pr-list"></div></div></div>
     <div class="grid">
       <div class="field"><label>Via</label><select id="pr-via" class="f"><option>Via oral</option><option>Sublingual</option><option>Intramuscular</option><option>Endovenosa</option><option>Tópica</option><option>Inalatória</option></select></div>
       <div class="field"><label>Dose</label><input id="pr-dose" class="f" placeholder="1 comprimido"></div>
@@ -484,6 +489,82 @@ function taBind(input,list,fetcher,onPick){
   });
   input.addEventListener('blur',()=> setTimeout(()=>list.classList.remove('open'),180));
 }
+
+// ---------- busca de medicamentos (catálogo) ----------
+taBind($('pr-med'),$('pr-list'),async q=>{
+  const {data,error}=await sb.rpc('buscar_medicamentos',{p_termo:q});
+  if(error) return [];   // catálogo indisponível: segue como texto livre
+  return (data||[]).map(m=>({label:m.nome+' '+m.apresentacao,sub:m.via||'',value:m}));
+},opt=>{ const m=opt.value; $('pr-med').value=m.nome+' '+m.apresentacao;
+  if(m.via){ const sel=$('pr-via'); const o=[...sel.options].find(x=>x.text===m.via); if(o) sel.value=o.text; else { sel.add(new Option(m.via,m.via)); sel.value=m.via; } }
+  $('pr-dose').focus(); });
+
+// ---------- importar a tabela SIGTAP oficial (ZIP do DATASUS) ----------
+function parseLayout(txt){
+  const cols=[]; let cursor=1;
+  for(const raw of txt.split(/\r?\n/)){
+    const parts=raw.replace(/[;,]+/g,' ').trim().split(/\s+/).filter(Boolean);
+    if(!parts.length) continue;
+    const name=parts[0].toUpperCase();
+    if(!/^[A-Z_][A-Z0-9_]*$/.test(name)||name==='COLUNA') continue;
+    const ti=parts.findIndex((p,i)=>i>0&&/^(var ?char2?|numeric|number|char|date|int)/i.test(p));
+    const after=ti>=0?parts.slice(ti+1):parts.slice(1);
+    const nums=after.map(x=>parseInt(x,10)).filter(n=>Number.isFinite(n));
+    let start,end;
+    if(nums.length>=3){ start=nums[nums.length-2]; end=nums[nums.length-1]; }
+    else if(nums.length>=1){ start=cursor; end=cursor+nums[0]-1; }
+    else continue;
+    cols.push({name,start,end}); cursor=end+1;
+  }
+  return cols;
+}
+async function lerTabelaZip(zip,base){
+  const achar=n=>Object.values(zip.files).find(f=>!f.dir&&f.name.split('/').pop().toLowerCase()===n);
+  const fd=achar(base+'.txt'), fl=achar(base+'_layout.txt');
+  if(!fd||!fl) throw new Error('Arquivo '+base+'.txt (ou seu layout) não está no pacote.');
+  const dec=new TextDecoder('iso-8859-1');
+  const dados=dec.decode(await fd.async('uint8array')), layout=dec.decode(await fl.async('uint8array'));
+  const cols=parseLayout(layout);
+  if(!cols.length) throw new Error('Layout de '+base+' não reconhecido.');
+  const out=[];
+  for(const raw of dados.split(/\r?\n/)){ if(!raw.trim()) continue; const o={}; for(const c of cols) o[c.name]=raw.substring(c.start-1,c.end).trim(); out.push(o); }
+  return out;
+}
+async function upsertLotes(tabela,linhas,onConflict,rotulo){
+  for(let i=0;i<linhas.length;i+=500){
+    const {error}=await sb.from(tabela).upsert(linhas.slice(i,i+500),{onConflict});
+    if(error) throw new Error(tabela+': '+error.message);
+    $('sigtap-status').textContent=rotulo+' '+Math.min(i+500,linhas.length)+'/'+linhas.length;
+  }
+}
+async function importarSigtap(file){
+  const st=$('sigtap-status'); const toInt=v=>{const n=parseInt(v,10); return Number.isFinite(n)?n:null;};
+  try{
+    if(!window.JSZip) throw new Error('Biblioteca de ZIP não carregou; recarregue a página.');
+    st.textContent='Lendo o pacote…';
+    const zip=await JSZip.loadAsync(file);
+    const procs=(await lerTabelaZip(zip,'tb_procedimento')).map(r=>({co_procedimento:r.CO_PROCEDIMENTO,no_procedimento:r.NO_PROCEDIMENTO,
+      tp_complexidade:r.TP_COMPLEXIDADE||null,tp_sexo:r.TP_SEXO||null,qt_maxima_execucao:toInt(r.QT_MAXIMA_EXECUCAO),
+      vl_idade_minima:toInt(r.VL_IDADE_MINIMA),vl_idade_maxima:toInt(r.VL_IDADE_MAXIMA),co_financiamento:r.CO_FINANCIAMENTO||null,dt_competencia:r.DT_COMPETENCIA||null}));
+    // trava de segurança: só grava se o arquivo foi lido no formato esperado
+    const ruins=procs.filter(p=>!/^\d{10}$/.test(p.co_procedimento||'')||!(p.no_procedimento||'').trim()).length;
+    if(procs.length<1000||ruins>0) throw new Error('O pacote não foi lido no formato esperado ('+procs.length+' linhas, '+ruins+' inválidas). Nada foi gravado.');
+    const grupos=(await lerTabelaZip(zip,'tb_grupo')).map(r=>({co_grupo:r.CO_GRUPO,no_grupo:r.NO_GRUPO}));
+    const subs=(await lerTabelaZip(zip,'tb_sub_grupo')).map(r=>({co_grupo:r.CO_GRUPO,co_sub_grupo:r.CO_SUB_GRUPO,no_sub_grupo:r.NO_SUB_GRUPO}));
+    const formas=(await lerTabelaZip(zip,'tb_forma_organizacao')).map(r=>({co_grupo:r.CO_GRUPO,co_sub_grupo:r.CO_SUB_GRUPO,co_forma_organizacao:r.CO_FORMA_ORGANIZACAO,no_forma_organizacao:r.NO_FORMA_ORGANIZACAO}));
+    await upsertLotes('sigtap_grupo',grupos,'co_grupo','Grupos');
+    await upsertLotes('sigtap_sub_grupo',subs,'co_grupo,co_sub_grupo','Subgrupos');
+    await upsertLotes('sigtap_forma_organizacao',formas,'co_grupo,co_sub_grupo,co_forma_organizacao','Formas');
+    await upsertLotes('sigtap_procedimento',procs,'co_procedimento','Procedimentos');
+    const comp=(procs.find(p=>p.dt_competencia)||{}).dt_competencia||null;
+    if(comp) await sb.from('sigtap_competencia').upsert({competencia:comp,importado_em:new Date().toISOString(),qt_procedimentos:procs.length},{onConflict:'competencia'});
+    const nEx=procs.filter(p=>p.co_procedimento.startsWith('02')).length;
+    st.textContent='SIGTAP '+(comp||'')+' importada: '+procs.length+' procedimentos ('+nEx+' exames).';
+    toast('Tabela SIGTAP importada ✓');
+  }catch(err){ st.textContent='Falha: '+(err.message||err); toast('Importação falhou: '+(err.message||err),true); }
+}
+$('btn-sigtap').onclick=()=>$('sigtap-file').click();
+$('sigtap-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarSigtap(f); });
 
 boot();
 </script>
