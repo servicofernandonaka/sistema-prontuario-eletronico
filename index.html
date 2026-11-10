@@ -2,503 +2,490 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0f1b2d">
-<title>PEP – Prontuário Eletrônico</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEP Clínico</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
-:root{
-  color-scheme:dark;
-  --bg:#f5f7fb;--panel:#fff;--side:#0f1b2d;--side2:#18283f;--ink:#152033;--mut:#6b7a90;--line:#e5eaf2;
-  --pri:#2563eb;--pri-soft:#e8efff;--ok:#12805c;--ok-soft:#dcf5ea;--warn:#a85a00;--warn-soft:#fff0d6;--bad:#c62828;--bad-soft:#fde4e4;
-  --r:14px;--sh:0 1px 2px #0b1a3012,0 4px 16px #0b1a300a
-}
-/* tema escuro fixo, independente do modo do aparelho */
-:root{
-  --bg:#0b1220;--panel:#141d2e;--side:#0e1729;--side2:#17233a;--ink:#e6ecf5;--mut:#8b9bb3;--line:#223049;
-  --pri:#5b8cff;--pri-soft:#1b2a4d;--ok:#4cd2a1;--ok-soft:#10372c;--warn:#ffbf5c;--warn-soft:#3b2a0c;--bad:#ff7b7b;--bad-soft:#3d1717;--sh:none}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
-svg.i{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
-.app{display:grid;grid-template-columns:290px 1fr;min-height:100%}
-/* sidebar */
-aside{background:var(--side);color:#cfd9ea;border-right:1px solid #ffffff12;padding:20px 16px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100vh}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:#fff;padding:0 6px}
-.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#22d3ee);display:grid;place-items:center;color:#fff}
-.search{position:relative}
-.search input{width:100%;background:var(--side2);border:1px solid #243551;color:#fff;border-radius:10px;padding:9px 12px 9px 34px}
-.search svg{position:absolute;left:11px;top:11px;color:#7c8ba3}
-.plist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:4px;margin:0 -4px;padding:0 4px}
-.pi{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
-.pi:hover{background:var(--side2)}.pi.on{background:#1d3157;border-color:#2c4a80}
-.pi b{display:block;color:#fff;font-weight:600;font-size:13.5px}.pi small{color:#8ea0bd}
-.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;font-size:13px}
-.sidefoot{display:grid;gap:6px}
-/* main */
-main{padding:28px 32px 64px;max-width:1180px;width:100%}
-.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.top .who{color:var(--mut)}.top select{width:auto}
-.demo{background:var(--warn-soft);color:var(--warn);padding:6px 12px;border-radius:10px;font-size:12px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--sh);margin-bottom:20px}
-.card h3{margin:0 0 14px;font-size:16px;letter-spacing:-.01em}
-.qa{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:20px}.qa .btn{justify-content:center}
-.phead{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
-.phead .av{width:64px;height:64px;font-size:22px}
-.phead h2{margin:0;font-size:20px}
-.meta{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--mut);margin-top:4px}
-.meta b{color:var(--ink);font-weight:600}
-.alert{margin-top:10px;background:var(--bad-soft);color:var(--bad);border-radius:10px;padding:6px 12px;display:inline-block;font-weight:600}
-.tabs{display:inline-flex;gap:4px;background:var(--panel);border:1px solid var(--line);padding:4px;border-radius:12px;margin-bottom:20px;flex-wrap:wrap}
-.tabs button{border:0;background:none;color:var(--mut);padding:8px 16px;border-radius:9px;cursor:pointer;font:inherit;font-weight:500}
-.tabs button.on{background:var(--pri);color:#fff}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
-.stat b{font-size:26px;display:block}.stat span{color:var(--mut)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
-/* controls */
-button{font:inherit}
-.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;background:var(--pri);color:#fff;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600}
-.btn:hover{filter:brightness(1.08)}
-.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
-.btn.soft{background:var(--pri-soft);color:var(--pri)}
-.btn.danger{background:var(--bad-soft);color:var(--bad)}
-.btn.ok{background:var(--ok);color:#fff}
-.btn.sm{padding:4px 10px;font-size:12.5px;border-radius:8px}
-aside .btn.ghost{color:#e6ecf5;background:#ffffff0f;border-color:#34476b}
-aside .btn.ghost:hover{background:#ffffff1c}
-.tabs svg{display:none}
-#mbar,#scrim,#menuClose{display:none}
-label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px;font-weight:600}
-input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;font:inherit;background:var(--panel);color:var(--ink)}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--pri);outline-offset:-1px;border-color:transparent}
-textarea{min-height:76px;resize:vertical}
-input[type=checkbox]{width:auto}
-.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.row>*{flex:1;min-width:110px}.row>.fix{flex:none;min-width:0}
-.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.head h3{margin:0}
-.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600;background:var(--pri-soft);color:var(--pri)}
-.chip.ok{background:var(--ok-soft);color:var(--ok)}.chip.warn{background:var(--warn-soft);color:var(--warn)}.chip.bad{background:var(--bad-soft);color:var(--bad)}
-.item{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px}
-.item .h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:6px}
-.item p{margin:3px 0;white-space:pre-wrap}.item .acts{display:flex;gap:6px;flex-wrap:wrap}
-table{width:100%;border-collapse:collapse}
-td,th{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
-th{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
-tr:last-child td{border-bottom:0}
-.empty{text-align:center;color:var(--mut);padding:28px}
-.timeline{border-left:2px solid var(--line);margin-left:6px;padding-left:18px}
-.timeline .item{position:relative}.timeline .item:before{content:"";position:absolute;left:-26px;top:20px;width:12px;height:12px;border-radius:50%;background:var(--pri);border:3px solid var(--bg)}
-.file{display:inline-flex;gap:6px;align-items:center;background:var(--pri-soft);color:var(--pri);border-radius:8px;padding:3px 8px;font-size:12.5px;margin:2px 4px 2px 0}
-.file a{color:inherit;text-decoration:none;cursor:pointer}
-.sigbox{margin-top:8px;font-size:12px;color:var(--ok);background:var(--ok-soft);padding:6px 10px;border-radius:8px;word-break:break-all}
-/* dialog */
-dialog{border:0;border-radius:18px;padding:22px;width:min(680px,94vw);background:var(--panel);color:var(--ink);box-shadow:0 20px 60px #0007}
-dialog.wide{width:min(820px,95vw)}
-dialog::backdrop{background:#0a122399;backdrop-filter:blur(3px)}
-dialog h3{margin:0 0 4px;font-size:18px}
-.bar{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f1b2d;color:#fff;padding:10px 18px;border-radius:12px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
-#toast.on{opacity:1}
-#print{display:none}
-#auth{display:none;position:fixed;inset:0;z-index:50;background:var(--bg);place-items:center;padding:16px}
-#auth form{width:min(400px,100%);margin:0}
-@media (max-width:860px){
-  body{font-size:15px}
-  .app{display:block}
-  /* barra superior + menu lateral deslizante (em vez de empilhar a barra lateral no topo) */
-  #mbar{display:flex;position:sticky;top:0;z-index:30;align-items:center;gap:10px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top));background:var(--side);color:#fff}
-  #mbar .pn{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
-  #mbar .pn small{color:#9fb0cb;font-size:11.5px}
-  #mbar .pn b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #mbar button,#menuClose{background:#ffffff1a;border:0;color:#fff;border-radius:10px;width:42px;height:42px;display:grid;place-items:center;cursor:pointer}
-  #menuClose{display:grid;margin-left:auto}
-  aside{position:fixed;inset:0 auto 0 0;width:min(86vw,340px);height:100dvh;z-index:60;transform:translateX(-105%);transition:transform .25s;overflow:auto;padding-top:calc(18px + env(safe-area-inset-top))}
-  body.menu aside{transform:none;box-shadow:0 0 40px #0008}
-  #scrim{display:block;position:fixed;inset:0;background:#0009;z-index:55;opacity:0;pointer-events:none;transition:opacity .25s}
-  body.menu #scrim{opacity:1;pointer-events:auto}
-  main{padding:14px 14px 100px}
-  .top{flex-direction:column;align-items:stretch;gap:8px;margin-bottom:12px}.top select{width:100%}.top .who{display:none}
-  .demo{font-size:11.5px;padding:5px 10px}
-  .card{padding:14px;margin-bottom:12px}
-  .phead{gap:12px}.phead .av{width:48px;height:48px;font-size:17px}.phead h2{font-size:18px;line-height:1.25}
-  .meta{gap:4px 14px;font-size:13px}
-  .two{grid-template-columns:1fr}
-  .stats{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}.stat{padding:12px 14px}.stat b{font-size:22px}.stat span{font-size:13px}
-  .qa{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}.qa .btn{padding:10px 8px;font-size:13.5px}
-  .card h3{font-size:15.5px}.head{margin-bottom:12px}.item{padding:14px}
-  /* abas viram barra de navegação inferior */
-  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin:0;border:0;border-top:1px solid var(--line);border-radius:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
-  .tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:10.5px;border-radius:10px}
-  .tabs svg{display:block;width:21px;height:21px}
-  input,select,textarea{font-size:16px}
-  .btn{min-height:42px;padding:9px 14px}.btn.sm{min-height:36px;padding:6px 12px;font-size:13px}
-  .item .acts{width:100%}
-  dialog,dialog.wide{width:100vw;max-width:100vw;margin:auto 0 0;max-height:94dvh;border-radius:20px 20px 0 0;padding:18px}
-  #toast{bottom:90px;width:max-content;max-width:90vw}
-}
-@media print{
-  body{background:#fff;color:#000}.app,dialog,#toast{display:none!important}
-  #print{display:block;font:14px/1.5 Georgia,serif;padding:10mm}
-  #print h2{margin:0 0 4px}#print hr{margin:10px 0}#print .sig{margin-top:40px;font:11px/1.4 monospace;border-top:1px solid #000;padding-top:6px;word-break:break-all}
-}
+  :root{
+    --bg:#0b1220; --panel:#111c2e; --panel-2:#16233a; --card:#152238; --line:#243246;
+    --fg:#e8eef6; --muted:#8aa0bb; --brand:#3b82f6; --brand-600:#2f6fe0; --brand-050:#16233a;
+    --ok:#22c55e; --err:#ef4444; --warn-bg:#3a2f12; --warn-br:#6b5718; --warn-fg:#e6c24a;
+    --s:#ec6a93; --s-bg:#2a1620; --o:#4a95e6; --o-bg:#11243a; --a:#d7a641; --a-bg:#2a2412; --p:#39c08a; --p-bg:#10271d;
+    --radius:12px; --font:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.5}
+  h1,h2,h3{margin:0}
+  button{font-family:inherit;cursor:pointer}
+  input,select,textarea{font-family:inherit}
+  .hidden{display:none!important}
+
+  /* inputs */
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px;letter-spacing:.01em}
+  .inp,input.f,select.f,textarea.f{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--fg);
+    border-radius:9px;padding:10px 12px;font-size:14px;outline:0}
+  .inp:focus,input.f:focus,select.f:focus,textarea.f:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+  textarea.f{min-height:80px;resize:vertical}
+  .field{margin-bottom:12px}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:9px;
+    padding:10px 15px;font-size:14px;font-weight:600;background:var(--panel-2);color:var(--fg)}
+  .btn:hover{background:#1b2c47}
+  .btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .btn.primary:hover{background:var(--brand-600)}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--fg)}
+  .btn.sm{padding:7px 11px;font-size:13px}
+  .btn.block{width:100%}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ---------- LOGIN ---------- */
+  #view-login{min-height:100%;display:grid;place-items:center;padding:24px}
+  .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px}
+  .login-card h1{font-size:22px;margin-bottom:4px}
+  .login-card p{color:var(--muted);font-size:13.5px;margin:0 0 18px}
+
+  /* ---------- APP SHELL ---------- */
+  #view-app{display:flex;min-height:100%}
+  .sidebar{flex:0 0 268px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;
+    padding:16px 14px;gap:12px;position:sticky;top:0;height:100vh}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;padding:4px 6px}
+  .logo .tile{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:20px;font-weight:700}
+  .search-box{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .search-box svg{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
+  .search-box input{border:0;background:transparent;color:var(--fg);outline:0;width:100%;font-size:14px}
+  .side-list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:4px;margin:2px -4px}
+  .side-item{text-align:left;border:0;background:transparent;color:var(--fg);border-radius:9px;padding:10px 10px;display:flex;flex-direction:column;gap:1px}
+  .side-item:hover{background:var(--panel-2)}
+  .side-item.active{background:var(--brand-050);box-shadow:inset 0 0 0 1px var(--line)}
+  .side-item .nm{font-size:14px;font-weight:600}
+  .side-item .mt{font-size:11.5px;color:var(--muted)}
+  .side-foot{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+  .side-foot .btn{justify-content:flex-start}
+
+  .main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line)}
+  .badge-proto{background:var(--warn-bg);border:1px solid var(--warn-br);color:var(--warn-fg);font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px}
+  .who{font-size:13px;color:var(--muted)}
+  .who b{color:var(--fg)}
+  .content{flex:1;padding:22px;overflow:auto}
+  .maxw{max-width:1080px;margin:0 auto}
+
+  .empty{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:40px;text-align:center;color:var(--muted)}
+
+  /* patient header */
+  .phead{display:flex;flex-wrap:wrap;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px}
+  .avatar{width:48px;height:48px;border-radius:50%;background:var(--brand-050);color:var(--brand);display:grid;place-items:center;font-weight:700;flex:0 0 auto}
+  .phead .nm{font-size:18px;font-weight:700}
+  .phead .mt{font-size:12.5px;color:var(--muted)}
+  .phead .sp{flex:1}
+
+  .sec-title{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin:4px 0 10px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .atd-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .atd-row:last-child{border-bottom:0}
+  .atd-row .dt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 150px}
+  .atd-row .tp{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
+  .chip{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line)}
+
+  /* SOAP editor */
+  .soap{display:flex;flex-direction:column;gap:14px}
+  .sbox{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .sbox .h{display:flex;align-items:center;gap:10px;padding:12px 16px;font-weight:700;font-size:15px}
+  .sbox .bd{padding:14px 16px}
+  .bdg{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-weight:800;color:#06101f}
+  .sbox.s .h{background:var(--s-bg)} .sbox.s .bdg{background:var(--s)}
+  .sbox.o .h{background:var(--o-bg)} .sbox.o .bdg{background:var(--o)}
+  .sbox.a .h{background:var(--a-bg)} .sbox.a .bdg{background:var(--a)}
+  .sbox.p .h{background:var(--p-bg)} .sbox.p .bdg{background:var(--p)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  .rm{color:var(--err);border:0;background:transparent;font-size:16px}
+  .muted{color:var(--muted);font-size:12.5px}
+
+  /* typeahead */
+  .ta{position:relative}
+  .ta-list{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line);border-radius:9px;max-height:240px;overflow:auto;z-index:5;display:none;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+  .ta-list.open{display:block}
+  .ta-opt{padding:9px 12px;border-bottom:1px solid var(--line)}
+  .ta-opt:last-child{border-bottom:0}
+  .ta-opt:hover{background:var(--panel-2)}
+  .ta-opt .t{font-weight:600;font-size:13.5px}
+  .ta-opt .c{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .chipx{display:inline-flex;align-items:center;gap:7px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line);border-radius:20px;padding:4px 7px 4px 11px;font-size:12.5px;font-weight:600}
+  .chipx button{border:0;background:transparent;color:var(--brand);font-size:14px}
+
+  /* tabs do plano */
+  .ptabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+  .ptab{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600}
+  .ptab.active{background:var(--brand-050);color:var(--fg)}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(2,8,18,.66);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:50}
+  .overlay.open{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;width:100%;max-width:620px;margin:auto;overflow:hidden}
+  .modal .mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);font-weight:700;font-size:17px}
+  .modal .mb{padding:18px 20px}
+  .modal .mf{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--line)}
+  .x{border:1px solid var(--line);background:transparent;color:var(--muted);width:32px;height:32px;border-radius:8px}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0b1220;border:1px solid var(--line);color:var(--fg);padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80}
+  .toast.show{opacity:1}
+  .toast.err{border-color:var(--err);color:#ffb4ac}
+  .cfg{background:var(--warn-bg);border:1px solid var(--warn-br);color:var(--warn-fg);padding:11px 13px;border-radius:9px;font-size:13px;margin-bottom:14px}
+
+  @media (max-width:760px){
+    .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
+    .sidebar.open{transform:none}
+    .menu-btn{display:inline-flex!important}
+  }
+  .menu-btn{display:none;border:1px solid var(--line);background:transparent;color:var(--fg);width:38px;height:38px;border-radius:9px;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
-<div id="mbar"><button id="menuBtn" aria-label="Abrir menu"><svg class="i" viewBox="0 0 24 24" style="width:22px;height:22px"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="pn"><small>Paciente</small><b id="pname">—</b></div></div>
-<div id="scrim"></div>
-<div class="app">
-  <aside>
-    <div class="brand"><div class="logo"><svg class="i" viewBox="0 0 24 24" style="width:20px;height:20px"><path d="M12 5v14M5 12h14"/></svg></div>PEP Clínico<button id="menuClose" aria-label="Fechar menu"><svg class="i" viewBox="0 0 24 24" style="width:20px;height:20px"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
-    <div class="search"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar paciente, CPF, CNS…"></div>
-    <button class="btn" id="novoPac"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Novo paciente</button>
-    <div class="plist" id="plist"></div>
-    <div class="sidefoot">
-      <button class="btn ghost sm" id="exp"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg> Exportar backup</button>
-      <button class="btn ghost sm" id="imp"><svg class="i" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4 4 4M4 21h16"/></svg> Importar backup</button>
-      <button class="btn ghost sm" id="reset">Resetar demo</button>
-      <button class="btn ghost sm" id="out" style="display:none">Sair da conta</button>
-      <input type="file" id="impFile" accept=".json" hidden>
+
+<!-- ================= LOGIN ================= -->
+<div id="view-login" class="hidden">
+  <div class="login-card">
+    <h1>Entrar no PEP</h1>
+    <p>Acesso restrito. Seus dados ficam na sua conta.</p>
+    <div id="cfg" class="cfg hidden"></div>
+    <div class="field"><label>E-mail</label><input id="li-email" class="f" type="email" autocomplete="username"></div>
+    <div class="field"><label>Senha</label><input id="li-pass" class="f" type="password" autocomplete="current-password"></div>
+    <button id="li-btn" class="btn primary block">Entrar</button>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div id="view-app" class="hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo"><span class="tile">+</span> PEP Clínico</div>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="pac-search" placeholder="Buscar paciente, CPF, CNS…" autocomplete="off">
+    </div>
+    <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
+    <div class="side-list" id="pac-list"></div>
+    <div class="side-foot">
+      <button class="btn ghost" id="btn-logout">Sair da conta</button>
     </div>
   </aside>
-  <main>
-    <div class="top">
-      <div><select id="unidade"><option>UBS Jardim Fictício – Itapevi</option><option>UBS Centro Fictício – Barueri</option></select></div>
-      <div class="demo">Protótipo com dados fictícios · não usar com pacientes reais</div>
-      <div class="who">Dr(a). Fernando · Clínica Médica</div>
+
+  <main class="main">
+    <div class="topbar">
+      <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
+      <span class="badge-proto">Protótipo · dados fictícios · não usar com pacientes reais</span>
+      <span class="who" id="who"></span>
     </div>
-    <div id="ficha"></div>
-    <div class="tabs" id="tabs"></div>
-    <div id="view"></div>
+    <div class="content"><div class="maxw" id="main-content"></div></div>
   </main>
 </div>
-<div id="print"></div>
-<div id="auth"><form id="aForm" class="card"><h3 style="font-size:20px">Entrar no PEP</h3><p style="color:var(--mut);margin:0">Acesso restrito. Seus dados ficam na sua conta.</p>
-  <label>E-mail</label><input id="aEmail" type="email" required autocomplete="username"><label>Senha</label><input id="aPass" type="password" required minlength="8" autocomplete="current-password">
-  <div id="aMsg" style="color:var(--bad);min-height:20px;margin-top:8px"></div>
-  <div class="bar"><button class="btn">Entrar</button></div></form></div>
-<dialog id="dlg"></dialog>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<div id="toast"></div>
-<input type="file" id="upFile" accept=".pdf,image/*" multiple hidden>
-<datalist id="dlCid"></datalist><datalist id="dlMed"></datalist><datalist id="dlExame"></datalist>
+
+<!-- ======= MODAL: Novo paciente ======= -->
+<div class="overlay" id="m-pac"><div class="modal">
+  <div class="mh"><span>Novo paciente</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="grid">
+      <div class="field" style="grid-column:1/-1"><label>Nome completo *</label><input id="np-nome" class="f" placeholder="Nome do paciente"></div>
+      <div class="field"><label>CPF</label><input id="np-cpf" class="f" placeholder="000.000.000-00"></div>
+      <div class="field"><label>CNS (Cartão SUS)</label><input id="np-cns" class="f" placeholder="000 0000 0000 0000"></div>
+      <div class="field"><label>Data de nascimento</label><input id="np-nasc" class="f" type="date"></div>
+      <div class="field"><label>Sexo</label><select id="np-sexo" class="f"><option value="">—</option><option>Feminino</option><option>Masculino</option></select></div>
+      <div class="field"><label>Nome da mãe</label><input id="np-mae" class="f"></div>
+      <div class="field"><label>Telefone</label><input id="np-tel" class="f" placeholder="(11) 90000-0000"></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="np-save">Salvar paciente</button></div>
+</div></div>
+
+<!-- ======= MODAL: Exame ======= -->
+<div class="overlay" id="m-exam"><div class="modal">
+  <div class="mh"><span>Solicitar exame</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Exames (busca na SIGTAP)</label>
+      <div class="ta"><input id="ex-search" class="f" placeholder="Digite: hemo, glicose, tsh, ultrassom…" autocomplete="off"><div class="ta-list" id="ex-list"></div></div>
+      <div class="chips" id="ex-chips"></div>
+    </div>
+    <div class="field"><label>CID 10 (opcional)</label><input id="ex-cid" class="f" placeholder="Ex.: E11"></div>
+    <div class="field"><label>Justificativa</label><textarea id="ex-just" class="f" placeholder="Justificativa do procedimento"></textarea></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="ex-add">Adicionar ao atendimento</button></div>
+</div></div>
+
+<!-- ======= MODAL: Prescrição ======= -->
+<div class="overlay" id="m-presc"><div class="modal">
+  <div class="mh"><span>Prescrição de medicamento</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Medicamento *</label><input id="pr-med" class="f" placeholder="Ex.: Losartana 50 mg"></div>
+    <div class="grid">
+      <div class="field"><label>Via</label><select id="pr-via" class="f"><option>Via oral</option><option>Sublingual</option><option>Intramuscular</option><option>Endovenosa</option><option>Tópica</option><option>Inalatória</option></select></div>
+      <div class="field"><label>Dose</label><input id="pr-dose" class="f" placeholder="1 comprimido"></div>
+      <div class="field"><label>Frequência</label><input id="pr-freq" class="f" placeholder="12/12h"></div>
+      <div class="field"><label>Duração</label><input id="pr-dur" class="f" placeholder="30 dias"></div>
+      <div class="field"><label>Quantidade</label><input id="pr-qtd" class="f" placeholder="60"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:500"><input type="checkbox" id="pr-cont" style="width:auto"> Uso contínuo</label>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pr-add">Adicionar à prescrição</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-"use strict";
-/* =============== constantes =============== */
-const KEY="pep-demo-v1";
-/* Supabase: preencha as duas linhas abaixo (Project Settings → API). Vazio = modo local (só para desenvolvimento). */
-const SUPABASE_URL="https://joygodczajayygjxerno.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpveWdvZGN6YWpheXlnanhlcm5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxODI5MjMsImV4cCI6MjEwODc1ODkyM30.D5WdaqV6k1oN19TTffLPQ1NQejBFu91p9nlT2kV51Rs";   // chave "anon public" (a service_role NUNCA entra aqui)
-const SB_ON=!!(SUPABASE_URL&&SUPABASE_ANON_KEY&&window.supabase);
-const sb=SB_ON?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
-let UID=null;
-const CID=[["I10","Hipertensão essencial"],["E11","Diabetes mellitus tipo 2"],["E78","Dislipidemia"],["J06","Infecção aguda de vias aéreas superiores"],["J45","Asma"],["M54","Dorsalgia"],["N39","Transtornos do trato urinário (ITU)"],["F32","Episódio depressivo"],["F41","Transtornos ansiosos"],["K29","Gastrite e duodenite"],["R51","Cefaleia"],["Z00","Exame médico geral"],["G30","Doença de Alzheimer"],["F03","Demência não especificada"],["E03","Hipotireoidismo"]];
-const MEDS=["Losartana 50 mg cp","Hidroclorotiazida 25 mg cp","Anlodipino 5 mg cp","Enalapril 10 mg cp","Metformina 850 mg cp","Glibenclamida 5 mg cp","Sinvastatina 20 mg cp","AAS 100 mg cp","Omeprazol 20 mg cp","Dipirona 500 mg cp","Paracetamol 500 mg cp","Ibuprofeno 600 mg cp","Amoxicilina 500 mg cp","Azitromicina 500 mg cp","Salbutamol spray 100 mcg","Sertralina 50 mg cp","Levotiroxina 50 mcg cp","Donepezila 5 mg cp","Memantina 10 mg cp","Insulina NPH 100 UI/mL"];
-const EXAMES=[["Hemograma completo","Laboratorial"],["Glicemia de jejum","Laboratorial"],["Hemoglobina glicada","Laboratorial"],["Colesterol total e frações","Laboratorial"],["Triglicerídeos","Laboratorial"],["Creatinina","Laboratorial"],["Ureia","Laboratorial"],["TSH","Laboratorial"],["Vitamina B12","Laboratorial"],["EAS (urina tipo 1)","Laboratorial"],["Urocultura","Laboratorial"],["TGO/TGP","Laboratorial"],["Raio-X de tórax PA e perfil","Imagem"],["Ecografia de abdome total","Imagem"],["Ecografia de tireoide","Imagem"],["Mamografia bilateral","Imagem"],["RM de crânio","Imagem"],["ECG","Imagem"]];
-const CARATER=["Eletivo","Urgência","Acidente de trabalho","Demanda espontânea","Retorno"];
-const STATUS_EX=["Solicitado","Coletado","Em análise","Resultado","Cancelado"];
-const STCOLOR={Solicitado:"warn",Coletado:"",["Em análise"]:"",Resultado:"ok",Cancelado:"bad"};
+// ===================== CONFIG =====================
+const SUPABASE_URL = "https://joygodczajayygikerno.supabase.co";
+// Publishable key (formato novo) — pública/segura no front-end; o RLS protege os dados.
+const SUPABASE_ANON_KEY = "sb_publishable_kk6ty_YczpR02xLJouj8EA_-oRjTsT6";
+// ==================================================
 
-/* =============== utilidades =============== */
-const uid=()=>Math.random().toString(36).slice(2,10);
-const $=s=>document.querySelector(s);
-const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const fdate=d=>d?new Date(d).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"";
-const fday=d=>d?new Date(d+"T12:00").toLocaleDateString("pt-BR"):"";
-const nowLocal=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
-const idade=n=>{if(!n)return"";const d=new Date(n),h=new Date();let a=h.getFullYear()-d.getFullYear();if(h<new Date(h.getFullYear(),d.getMonth(),d.getDate()))a--;return a};
-const fsize=n=>n>1048576?(n/1048576).toFixed(1)+" MB":Math.max(1,Math.round(n/1024))+" KB";
-const ICO={plus:"M12 5v14M5 12h14",print:"M6 9V3h12v6M6 18H4v-7h16v7h-2M6 14h12v7H6z",pen:"M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",trash:"M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14",clip:"M21 12l-9 9a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8",copy:"M9 9h11v11H9zM5 15V4h11",eye:"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",lock:"M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z",dl:"M12 3v12m0 0-4-4m4 4 4-4M4 21h16",check:"M20 6 9 17l-5-5",edit:"M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",home:"M3 11l9-8 9 8M5 10v10h14V10",doc:"M6 3h9l4 4v14H6zM14 3v5h5M9 13h6M9 17h6",pulse:"M3 12h4l3-8 4 16 3-8h4",pill:"M10.5 20.5a5 5 0 0 1-7-7l9-9a5 5 0 0 1 7 7zM8.5 8.5l7 7",flask:"M9 3h6M10 3v6L4 19a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-6-10V3M7 15h10"};
-const TABICO={Resumo:"home",Atendimentos:"doc","Evolução":"pulse","Prescrições":"pill",Exames:"flask"};
-const ic=n=>`<svg class="i" viewBox="0 0 24 24"><path d="${ICO[n]}"/></svg>`;
-const COLORS=["#3b82f6","#8b5cf6","#ec4899","#f59e0b","#10b981","#06b6d4","#ef4444"];
-const avatar=(p,cls="")=>{const ini=p.nome.replace(/\(.*\)/,"").trim().split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();const c=COLORS[[...p.id].reduce((a,x)=>a+x.charCodeAt(0),0)%COLORS.length];return `<div class="av ${cls}" style="background:${c}">${ini}</div>`};
-let tt;function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("on"),2600)}
+const $ = id => document.getElementById(id);
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const toast=(m,err=false)=>{const t=$('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2800);};
+function idade(d){ if(!d) return ''; const b=new Date(d), n=new Date(); let a=n.getFullYear()-b.getFullYear(); const mm=n.getMonth()-b.getMonth(); if(mm<0||(mm===0&&n.getDate()<b.getDate()))a--; return a+' anos'; }
+function dataBR(s){ if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 
-/* =============== armazenamento de arquivos (IndexedDB) =============== */
-const DB=new Promise((res,rej)=>{const r=indexedDB.open("pep-files",1);r.onupgradeneeded=()=>r.result.createObjectStore("f");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
-const idb=async(mode,fn)=>{const db=await DB;return new Promise((res,rej)=>{const rq=fn(db.transaction("f",mode).objectStore("f"));rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error)})};
-const bucket=()=>sb.storage.from("exames");
-const chk=r=>{if(r.error)throw r.error;return r};
-const fPut=async(id,blob)=>SB_ON?void chk(await bucket().upload(UID+"/"+id,blob,{upsert:true,contentType:blob.type||undefined})):idb("readwrite",s=>s.put(blob,id));
-const fGet=async id=>SB_ON?(await bucket().download(UID+"/"+id)).data:idb("readonly",s=>s.get(id));
-const fDel=async id=>SB_ON?void chk(await bucket().remove([UID+"/"+id])):idb("readwrite",s=>s.delete(id));
-const b64=blob=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(blob)});
+let sb=null, pacientes=[], pacienteSel=null, atendAtual=null;
+const examItens=[], prescItens=[];
 
-/* =============== dados =============== */
-function seed(){return {cur:"p1",pacs:[
- {id:"p1",nome:"Maria Aparecida da Silva (FICTÍCIA)",social:"",sexo:"F",nasc:"1948-03-14",raca:"Parda",cns:"700 0000 0000 0001",cpf:"000.000.000-01",pront:"10001",end:"Rua Exemplo, 100 – Itapevi/SP",tel:"(11) 90000-0001",equipe:"INE 0000001 – ESF Jardim Fictício",alergias:"Dipirona (urticária)",
-  aten:[{id:uid(),data:"2026-09-10T09:00",carater:"Eletivo",vit:{pa:"138/82",fc:"72",temp:"36,5",peso:"68",sat:"97"},S:"Queixa de esquecimentos há 1 ano. Filha refere perda de objetos e repetição de perguntas.",O:"MEEM 22/30.",A:"Comprometimento cognitivo – investigar.",P:"Solicitar exames de rastreio de causas reversíveis. Retorno em 30 dias.",cids:["F03 – Demência não especificada","I10 – Hipertensão essencial"],proc:"Consulta médica (03.01.01.007-2)",assinado:true,assinadoEm:"2026-09-10T09:40:00"}],
-  presc:[{id:uid(),data:"2026-09-10T09:30",itens:[{med:"Losartana 50 mg cp",dose:"1 comprimido",via:"VO",freq:"12/12h",dur:"uso contínuo"}],assinatura:null}],
-  exames:[{id:uid(),data:"2026-09-10T09:30",nome:"TSH",tipo:"Laboratorial",status:"Resultado",ind:"Investigação de declínio cognitivo",res:"2,1 mUI/L (normal)",anexos:[]},{id:uid(),data:"2026-09-10T09:30",nome:"Vitamina B12",tipo:"Laboratorial",status:"Solicitado",ind:"Investigação de declínio cognitivo",res:"",anexos:[]}]},
- {id:"p2",nome:"José Carlos Pereira (FICTÍCIO)",social:"",sexo:"M",nasc:"1975-11-02",raca:"Branca",cns:"700 0000 0000 0002",cpf:"000.000.000-02",pront:"10002",end:"Av. Modelo, 45 – Barueri/SP",tel:"(11) 90000-0002",equipe:"INE 0000002 – ESF Centro Fictício",alergias:"Nenhuma conhecida",aten:[],presc:[],exames:[]}]}}
-let S=SB_ON?{cur:null,pacs:[]}:(()=>{try{return JSON.parse(localStorage[KEY])}catch{return seed()}})();
-/* Persistência: cada paciente é uma linha da tabela "pacientes" (documento jsonb). Só o que mudou é enviado. */
-let synced=new Map(),syncTimer,syncQ=Promise.resolve();
-function save(){
-  if(!SB_ON){try{localStorage[KEY]=JSON.stringify(S)}catch{toast("Aviso: não foi possível salvar no navegador")}return}
-  try{localStorage["pep-cur"]=S.cur||""}catch{}
-  if(!UID)return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>{syncQ=syncQ.then(syncRemote)},400);
+// ---------- boot/auth ----------
+function show(v){ $('view-login').classList.toggle('hidden', v!=='login'); $('view-app').classList.toggle('hidden', v!=='app'); }
+function boot(){
+  if(!window.supabase||!window.supabase.createClient){ show('login'); toast('Falha ao carregar o Supabase',true); return; }
+  if(!SUPABASE_ANON_KEY||SUPABASE_ANON_KEY.startsWith('COLE_')){ show('login'); $('cfg').classList.remove('hidden'); $('cfg').textContent='Configure SUPABASE_URL e SUPABASE_ANON_KEY.'; $('li-btn').disabled=true; return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb.auth.getSession().then(({data})=> data.session?enter(data.session):show('login'));
+  sb.auth.onAuthStateChange((_e,s)=> s?enter(s):show('login'));
 }
-async function syncRemote(){
-  try{
-    const cur=new Map(S.pacs.map(p=>[p.id,JSON.stringify(p)]));
-    const up=S.pacs.filter(p=>synced.get(p.id)!==cur.get(p.id));
-    const del=[...synced.keys()].filter(id=>!cur.has(id));
-    if(up.length){chk(await sb.from("pacientes").upsert(up.map(p=>({owner_id:UID,id:p.id,nome:p.nome,dados:p,updated_at:new Date().toISOString()})),{onConflict:"owner_id,id"}));up.forEach(p=>synced.set(p.id,cur.get(p.id)))}
-    if(del.length){chk(await sb.from("pacientes").delete().in("id",del));del.forEach(id=>synced.delete(id))}
-  }catch(e){toast("Erro ao salvar no servidor: "+(e.message||e))}
+async function enter(session){ $('who').innerHTML='<b>'+esc(session.user.email||'Profissional')+'</b> · Clínica Médica'; show('app'); await carregarPacientes(); renderMain(); }
+$('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({email:$('li-email').value.trim(),password:$('li-pass').value}); if(error) toast(error.message,true); };
+$('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
+$('btn-logout').onclick=()=>{ pacienteSel=null; sb.auth.signOut(); };
+
+// ---------- pacientes ----------
+async function carregarPacientes(q){
+  let query = sb.from('pacientes').select('id,nome,cpf,cns,data_nascimento,sexo,nome_mae,telefone').order('nome',{ascending:true}).limit(200);
+  if(q) query = query.ilike('nome','%'+q+'%');
+  const {data,error}=await query;
+  if(error){ toast('Erro ao carregar pacientes: '+error.message,true); pacientes=[]; } else pacientes=data||[];
+  renderSideList();
 }
-async function loadRemote(){
-  const r=chk(await sb.from("pacientes").select("id,dados").order("created_at"));
-  S.pacs=r.data.map(x=>x.dados);synced=new Map(S.pacs.map(p=>[p.id,JSON.stringify(p)]));
-  let c="";try{c=localStorage["pep-cur"]}catch{}S.cur=S.pacs.some(p=>p.id===c)?c:S.pacs[0]?.id||null;
+function renderSideList(){
+  const box=$('pac-list'); box.innerHTML='';
+  if(!pacientes.length){ box.appendChild(el('div','muted','<div style="padding:10px">Nenhum paciente.</div>')); return; }
+  pacientes.forEach(p=>{
+    const b=el('button','side-item'+(pacienteSel&&pacienteSel.id===p.id?' active':''));
+    b.innerHTML='<span class="nm">'+esc(p.nome||'(sem nome)')+'</span><span class="mt">'+[idade(p.data_nascimento),p.cpf].filter(Boolean).map(esc).join(' · ')+'</span>';
+    b.onclick=()=>{ pacienteSel=p; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain(); };
+    box.appendChild(b);
+  });
 }
-const P=()=>S.pacs.find(p=>p.id===S.cur)||S.pacs[0];
-let tab="Resumo",filtroEx="";
-const TABS=["Resumo","Atendimentos","Evolução","Prescrições","Exames"];
+let searchTimer;
+$('pac-search').addEventListener('input',e=>{ clearTimeout(searchTimer); searchTimer=setTimeout(()=>carregarPacientes(e.target.value.trim()),250); });
 
-/* =============== assinatura eletrônica (ponto de integração) ===============
-   Para ligar um certificado em nuvem (ex.: VIDaaS, BirdID, SafeID, gov.br),
-   registre um provedor em Signer.providers com um método sign(hashHex, ctx)
-   que faça o fluxo OAuth/PSC do provedor e devolva {signature, signer, cert}.
-   O hash SHA-256 do conteúdo clínico é calculado aqui; o conteúdo assinado
-   fica travado (não editável) depois de assinado.                                */
-const Signer={providers:{demo:{label:"Simulado (demonstração)",async sign(hash){return{signature:"DEMO-"+hash.slice(0,24),signer:"Dr(a). Fernando (assinatura simulada)",cert:"Sem validade legal"}}}}};
-async function sha256(s){if(crypto&&crypto.subtle){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return("00000000"+(h>>>0).toString(16)).repeat(8)}
-const canon=(tipo,pac,obj)=>JSON.stringify({tipo,pac:{id:pac.id,nome:pac.nome,cns:pac.cns,cpf:pac.cpf},doc:obj});
-function signDialog(tipo,obj,done){
-  const pac=P();
-  modal(`<h3>Assinar eletronicamente</h3><p style="color:var(--mut);margin:0">O conteúdo será travado após a assinatura.</p>
-  <form><label>Provedor de certificado</label><select name="prov">${Object.entries(Signer.providers).map(([k,v])=>`<option value="${k}">${esc(v.label)}</option>`).join("")}</select>
-  <p style="color:var(--mut);font-size:12.5px">Os provedores de certificado em nuvem (ICP-Brasil) serão adicionados aqui. Por ora só a assinatura simulada, sem validade legal.</p>
-  <div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn ok">${ic("pen")} Assinar</button></div></form>`,
-  async f=>{const hash=await sha256(canon(tipo,pac,{...obj,assinatura:undefined}));
-    try{const r=await Signer.providers[f.prov].sign(hash,{tipo,pac});obj.assinatura={provider:f.prov,hash,em:new Date().toISOString(),...r};}
-    catch(e){toast("Falha na assinatura: "+e.message);return false}
-    toast("Documento assinado");if(done)done()});
-}
-const sigHtml=a=>a?`<div class="sigbox">${ic("lock")} Assinado por ${esc(a.signer)} em ${fdate(a.em)} · ${esc(a.cert||"")}<br>SHA-256: ${a.hash}</div>`:"";
-
-/* =============== modal =============== */
-function modal(html,onSubmit,wide){
-  const d=$("#dlg");d.className=wide?"wide":"";d.innerHTML=html;if(!d.open)d.showModal();
-  d.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>d.close());
-  const f=d.querySelector("form");
-  if(f)f.onsubmit=async e=>{e.preventDefault();try{const r=await onSubmit(Object.fromEntries(new FormData(f)),f);if(r===false)return;d.close();render()}catch(err){toast("Erro: "+(err.message||err))}};
-}
-const confirmDlg=(msg,ok)=>modal(`<h3>Confirmar</h3><p>${msg}</p><form><div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn danger">Confirmar</button></div></form>`,()=>ok());
-
-/* =============== render =============== */
-$("#dlCid").innerHTML=CID.map(([c,d])=>`<option value="${c} – ${d}">`).join("");
-$("#dlMed").innerHTML=MEDS.map(m=>`<option value="${m}">`).join("");
-$("#dlExame").innerHTML=EXAMES.map(e=>`<option value="${e[0]}">`).join("");
-
-function render(){
-  save();
-  $("#pname").textContent=P()?P().nome.replace(/\(.*\)/,"").trim():"Nenhum paciente";
-  if(!S.pacs.length){$("#ficha").innerHTML='<div class="card empty">Nenhum paciente. Clique em “Novo paciente”.</div>';$("#tabs").innerHTML="";$("#view").innerHTML="";$("#plist").innerHTML="";return}
-  const q=$("#q").value.toLowerCase().trim();
-  $("#plist").innerHTML=S.pacs.filter(p=>!q||(p.nome+p.cpf+p.cns+p.pront).toLowerCase().includes(q)).map(p=>{
-    const last=[...p.aten].sort((a,b)=>b.data.localeCompare(a.data))[0];
-    return `<div class="pi ${p.id===S.cur?"on":""}" data-act="sel" data-id="${p.id}">${avatar(p)}<div><b>${esc(p.nome.replace(/\(.*\)/,"").trim())}</b><small>${idade(p.nasc)} anos · ${last?"últ. "+new Date(last.data).toLocaleDateString("pt-BR"):"sem atendimento"}</small></div></div>`}).join("")||'<div style="color:#8ea0bd;padding:8px">Nenhum resultado</div>';
-  const p=P();
-  $("#ficha").innerHTML=`<div class="card"><div class="phead">${avatar(p)}<div style="flex:1;min-width:240px">
-    <h2>${esc(p.nome)} <button class="btn ghost sm" data-act="editPac" title="Editar cadastro">${ic("edit")} Editar</button></h2>
-    <div class="meta"><span><b>${p.sexo==="F"?"Feminino":"Masculino"}</b>, ${idade(p.nasc)} anos (${fday(p.nasc)})</span><span>Prontuário <b>${esc(p.pront)}</b></span><span>CNS <b>${esc(p.cns)}</b></span><span>CPF <b>${esc(p.cpf)}</b></span><span>${esc(p.tel)}</span></div>
-    <div class="meta"><span>${esc(p.end)}</span><span>${esc(p.equipe)}</span></div>
-    ${p.alergias&&!/^nenhuma/i.test(p.alergias)?`<div class="alert">⚠ Alergias: ${esc(p.alergias)}</div>`:`<div class="meta"><span>Alergias: <b>${esc(p.alergias||"não informado")}</b></span></div>`}
-  </div></div></div>`;
-  $("#tabs").innerHTML=TABS.map(t=>`<button class="${t===tab?"on":""}" data-act="tab" data-id="${t}">${ic(TABICO[t])}<span>${t}</span></button>`).join("");
-  $("#view").innerHTML=({Resumo:vResumo,Atendimentos:vAten,"Evolução":vEvol,"Prescrições":vPresc,Exames:vEx})[tab]();
-}
-
-/* ---- resumo ---- */
-function vResumo(){
-  const p=P();const pend=p.exames.filter(e=>e.status==="Solicitado"||e.status==="Coletado"||e.status==="Em análise");
-  const lastP=[...p.presc].sort((a,b)=>b.data.localeCompare(a.data))[0];
-  const lastA=[...p.aten].sort((a,b)=>b.data.localeCompare(a.data))[0];
-  return `<div class="stats"><div class="stat"><b>${p.aten.length}</b><span>Atendimentos</span></div><div class="stat"><b>${p.presc.length}</b><span>Prescrições</span></div><div class="stat"><b>${pend.length}</b><span>Exames pendentes</span></div><div class="stat"><b>${p.exames.reduce((n,e)=>n+(e.anexos||[]).length,0)}</b><span>Arquivos anexados</span></div></div>
-  <div class="qa"><button class="btn" data-act="novoAten">${ic("plus")} Novo atendimento</button><button class="btn soft" data-act="novaPresc">${ic("plus")} Prescrever</button><button class="btn soft" data-act="novoEx">${ic("plus")} Solicitar exames</button><button class="btn soft" data-act="anexoAvulso">${ic("clip")} Anexar resultado</button></div>
-  <div class="two"><div class="card"><h3>Último atendimento</h3>${lastA?atenHtml(lastA,false):'<div class="empty">Sem registros</div>'}</div>
-  <div class="card"><h3>Última prescrição</h3>${lastP?`<table>${lastP.itens.map(i=>`<tr><td><b>${esc(i.med)}</b><br><small style="color:var(--mut)">${esc(i.dose)} · ${esc(i.via)} · ${esc(i.freq)} · ${esc(i.dur)}</small></td></tr>`).join("")}</table><small style="color:var(--mut)">${fdate(lastP.data)} ${lastP.assinatura?"· assinada":"· sem assinatura"}</small>`:'<div class="empty">Sem prescrições</div>'}
-  <h3 style="margin-top:18px">Exames pendentes</h3>${pend.length?pend.map(e=>`<div>${esc(e.nome)} <span class="chip ${STCOLOR[e.status]}">${e.status}</span></div>`).join(""):'<div style="color:var(--mut)">Nenhum</div>'}</div></div>`;
-}
-
-/* ---- atendimentos ---- */
-const atenHtml=(a,full=true)=>{const v=a.vit||{};const vit=[["PA",v.pa,""],["FC",v.fc,"bpm"],["T",v.temp,"°C"],["Peso",v.peso,"kg"],["SpO₂",v.sat,"%"]].filter(x=>x[1]);
-  return `<div class="item"><div class="h"><div><b>${fdate(a.data)}</b> · ${esc(a.carater)} ${a.assinado?'<span class="chip ok">'+ic("lock")+' Assinado</span>':'<span class="chip warn">Rascunho</span>'}</div>
-  ${full?`<div class="acts">${a.assinado?"":`<button class="btn sm ok" data-act="signAten" data-id="${a.id}">${ic("pen")} Assinar</button><button class="btn sm ghost" data-act="editAten" data-id="${a.id}">${ic("edit")} Editar</button><button class="btn sm danger" data-act="delAten" data-id="${a.id}">${ic("trash")}</button>`}</div>`:""}</div>
-  ${vit.length?`<p style="color:var(--mut)">${vit.map(x=>`${x[0]} <b style="color:var(--ink)">${esc(x[1])}${x[2]}</b>`).join(" · ")}</p>`:""}
-  ${["S","O","A","P"].filter(k=>a[k]).map(k=>`<p><b>${{S:"Subjetivo",O:"Objetivo",A:"Avaliação",P:"Plano"}[k]}:</b> ${esc(a[k])}</p>`).join("")}
-  ${a.cids.length?`<p>${a.cids.map(c=>`<span class="chip">${esc(c)}</span>`).join(" ")}</p>`:""}
-  ${a.proc&&full?`<p style="color:var(--mut)">Procedimento: ${esc(a.proc)}</p>`:""}${a.assinado&&a.assinatura?sigHtml(a.assinatura):""}</div>`};
-function vAten(){const p=P();const l=[...p.aten].sort((a,b)=>b.data.localeCompare(a.data));
-  return `<div class="card"><div class="head"><h3>Atendimentos</h3><button class="btn" data-act="novoAten">${ic("plus")} Novo atendimento</button></div>${l.length?l.map(a=>atenHtml(a)).join(""):'<div class="empty">Nenhum atendimento registrado.</div>'}</div>`}
-function vEvol(){const p=P();const l=[...p.aten].sort((a,b)=>b.data.localeCompare(a.data));
-  return `<div class="card"><h3>Evolução</h3>${l.length?`<div class="timeline">${l.map(a=>atenHtml(a,false)).join("")}</div>`:'<div class="empty">Sem evolução registrada.</div>'}</div>`}
-
-function formAten(id){
-  const ex=id?P().aten.find(a=>a.id===id):null;const cids=[...(ex?.cids||[])];const v=ex?.vit||{};
-  modal(`<h3>${ex?"Editar":"Novo"} atendimento</h3><form>
-  <div class="row"><div><label>Data/hora</label><div class="row"><input type="datetime-local" name="data" id="dt" value="${ex?.data||nowLocal()}"><button type="button" class="btn ghost sm fix" id="agora">Agora</button></div></div>
-  <div><label>Caráter</label><select name="carater">${CARATER.map(c=>`<option ${ex?.carater===c?"selected":""}>${c}</option>`).join("")}</select></div></div>
-  <div class="row"><div><label>PA</label><input name="pa" placeholder="120/80" value="${esc(v.pa)}"></div><div><label>FC (bpm)</label><input name="fc" value="${esc(v.fc)}"></div><div><label>Temp (°C)</label><input name="temp" value="${esc(v.temp)}"></div><div><label>Peso (kg)</label><input name="peso" value="${esc(v.peso)}"></div><div><label>SpO₂ (%)</label><input name="sat" value="${esc(v.sat)}"></div></div>
-  <label>Subjetivo (queixa, HDA)</label><textarea name="S">${esc(ex?.S)}</textarea>
-  <label>Objetivo (exame físico)</label><textarea name="O">${esc(ex?.O)}</textarea>
-  <label>Avaliação</label><textarea name="A">${esc(ex?.A)}</textarea>
-  <label>Plano / conduta</label><textarea name="P">${esc(ex?.P)}</textarea>
-  <label>Diagnósticos (CID-10)</label><div class="row"><input id="cidIn" list="dlCid" placeholder="Buscar CID…"><button type="button" class="btn soft sm fix" id="addCid">Adicionar</button></div>
-  <div id="cidList" style="margin-top:8px"></div>
-  <label>Procedimento</label><input name="proc" value="${esc(ex?.proc??"Consulta médica (03.01.01.007-2)")}">
-  <div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn">Salvar rascunho</button></div></form>`,
-  f=>{if(!(f.S||f.O||f.A||f.P)){toast("Preencha ao menos um campo clínico");return false}
-    const o={data:f.data,carater:f.carater,vit:{pa:f.pa,fc:f.fc,temp:f.temp,peso:f.peso,sat:f.sat},S:f.S,O:f.O,A:f.A,P:f.P,cids:[...cids],proc:f.proc};
-    if(ex)Object.assign(ex,o);else P().aten.push({id:uid(),assinado:false,...o});tab="Atendimentos";toast("Atendimento salvo")},true);
-  const draw=()=>$("#cidList").innerHTML=cids.map((c,i)=>`<span class="chip">${esc(c)} <a href="#" data-i="${i}" style="color:inherit;text-decoration:none">✕</a></span> `).join("");draw();
-  $("#agora").onclick=()=>$("#dt").value=nowLocal();
-  $("#addCid").onclick=()=>{const x=$("#cidIn").value.trim();if(x){cids.push(x);$("#cidIn").value="";draw()}};
-  $("#cidList").onclick=e=>{e.preventDefault();if(e.target.dataset.i){cids.splice(+e.target.dataset.i,1);draw()}};
-}
-
-/* ---- prescrições ---- */
-function vPresc(){const p=P();const l=[...p.presc].sort((a,b)=>b.data.localeCompare(a.data));
-  return `<div class="card"><div class="head"><h3>Prescrições</h3><button class="btn" data-act="novaPresc">${ic("plus")} Nova prescrição</button></div>
-  ${l.length?l.map(r=>`<div class="item"><div class="h"><div><b>${fdate(r.data)}</b> ${r.assinatura?'<span class="chip ok">'+ic("lock")+' Assinada</span>':'<span class="chip warn">Sem assinatura</span>'}</div>
-   <div class="acts">${r.assinatura?"":`<button class="btn sm ok" data-act="signPresc" data-id="${r.id}">${ic("pen")} Assinar</button>`}<button class="btn sm ghost" data-act="printPresc" data-id="${r.id}">${ic("print")} Imprimir</button><button class="btn sm ghost" data-act="repPresc" data-id="${r.id}">${ic("copy")} Repetir</button>${r.assinatura?"":`<button class="btn sm danger" data-act="delPresc" data-id="${r.id}">${ic("trash")}</button>`}</div></div>
-   <table>${r.itens.map((i,n)=>`<tr><td style="width:28px;color:var(--mut)">${n+1}.</td><td><b>${esc(i.med)}</b><br><small style="color:var(--mut)">${esc(i.dose)} · ${esc(i.via)} · ${esc(i.freq)} · ${esc(i.dur)}</small></td><td style="text-align:right">${r.assinatura?'<span class="chip ok">'+ic("check")+'</span>':""}</td></tr>`).join("")}</table>${sigHtml(r.assinatura)}</div>`).join(""):'<div class="empty">Nenhuma prescrição.</div>'}</div>`}
-
-function formPresc(base=[]){
-  const itens=base.map(i=>({...i}));
-  modal(`<h3>Nova prescrição</h3>${P().alergias&&!/^nenhuma/i.test(P().alergias)?`<div class="alert">⚠ Alergias: ${esc(P().alergias)}</div>`:""}
-  <form><div class="row"><div style="flex:2"><label>Medicamento</label><input id="m" list="dlMed" placeholder="Digite para buscar"></div><div><label>Dose</label><input id="d" placeholder="1 cp"></div></div>
-  <div class="row"><div><label>Via</label><select id="v"><option>VO</option><option>IM</option><option>EV</option><option>SC</option><option>Inalatória</option><option>Tópica</option></select></div><div><label>Frequência</label><input id="fq" placeholder="8/8h"></div><div><label>Duração</label><input id="du" placeholder="7 dias"></div><button type="button" class="btn soft fix" id="add">${ic("plus")} Item</button></div>
-  <div id="lst" style="margin-top:14px"></div>
-  <label style="display:flex;gap:8px;align-items:center;margin-top:14px"><input type="checkbox" name="sig"> Assinar ao salvar</label>
-  <div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn">Salvar prescrição</button></div></form>`,
-  f=>{if(!itens.length){toast("Adicione ao menos um item");return false}
-    const r={id:uid(),data:new Date().toISOString(),itens,assinatura:null};P().presc.push(r);tab="Prescrições";toast("Prescrição salva");
-    if(f.sig)setTimeout(()=>signDialog("prescricao",r,render),50)},true);
-  const draw=()=>$("#lst").innerHTML=itens.length?`<table>${itens.map((i,n)=>`<tr><td><b>${esc(i.med)}</b><br><small style="color:var(--mut)">${esc(i.dose)} · ${esc(i.via)} · ${esc(i.freq)} · ${esc(i.dur)}</small></td><td style="text-align:right"><a href="#" data-n="${n}" style="color:var(--bad)">remover</a></td></tr>`).join("")}</table>`:'<div style="color:var(--mut)">Nenhum item adicionado.</div>';draw();
-  $("#add").onclick=()=>{const med=$("#m").value.trim();if(!med)return;
-    const al=(P().alergias||"").toLowerCase().split(/[,;]/).map(s=>s.trim().split(" ")[0]).filter(s=>s.length>3&&!s.startsWith("nenhum"));
-    if(al.some(a=>med.toLowerCase().includes(a))&&!window.confirm("Possível conflito com alergia registrada. Adicionar mesmo assim?"))return;
-    itens.push({med,dose:$("#d").value,via:$("#v").value,freq:$("#fq").value,dur:$("#du").value||"uso contínuo"});["m","d","fq","du"].forEach(i=>$("#"+i).value="");draw();$("#m").focus()};
-  $("#lst").onclick=e=>{e.preventDefault();if(e.target.dataset.n){itens.splice(+e.target.dataset.n,1);draw()}};
-}
-
-/* ---- exames ---- */
-function vEx(){
-  const p=P();const l=p.exames.filter(e=>!filtroEx||e.status===filtroEx).sort((a,b)=>b.data.localeCompare(a.data));
-  return `<div class="card"><div class="head"><h3>Exames</h3><div class="row"><select id="fx" style="width:auto"><option value="">Todos os status</option>${STATUS_EX.map(s=>`<option ${s===filtroEx?"selected":""}>${s}</option>`).join("")}</select>
-  <button class="btn ghost" data-act="printEx">${ic("print")} Imprimir pedido</button><button class="btn soft" data-act="anexoAvulso">${ic("clip")} Anexar resultado</button><button class="btn" data-act="novoEx">${ic("plus")} Solicitar</button></div></div>
-  ${l.length?l.map(e=>`<div class="item"><div class="h"><div><b>${esc(e.nome)}</b> <span class="chip">${e.tipo}</span> <small style="color:var(--mut)">${fdate(e.data)}</small></div>
-   <div class="acts"><select data-act="stEx" data-id="${e.id}" style="width:auto;padding:4px 8px">${STATUS_EX.map(s=>`<option ${s===e.status?"selected":""}>${s}</option>`).join("")}</select><button class="btn sm soft" data-act="upEx" data-id="${e.id}">${ic("clip")} Anexar</button><button class="btn sm danger" data-act="delEx" data-id="${e.id}">${ic("trash")}</button></div></div>
-   ${e.ind?`<p style="color:var(--mut)">Indicação: ${esc(e.ind)}</p>`:""}
-   <div class="row" style="margin-top:6px"><input data-act="resEx" data-id="${e.id}" value="${esc(e.res)}" placeholder="Resultado / observações (texto)"></div>
-   <div style="margin-top:6px">${(e.anexos||[]).map(a=>`<span class="file">${ic("clip")} <a data-act="openF" data-id="${a.id}" data-n="${esc(a.nome)}">${esc(a.nome)}</a> <small>${fsize(a.size)}</small> <a data-act="dlF" data-id="${a.id}" data-n="${esc(a.nome)}" title="Baixar">${ic("dl")}</a> <a data-act="delF" data-id="${e.id}" data-f="${a.id}" title="Remover">✕</a></span>`).join("")}</div></div>`).join(""):'<div class="empty">Nenhum exame.</div>'}</div>`}
-
-function formEx(){
-  const extra=[];
-  modal(`<h3>Solicitar exames</h3><form><label>Indicação clínica</label><input name="ind" required placeholder="Hipótese / motivo">
-  <label>Buscar exame</label><div class="row"><input id="ex" list="dlExame" placeholder="Digite o nome"><button type="button" class="btn soft sm fix" id="addEx">Adicionar</button></div>
-  <div id="extra" style="margin-top:8px"></div>
-  <label>Ou marque rapidamente</label><div style="columns:2;gap:16px">${EXAMES.map(e=>`<label style="color:var(--ink);font-size:13px;font-weight:400;margin:3px 0;display:flex;gap:6px;align-items:center"><input type="checkbox" name="ck" value="${esc(e[0])}"> ${e[0]}</label>`).join("")}</div>
-  <div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn">Solicitar</button></div></form>`,
-  (f,form)=>{const sel=new Set([...form.querySelectorAll("[name=ck]:checked")].map(c=>c.value));extra.forEach(x=>sel.add(x));
-    if(!sel.size){toast("Selecione ao menos um exame");return false}
-    const now=new Date().toISOString();sel.forEach(n=>P().exames.push({id:uid(),data:now,nome:n,tipo:(EXAMES.find(e=>e[0]===n)||[0,"Laboratorial"])[1],status:"Solicitado",ind:f.ind,res:"",anexos:[]}));tab="Exames";toast(sel.size+" exame(s) solicitado(s)")},true);
-  $("#addEx").onclick=()=>{const v=$("#ex").value.trim();if(!v)return;const c=[...document.querySelectorAll("[name=ck]")].find(c=>c.value===v);if(c)c.checked=true;else{extra.push(v);$("#extra").innerHTML=extra.map(x=>`<span class="chip">${esc(x)}</span> `).join("")}$("#ex").value=""};
-}
-function formAvulso(){
-  modal(`<h3>Anexar resultado de exame</h3><p style="color:var(--mut);margin:0">Guarda PDF/imagem de um exame já realizado.</p><form>
-  <label>Nome do exame</label><input name="nome" list="dlExame" required><div class="row"><div><label>Data de realização</label><input type="date" name="dia" value="${nowLocal().slice(0,10)}"></div><div><label>Tipo</label><select name="tipo"><option>Laboratorial</option><option>Imagem</option></select></div></div>
-  <label>Resultado / observações</label><textarea name="res"></textarea><label>Arquivo(s) (PDF, JPG, PNG)</label><input type="file" name="arq" accept=".pdf,image/*" multiple>
-  <div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn">Salvar</button></div></form>`,
-  async (f,form)=>{const files=[...form.arq.files];const e={id:uid(),data:f.dia+"T12:00",nome:f.nome,tipo:f.tipo,status:"Resultado",ind:"",res:f.res,anexos:[]};
-    for(const fl of files)e.anexos.push(await addFile(fl));P().exames.push(e);tab="Exames";toast("Resultado guardado")});
-}
-async function addFile(fl){const id=uid();await fPut(id,fl);return{id,nome:fl.name,size:fl.size,mime:fl.type}}
-async function getUrl(id){const b=await fGet(id);return b?URL.createObjectURL(b):null}
-
-/* =============== impressão =============== */
-function imprimir(tipo,id){
-  const p=P();const cab=`<h2>${tipo==="presc"?"Receituário":"Solicitação de exames"}</h2><div>${$("#unidade").value}</div><p><b>${esc(p.nome)}</b> · ${idade(p.nasc)} anos · CNS ${esc(p.cns)} · CPF ${esc(p.cpf)}</p><hr>`;
-  let corpo,ass="";
-  if(tipo==="presc"){const r=p.presc.find(x=>x.id===id);corpo=`<ol>${r.itens.map(i=>`<li style="margin-bottom:10px"><b>${esc(i.med)}</b><br>${esc(i.dose)} · ${esc(i.via)} · ${esc(i.freq)} · ${esc(i.dur)}</li>`).join("")}</ol><p>${fdate(r.data)}</p>`;
-    if(r.assinatura)ass=`Assinado eletronicamente por ${esc(r.assinatura.signer)} em ${fdate(r.assinatura.em)}<br>Certificado: ${esc(r.assinatura.cert||"")}<br>SHA-256: ${r.assinatura.hash}`}
-  else{const l=p.exames.filter(e=>e.status==="Solicitado");if(!l.length){toast("Não há exames com status “Solicitado”");return}
-    corpo=`<ul>${l.map(e=>`<li>${esc(e.nome)} <small>(${e.tipo})</small></li>`).join("")}</ul><p><b>Indicação:</b> ${esc([...new Set(l.map(e=>e.ind))].join("; "))}</p><p>${fdate(new Date().toISOString())}</p>`}
-  $("#print").innerHTML=cab+corpo+`<div class="sig">${ass||"Dr(a). Fernando – CRM/SP 000000 (fictício) – sem assinatura eletrônica"}</div>`;
-  window.print();
-}
-
-/* =============== ações (delegação) =============== */
-function formPac(id){
-  const ex=id?S.pacs.find(p=>p.id===id):{};const F=(n,l,t="text",x="")=>`<div><label>${l}</label><input type="${t}" name="${n}" value="${esc(ex[n]??"")}" ${x}></div>`;
-  modal(`<h3>${id?"Editar cadastro":"Novo paciente"}</h3><p style="color:var(--mut);margin:0">Use apenas dados fictícios.</p><form>
-  <div class="row">${F("nome","Nome completo","text","required")}${F("social","Nome social")}</div>
-  <div class="row"><div><label>Sexo</label><select name="sexo"><option value="F" ${ex.sexo==="F"?"selected":""}>Feminino</option><option value="M" ${ex.sexo==="M"?"selected":""}>Masculino</option></select></div>${F("nasc","Nascimento","date","required")}${F("raca","Raça/cor")}</div>
-  <div class="row">${F("cns","CNS")}${F("cpf","CPF")}${F("tel","Telefone")}</div>${F("end","Endereço")}${F("equipe","Equipe / INE")}${F("alergias","Alergias")}
-  <div class="bar"><button type="button" class="btn ghost" data-close>Cancelar</button><button class="btn">Salvar</button></div></form>`,
-  f=>{if(id)Object.assign(ex,f);else{const n=uid();S.pacs.push({id:n,pront:String(10001+S.pacs.length),aten:[],presc:[],exames:[],alergias:"Nenhuma conhecida",...f});S.cur=n;tab="Resumo"}toast("Cadastro salvo")},true);
-}
-async function removeAllFiles(list){for(const e of list)for(const a of e.anexos||[])await fDel(a.id)}
-const A={
-  sel(id){S.cur=id;render()},tab(id){tab=id;render()},
-  editPac(){formPac(S.cur)},
-  novoAten(){formAten()},editAten(id){formAten(id)},
-  signAten(id){const a=P().aten.find(x=>x.id===id);signDialog("atendimento",a,()=>{a.assinado=true;a.assinadoEm=a.assinatura.em;render()})},
-  delAten(id){confirmDlg("Excluir este rascunho de atendimento?",()=>{P().aten=P().aten.filter(a=>a.id!==id)})},
-  novaPresc(){formPresc()},
-  repPresc(id){formPresc(P().presc.find(r=>r.id===id).itens)},
-  signPresc(id){const r=P().presc.find(x=>x.id===id);signDialog("prescricao",r,render)},
-  printPresc(id){imprimir("presc",id)},
-  delPresc(id){confirmDlg("Excluir esta prescrição?",()=>{P().presc=P().presc.filter(r=>r.id!==id)})},
-  novoEx(){formEx()},anexoAvulso(){formAvulso()},printEx(){imprimir("ex")},
-  delEx(id){confirmDlg("Excluir este exame e seus arquivos?",async()=>{const e=P().exames.find(x=>x.id===id);await removeAllFiles([e]);P().exames=P().exames.filter(x=>x.id!==id)})},
-  upEx(id){const u=$("#upFile");u.value="";u.onchange=async()=>{const e=P().exames.find(x=>x.id===id);for(const f of u.files)(e.anexos=e.anexos||[]).push(await addFile(f));if(e.status==="Solicitado"||e.status==="Coletado"||e.status==="Em análise")e.status="Resultado";toast("Arquivo guardado");render()};u.click()},
-  async openF(id){const u=await getUrl(id);u?window.open(u,"_blank"):toast("Arquivo não encontrado")},
-  async dlF(id,el){const u=await getUrl(id);if(!u)return toast("Arquivo não encontrado");const a=document.createElement("a");a.href=u;a.download=el.dataset.n;a.click()},
-  delF(id,el){confirmDlg("Remover este arquivo?",async()=>{const e=P().exames.find(x=>x.id===id);await fDel(el.dataset.f);e.anexos=e.anexos.filter(a=>a.id!==el.dataset.f)})}
+// Novo paciente
+$('btn-novo-pac').onclick=()=> openM('m-pac');
+$('np-save').onclick=async()=>{
+  const nome=$('np-nome').value.trim(); if(!nome){ toast('Informe o nome',true); return; }
+  const rec={ nome, cpf:$('np-cpf').value.trim()||null, cns:$('np-cns').value.trim()||null,
+    data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null, nome_mae:$('np-mae').value.trim()||null, telefone:$('np-tel').value.trim()||null };
+  const {data,error}=await sb.from('pacientes').insert(rec).select().single();
+  if(error){ toast('Erro ao salvar: '+error.message,true); return; }
+  ['np-nome','np-cpf','np-cns','np-nasc','np-mae','np-tel'].forEach(i=>$(i).value=''); $('np-sexo').value='';
+  closeM('m-pac'); toast('Paciente cadastrado ✓');
+  await carregarPacientes(); pacienteSel=data; atendAtual=null; renderSideList(); renderMain();
 };
-document.addEventListener("click",e=>{const t=e.target.closest("[data-act]");if(!t||t.tagName==="SELECT"||t.tagName==="INPUT")return;e.preventDefault();A[t.dataset.act]?.(t.dataset.id,t)});
-document.addEventListener("change",e=>{const t=e.target;if(t.id==="fx"){filtroEx=t.value;render();return}
-  if(t.dataset.act==="stEx"){P().exames.find(x=>x.id===t.dataset.id).status=t.value;render()}
-  if(t.dataset.act==="resEx"){const x=P().exames.find(x=>x.id===t.dataset.id);x.res=t.value;if(t.value&&x.status==="Solicitado")x.status="Resultado";render()}});
-$("#novoPac").onclick=()=>formPac();
-/* menu lateral (celular) */
-const menu=o=>document.body.classList.toggle("menu",o);
-$("#menuBtn").onclick=()=>menu(true);$("#scrim").onclick=()=>menu(false);$("#menuClose").onclick=()=>menu(false);
-document.querySelector("aside").addEventListener("click",e=>{if(e.target.closest(".pi,.sidefoot button,#novoPac"))menu(false)});
-$("#q").oninput=render;
-$("#reset").onclick=()=>confirmDlg("Restaurar dados de demonstração? Todos os pacientes e arquivos serão apagados.",async()=>{const db=await DB;db.transaction("f","readwrite").objectStore("f").clear();S=seed();tab="Resumo"});
 
-/* backup */
-$("#exp").onclick=async()=>{const files={};for(const p of S.pacs)for(const e of p.exames)for(const a of e.anexos||[]){const b=await fGet(a.id);if(b)files[a.id]=await b64(b)}
-  const blob=new Blob([JSON.stringify({versao:1,exportadoEm:new Date().toISOString(),S,files})],{type:"application/json"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="backup-pep-"+new Date().toISOString().slice(0,10)+".json";a.click();toast("Backup exportado")};
-$("#imp").onclick=()=>$("#impFile").click();
-$("#impFile").onchange=async e=>{const f=e.target.files[0];if(!f)return;
-  try{const d=JSON.parse(await f.text());if(!d.S?.pacs)throw 0;
-    confirmDlg("Importar substitui todos os dados atuais. Continuar?",async()=>{for(const [id,u] of Object.entries(d.files||{}))await fPut(id,await (await fetch(u)).blob());S=d.S;tab="Resumo";toast("Backup importado")})}
-  catch{toast("Arquivo de backup inválido")}e.target.value=""};
-/* =============== login (Supabase) e inicialização =============== */
-const cred=()=>({email:$("#aEmail").value.trim(),password:$("#aPass").value});
-async function enter(user){UID=user.id;$("#auth").style.display="none";$("#out").style.display="";try{await loadRemote()}catch(e){toast("Erro ao carregar: "+(e.message||e))}render()}
-$("#aForm").onsubmit=async e=>{e.preventDefault();const {data,error}=await sb.auth.signInWithPassword(cred());if(error)return void($("#aMsg").textContent=error.message);enter(data.user)};
-$("#out").onclick=async()=>{await sb.auth.signOut();location.reload()};
-/* Com Supabase configurado, o app NUNCA cai para o modo local: sem a biblioteca ou sem conexão, trava com erro. */
-function lockApp(msg){const a=$("#auth");a.innerHTML=`<div class="card" style="width:min(440px,100%)"><h3 style="font-size:20px;color:var(--bad)">Não foi possível iniciar o sistema</h3><p>${msg}</p><p style="color:var(--mut)">Verifique sua conexão com a internet e recarregue a página. Nenhum dado é exibido sem login.</p><div class="bar"><button class="btn" onclick="location.reload()">Recarregar</button></div></div>`;a.style.display="grid"}
-(async function boot(){
-  if(SUPABASE_URL&&SUPABASE_ANON_KEY&&!window.supabase){lockApp("A biblioteca de autenticação (Supabase) não carregou.");return}
-  if(!SB_ON){render();return}
-  $("#reset").style.display="none";
-  try{const {data,error}=await sb.auth.getSession();if(error)throw error;
-    if(data.session)enter(data.session.user);else $("#auth").style.display="grid"}
-  catch(e){lockApp("Falha ao verificar a sessão: "+esc(e.message||e))}
-})();
+// ---------- render principal ----------
+function renderMain(){
+  const c=$('main-content'); c.innerHTML='';
+  if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
+  if(atendAtual){ renderAtendimento(c); return; }
+  renderFichaPaciente(c);
+}
+
+async function renderFichaPaciente(c){
+  const p=pacienteSel;
+  const head=el('div','phead');
+  const ini=(p.nome||'?').trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
+  head.innerHTML='<div class="avatar">'+esc(ini)+'</div><div><div class="nm">'+esc(p.nome)+'</div>'+
+    '<div class="mt">'+[p.sexo,idade(p.data_nascimento),p.cpf?('CPF '+esc(p.cpf)):''].filter(Boolean).map(esc).join(' · ')+'</div></div>'+
+    '<div class="sp"></div>';
+  const bNovo=el('button','btn primary','+ Novo atendimento'); bNovo.onclick=novoAtendimento; head.appendChild(bNovo);
+  c.appendChild(head);
+
+  c.appendChild(el('div','sec-title','Atendimentos'));
+  const card=el('div','card'); c.appendChild(card);
+  const {data,error}=await sb.from('atendimentos').select('id,data_atendimento,tipo_atendimento,subjetivo').eq('paciente_id',p.id).order('data_atendimento',{ascending:false});
+  if(error){ card.appendChild(el('div','',' <div style="padding:16px" class="muted">Erro: '+esc(error.message)+'</div>')); return; }
+  if(!data||!data.length){ card.appendChild(el('div','',' <div style="padding:22px;text-align:center" class="muted">Nenhum atendimento ainda.</div>')); return; }
+  const tipos={no_dia:'Consulta no dia',agendada:'Consulta agendada',cuidado_continuado:'Cuidado continuado',urgencia:'Urgência'};
+  data.forEach(a=>{
+    const r=el('div','atd-row');
+    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a.subjetivo||'').slice(0,90)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span>';
+    card.appendChild(r);
+  });
+}
+
+// ---------- atendimento (SOAP) ----------
+function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; renderMain(); }
+function renderAtendimento(c){
+  const p=pacienteSel;
+  const head=el('div','phead');
+  head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">Novo atendimento · '+[p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
+  const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
+  c.appendChild(head);
+
+  c.insertAdjacentHTML('beforeend', `
+   <div class="soap">
+    <div class="sbox"><div class="h">Tipo de atendimento</div><div class="bd">
+      <select id="f-tipo" class="f" style="max-width:280px">
+        <option value="no_dia">Consulta no dia</option><option value="agendada">Consulta agendada</option>
+        <option value="cuidado_continuado">Cuidado continuado</option><option value="urgencia">Urgência</option>
+      </select></div></div>
+
+    <div class="sbox s"><div class="h"><span class="bdg">S</span> Subjetivo</div><div class="bd">
+      <textarea id="f-s" class="f" placeholder="Queixa e história do paciente…"></textarea></div></div>
+
+    <div class="sbox o"><div class="h"><span class="bdg">O</span> Objetivo</div><div class="bd">
+      <div class="field"><textarea id="f-o" class="f" placeholder="Exame físico…"></textarea></div>
+      <div class="grid">
+        <div class="field"><label>PA sistólica</label><input id="f-pas" class="f" type="number" placeholder="120"></div>
+        <div class="field"><label>PA diastólica</label><input id="f-pad" class="f" type="number" placeholder="80"></div>
+        <div class="field"><label>FC (bpm)</label><input id="f-fc" class="f" type="number" placeholder="72"></div>
+        <div class="field"><label>Peso (kg)</label><input id="f-peso" class="f" type="number" step="0.1"></div>
+        <div class="field"><label>Altura (cm)</label><input id="f-alt" class="f" type="number" step="0.1"></div>
+        <div class="field"><label>Glicemia (mg/dL)</label><input id="f-gli" class="f" type="number"></div>
+      </div></div></div>
+
+    <div class="sbox a"><div class="h"><span class="bdg">A</span> Avaliação</div><div class="bd">
+      <textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div></div>
+
+    <div class="sbox p"><div class="h"><span class="bdg">P</span> Plano</div><div class="bd">
+      <div class="field"><textarea id="f-p" class="f" placeholder="Plano de cuidado…"></textarea></div>
+      <div class="ptabs">
+        <button class="ptab active" data-pt="ex">Exames</button>
+        <button class="ptab" data-pt="rx">Prescrição</button>
+      </div>
+      <div data-panel="ex">
+        <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
+        <table style="margin-top:10px"><thead><tr><th>Exame</th><th>Código SIGTAP</th><th></th></tr></thead><tbody id="ex-tbody"></tbody></table>
+        <div id="ex-empty" class="muted" style="margin-top:8px">Nenhum exame adicionado.</div>
+      </div>
+      <div data-panel="rx" class="hidden">
+        <button class="btn primary sm" id="open-presc">+ Adicionar medicamento</button>
+        <table style="margin-top:10px"><thead><tr><th>Medicamento</th><th>Posologia</th><th>Qtd.</th><th></th></tr></thead><tbody id="rx-tbody"></tbody></table>
+        <div id="rx-empty" class="muted" style="margin-top:8px">Nenhum medicamento prescrito.</div>
+      </div>
+    </div></div>
+
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:30px">
+      <button class="btn ghost" id="btn-cancelar">Cancelar</button>
+      <button class="btn primary" id="btn-finalizar">Finalizar e salvar atendimento</button>
+    </div>
+   </div>`);
+
+  // tabs do plano
+  c.querySelectorAll('.ptab').forEach(t=>t.onclick=()=>{
+    c.querySelectorAll('.ptab').forEach(x=>x.classList.toggle('active',x===t));
+    c.querySelectorAll('[data-panel]').forEach(pn=>pn.classList.toggle('hidden',pn.dataset.panel!==t.dataset.pt));
+  });
+  $('open-exam').onclick=()=>{ renderExChips(); openM('m-exam'); };
+  $('open-presc').onclick=()=> openM('m-presc');
+  $('btn-cancelar').onclick=()=>{ atendAtual=null; renderMain(); };
+  $('btn-finalizar').onclick=finalizar;
+  renderExTable(); renderRxTable();
+}
+
+// ---------- busca de exames (SIGTAP via RPC) ----------
+function renderExChips(){
+  $('ex-chips').innerHTML=examItens.map((e,i)=>'<span class="chipx">'+esc(e.no_procedimento)+' <span class="chip">'+esc(e.co_procedimento)+'</span><button data-i="'+i+'">✕</button></span>').join('');
+  $('ex-chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ examItens.splice(+b.dataset.i,1); renderExChips(); });
+}
+function renderExTable(){
+  const tb=$('ex-tbody'); if(!tb) return;
+  tb.innerHTML=examItens.map((e,i)=>'<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+'</span></td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
+  $('ex-empty').style.display=examItens.length?'none':'block';
+  tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ examItens.splice(+b.dataset.i,1); renderExTable(); });
+}
+$('ex-add').onclick=()=>{ renderExTable(); closeM('m-exam'); };
+taBind($('ex-search'),$('ex-list'),async q=>{
+  const {data,error}=await sb.rpc('buscar_exames',{p_termo:q});
+  if(error){ toast('Erro na busca de exames: '+error.message,true); return []; }
+  return (data||[]).map(e=>({label:e.no_procedimento,sub:'Código '+e.co_procedimento,value:e}));
+},opt=>{ const e=opt.value; if(!examItens.find(x=>x.co_procedimento===e.co_procedimento)) examItens.push({co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento}); $('ex-search').value=''; renderExChips(); });
+
+// ---------- prescrição ----------
+function renderRxTable(){
+  const tb=$('rx-tbody'); if(!tb) return;
+  tb.innerHTML=prescItens.map((m,i)=>'<tr><td>'+esc(m.medicamento)+'</td><td class="muted">'+esc([m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
+  $('rx-empty').style.display=prescItens.length?'none':'block';
+  tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ prescItens.splice(+b.dataset.i,1); renderRxTable(); });
+}
+$('pr-add').onclick=()=>{
+  const med=$('pr-med').value.trim(); if(!med){ toast('Informe o medicamento',true); return; }
+  prescItens.push({medicamento:med,via:$('pr-via').value,dose:$('pr-dose').value,frequencia:$('pr-freq').value,duracao:$('pr-dur').value,quantidade:$('pr-qtd').value,uso_continuo:$('pr-cont').checked});
+  ['pr-med','pr-dose','pr-freq','pr-dur','pr-qtd'].forEach(i=>$(i).value=''); $('pr-cont').checked=false;
+  renderRxTable(); closeM('m-presc');
+};
+
+// ---------- finalizar: grava tudo no Supabase ----------
+async function finalizar(){
+  const btn=$('btn-finalizar'); btn.disabled=true; btn.textContent='Salvando…';
+  const num=id=>{ const v=$(id).value.trim(); return v===''?null:Number(v); };
+  try{
+    const {data:at,error:e1}=await sb.from('atendimentos').insert({
+      paciente_id:pacienteSel.id, tipo_atendimento:$('f-tipo').value,
+      subjetivo:$('f-s').value||null, objetivo:$('f-o').value||null, avaliacao:$('f-a').value||null, plano:$('f-p').value||null,
+      pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'), altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'),
+      status:'finalizado'
+    }).select().single();
+    if(e1) throw e1;
+    if(examItens.length){
+      const {data:sol,error:e2}=await sb.from('solicitacoes_exames').insert({atendimento_id:at.id,tipo:'comum',cid10:$('ex-cid').value||null,justificativa:$('ex-just').value||null}).select().single();
+      if(e2) throw e2;
+      const {error:e3}=await sb.from('solicitacao_itens').insert(examItens.map(e=>({solicitacao_id:sol.id,co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento})));
+      if(e3) throw e3;
+    }
+    if(prescItens.length){
+      const {data:rec,error:e4}=await sb.from('prescricoes').insert({atendimento_id:at.id,tipo_receita:'comum'}).select().single();
+      if(e4) throw e4;
+      const {error:e5}=await sb.from('prescricao_itens').insert(prescItens.map((m,i)=>({prescricao_id:rec.id,...m,ordem:i+1})));
+      if(e5) throw e5;
+    }
+    toast('Atendimento salvo ✓'); atendAtual=null; renderMain();
+  }catch(err){ toast('Erro ao salvar: '+(err.message||err),true); }
+  finally{ btn.disabled=false; btn.textContent='Finalizar e salvar atendimento'; }
+}
+
+// ---------- utils ----------
+function openM(id){ $(id).classList.add('open'); }
+function closeM(id){ $(id).classList.remove('open'); }
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=e=>e.target.closest('.overlay').classList.remove('open'));
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+$('menu-btn').onclick=()=>$('sidebar').classList.toggle('open');
+
+function taBind(input,list,fetcher,onPick){
+  let timer;
+  input.addEventListener('input',()=>{ clearTimeout(timer); const q=input.value.trim();
+    if(q.length<2){ list.classList.remove('open'); return; }
+    timer=setTimeout(async()=>{
+      const opts=await fetcher(q);
+      list.innerHTML=opts.length?opts.map((o,i)=>'<div class="ta-opt" data-i="'+i+'"><div class="t">'+esc(o.label)+'</div>'+(o.sub?'<div class="c">'+esc(o.sub)+'</div>':'')+'</div>').join(''):'<div class="ta-opt c">Nenhum resultado</div>';
+      list.classList.add('open');
+      list.querySelectorAll('.ta-opt[data-i]').forEach((d,i)=> d.onclick=()=>{ onPick(opts[i]); list.classList.remove('open'); });
+    },250);
+  });
+  input.addEventListener('blur',()=> setTimeout(()=>list.classList.remove('open'),180));
+}
+
+boot();
 </script>
 </body>
 </html>
