@@ -1143,13 +1143,20 @@ async function importarCid10(file){
     // 1) junta os CSVs que interessam, venham do ZIP ou soltos
     const arquivos={};   // chave lógica -> texto
     const classificar=(nome,txt)=>{
-      const n=nome.toUpperCase();
+      const n=nome.toUpperCase().replace(/[^A-Z0-9]/g,'');
+      // O pacote do DATASUS traz também a CID-O (morfologia de neoplasias),
+      // em arquivos CID-O-CATEGORIAS/GRUPOS cujos nomes casariam com os
+      // mesmos padrões. Os códigos dela são de outra natureza ("M8000/0"),
+      // então só entram os arquivos da CID-10.
+      if(/CIDO/.test(n)&&!/CID10/.test(n)) return;
       if(/SUBCATEG/.test(n)) arquivos.sub=txt;
       else if(/CATEG/.test(n)) arquivos.cat=txt;
       else if(/CAPITULO/.test(n)) arquivos.cap=txt;
       else if(/GRUPO/.test(n)) arquivos.gru=txt;
       else { // csv solto sem nome reconhecível: decide pelo cabeçalho
-        const {cols}=parseCSV(txt);
+        const {cols,linhas}=parseCSV(txt);
+        const cid10=linhas.length&&/^[A-Z][0-9]{2}/.test((linhas[0][cols[0]]||'').toUpperCase());
+        if(!cid10) return;
         if(cols.includes('SUBCAT')) arquivos.sub=txt;
         else if(cols.includes('CAT')) arquivos.cat=txt;
         else if(cols.includes('NUMCAP')) arquivos.cap=txt;
