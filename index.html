@@ -370,10 +370,13 @@ function aplicarSessao(s){
   if(s){ if(usuarioAtual!==s.user.id){ usuarioAtual=s.user.id; enter(s); } }
   else { usuarioAtual=null; pacienteSel=null; atendAtual=null; show('login'); }
 }
-let alertasMed=[];
+let alertasMed=[], alertasErro=null;
 async function carregarAlertas(){
-  const {data}=await sb.from('pep_alertas_medicamento').select('padrao,tipo,mensagem,idade_min,clcr_max').eq('ativo',true);
-  alertasMed=data||[];
+  const {data,error}=await sb.from('pep_alertas_medicamento')
+    .select('padrao,tipo,mensagem,idade_min,clcr_max').eq('ativo',true);
+  if(error){ alertasErro=error.message; alertasMed=[]; }
+  else { alertasErro=null; alertasMed=data||[]; }
+  renderAvisosRx();
 }
 async function enter(session){
   show('app'); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
@@ -973,7 +976,7 @@ function renderAtendimento(c){
       .forEach(([el2,k])=>{ if(d[k]!=null && $(el2)) $(el2).value=d[k]; });
   }
   ['f-peso','f-creat'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input',()=>{ renderClCr(); renderAvisosRx(); }); });
-  renderExTable(); renderRxTable(); renderClCr();
+  renderExTable(); renderRxTable(); renderClCr(); renderAvisosRx();
 }
 
 // ---------- busca de exames (SIGTAP via RPC) ----------
@@ -1075,9 +1078,34 @@ function renderAvisosRx(){
   prescItens.forEach(m=>avisosPara(m.medicamento).forEach(a=>todos.push({...a, med:m.medicamento})));
   const vistos=new Set();
   const unicos=todos.filter(a=>{ const k=a.med+'|'+a.m; if(vistos.has(k)) return false; vistos.add(k); return true; });
-  box.innerHTML=unicos.length
-    ? unicos.map(a=>'<div class="avso '+a.t+'"><b>'+esc(a.med)+'</b> — '+esc(a.m)+'</div>').join('')
-    : '';
+  const tabelaRuim = alertasErro ? 'a tabela de alertas não carregou ('+alertasErro+')'
+                    : (!alertasMed.length ? 'a tabela de alertas está vazia' : null);
+  if(unicos.length){
+    box.innerHTML=unicos.map(a=>'<div class="avso '+a.t+'"><b>'+esc(a.med)+'</b> — '+esc(a.m)+'</div>').join('')+
+      (tabelaRuim?'<div class="avso outro">Só a checagem de alergia está ativa: '+esc(tabelaRuim)+
+        ' — falta rodar o apoio_prescricao_schema.sql no Supabase.</div>':'');
+    return;
+  }
+
+  // Sem aviso: em vez de ficar mudo, diz por quê. Silêncio ambíguo é pior
+  // que aviso nenhum — não dá para saber se é "tudo certo" ou "não funciona".
+  const p=pacienteSel||{};
+  const anos=p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null;
+  const c=calcClCr();
+  const faltas=[];
+  if(alertasErro) faltas.push('a tabela de alertas não carregou ('+alertasErro+') — falta rodar o apoio_prescricao_schema.sql');
+  else if(!alertasMed.length) faltas.push('a tabela de alertas está vazia — falta rodar o apoio_prescricao_schema.sql');
+  if(!prescItens.length) faltas.push('nenhum medicamento adicionado ainda');
+  if(anos==null) faltas.push('o paciente está sem data de nascimento, então o aviso de idoso não é avaliado');
+  if(!c) faltas.push('sem peso e creatinina, o aviso de ajuste renal não é avaliado');
+  if(!(alergias||[]).length) faltas.push('o paciente não tem alergia registrada');
+  const ok = !alertasErro && alertasMed.length && prescItens.length;
+  box.innerHTML='<div class="avso outro">'+
+    (ok?'Nenhum alerta para os medicamentos desta receita.':'Verificação de alertas incompleta.')+
+    (faltas.length?'<div class="muted" style="margin-top:6px">'+faltas.map(esc).join('<br>')+'</div>':'')+
+    '<div class="muted" style="margin-top:6px">'+alertasMed.length+' regra(s) carregada(s)'+
+    (c?' · ClCr '+c.valor+' mL/min':'')+(anos!=null?' · '+anos+' anos':'')+
+    ' · '+(alergias||[]).length+' alergia(s) no cadastro</div></div>';
 }
 
 // ---------- prescrição ----------
