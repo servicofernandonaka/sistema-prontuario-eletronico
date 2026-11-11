@@ -108,7 +108,9 @@
   .lin .x{margin-left:auto;color:var(--err);border:0;background:transparent;font-size:15px}
   .tagc{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--brand-050);color:var(--brand)}
   .tagr{background:#fdecec;color:#c62828}
-  .chkp{display:flex;align-items:flex-start;gap:9px;padding:7px 0;font-size:13.5px;color:var(--fg);font-weight:400}
+  .chkp{display:flex;align-items:flex-start;gap:9px;padding:7px 0;font-size:13.5px;color:var(--fg);font-weight:400;cursor:pointer}
+  .chkp>span{flex:1}
+  .chkp .x{margin-left:auto;color:var(--err);border:0;background:transparent;font-size:15px;width:auto;height:auto;padding:0 4px}
   .chkp input{width:auto;margin-top:3px}
   .atd-row .dt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 150px}
   .atd-row .tp{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
@@ -236,6 +238,7 @@
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
+      <div class="muted" id="versao" style="padding:2px 4px;font-size:11px"></div>
     </div>
   </aside>
 
@@ -387,7 +390,8 @@ async function carregarAlertas(){
   renderAvisosRx();
 }
 async function enter(session){
-  show('app'); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
+  show('app');
+  const v=$('versao'); if(v) v.textContent='versão '+VERSAO; await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
 }
@@ -477,8 +481,23 @@ $('pb-save').onclick=async()=>{
   ['pb-cid','pb-desc','pb-ciap','pb-inicio'].forEach(x=>$(x).value=''); delete $('pb-cid').dataset.codigo;
   closeM('m-problema'); await carregarProblemasAlergias(); renderMain(); toast('Problema registrado ✓');
 };
-async function removerProblema(id){ await sb.from('pep_problemas').delete().eq('id',id); await carregarProblemasAlergias(); renderMain(); }
-async function removerAlergia(id){ await sb.from('pep_alergias').delete().eq('id',id); await carregarProblemasAlergias(); renderMain(); }
+// Apagar registro clínico pede confirmação, e o resultado é conferido: antes
+// eu ignorava o erro e recarregava a tela, então uma exclusão barrada ficava
+// indistinguível de nada ter acontecido.
+async function removerRegistro(tabela, id, rotulo){
+  const {data,error}=await sb.from(tabela).delete().eq('id',id).select();
+  if(error){ toast('Não foi possível remover: '+error.message,true); return false; }
+  if(!data||!data.length){ toast('Nada foi removido — o registro já não estava mais lá, ou o banco recusou.',true); return false; }
+  await carregarProblemasAlergias(); renderMain(); toast(rotulo+' removido ✓'); return true;
+}
+async function removerProblema(id,desc){
+  if(!confirm('Remover "'+(desc||'este problema')+'" da lista do paciente?\n\nIsso apaga o registro. Para apenas não tratá-lo nesta consulta, basta desmarcar a caixinha.')) return;
+  return removerRegistro('pep_problemas',id,'Problema');
+}
+async function removerAlergia(id,sub){
+  if(!confirm('Remover a alergia a "'+(sub||'')+'" deste paciente?\n\nIsso apaga o registro e o alerta deixa de aparecer na prescrição.')) return;
+  return removerRegistro('pep_alergias',id,'Alergia');
+}
 async function resolverProblema(pb){
   await sb.from('pep_problemas').update({situacao: pb.situacao==='ativo'?'resolvido':'ativo'}).eq('id',pb.id);
   await carregarProblemasAlergias(); renderMain();
@@ -519,7 +538,7 @@ async function renderFichaPaciente(c){
     l.innerHTML='<span>'+esc(pb.descricao)+(pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+
       (pb.situacao==='resolvido'?' <span class="tagc">resolvido</span>':'')+'</span>';
     const bR=el('button','btn ghost sm',pb.situacao==='ativo'?'Resolver':'Reativar'); bR.onclick=()=>resolverProblema(pb);
-    const bX=el('button','x','✕'); bX.title='Remover'; bX.onclick=()=>removerProblema(pb.id);
+    const bX=el('button','x','✕'); bX.title='Remover da lista do paciente'; bX.onclick=()=>removerProblema(pb.id,pb.descricao);
     const w=el('span','lin'); w.style.marginLeft='auto'; w.appendChild(bR); w.appendChild(bX); l.appendChild(w);
     bodyP.appendChild(l);
   });
@@ -528,7 +547,7 @@ async function renderFichaPaciente(c){
     const l=el('div','lin');
     l.innerHTML='<span><b>'+esc(a.substancia)+'</b>'+(a.reacao?' — '+esc(a.reacao):'')+
       (a.gravidade?' <span class="tagc tagr">'+esc(a.gravidade)+'</span>':'')+'</span>';
-    const bX=el('button','x','✕'); bX.onclick=()=>removerAlergia(a.id); l.appendChild(bX);
+    const bX=el('button','x','✕'); bX.title='Remover da lista do paciente'; bX.onclick=()=>removerAlergia(a.id,a.substancia); l.appendChild(bX);
     bodyA.appendChild(l);
   });
   cardP.appendChild(bodyP); cardA.appendChild(bodyA);
@@ -750,6 +769,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
+const VERSAO='2026-11-11.3 · TUSS';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -941,10 +961,12 @@ function renderAtendimento(c){
       <div class="field"><textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
       <label style="margin-bottom:6px">Problemas avaliados nesta consulta</label>
       <div id="f-probs">`+
-        (ativos.length ? ativos.map(pb=>'<label class="chkp"><input type="checkbox" value="'+pb.id+'"> '+esc(pb.descricao)+
-            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</label>').join('')
+        (ativos.length ? ativos.map(pb=>'<div class="chkp"><input type="checkbox" value="'+pb.id+'"><span>'+esc(pb.descricao)+
+            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</span>'+
+            '<button class="x" data-rm="'+pb.id+'" data-desc="'+esc(pb.descricao)+'" title="Remover da lista do paciente">✕</button></div>').join('')
           : '<div class="muted">Nenhum problema ativo. Use o botão abaixo para registrar.</div>')+`
       </div>
+      <div class="muted" style="margin-top:4px">Marque os que você está tratando hoje. O ✕ apaga o problema da lista do paciente.</div>
       <button class="btn ghost sm" id="f-addprob" style="margin-top:8px">+ Novo problema / condição</button>
     </div></div>
 
@@ -1013,6 +1035,11 @@ function renderAtendimento(c){
       .forEach(([el2,k])=>{ if(d[k]!=null && $(el2)) $(el2).value=d[k]; });
   }
   ['f-peso','f-creat'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input',()=>{ renderClCr(); renderAvisosRx(); }); });
+  c.querySelectorAll('#f-probs .chkp span').forEach(sp=>sp.onclick=()=>{
+    const cx=sp.parentElement.querySelector('input'); cx.checked=!cx.checked; cx.dispatchEvent(new Event('change',{bubbles:true})); });
+  c.querySelectorAll('#f-probs [data-rm]').forEach(b=>b.onclick=async ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+    if(await removerProblema(b.dataset.rm,b.dataset.desc)) renderMain(); });
   renderExTable(); renderRxTable(); renderClCr(); renderAvisosRx();
 }
 
@@ -1432,6 +1459,10 @@ async function importarExames(file){
       const zip=await JSZip.loadAsync(file);
       const arqs=Object.values(zip.files).filter(f=>!f.dir);
       const nome=f=>f.name.split('/').pop();
+      // deixa à vista o que foi encontrado: se o roteamento errar de novo,
+      // a própria tela diz por quê
+      st.textContent='Pacote com '+arqs.length+' arquivo(s): '+arqs.slice(0,3).map(nome).join(', ')+
+                     (arqs.length>3?'…':'')+' — versão '+VERSAO;
       // pacote da SIGTAP: arquivos tb_*.txt com os respectivos *_layout.txt
       if(arqs.some(f=>/^tb_.*\.txt$/i.test(nome(f))||/_layout\.txt$/i.test(nome(f)))) return importarSigtap(file);
       const plan=arqs.find(f=>/\.(xlsx|xlsm|xls)$/i.test(nome(f)));
