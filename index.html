@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PEP Clínico</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a6fbd">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -174,6 +178,17 @@
   .avso.renal{background:#e7f2fb;border-color:#1b74c4;color:#14517f}
   .avso.outro{background:#f1f5fa;border-color:#9bb0c7;color:#3f5570}
   .avso .muted{color:inherit;opacity:.78}
+  /* modo offline */
+  .faixa-off{display:none}
+  .faixa-off.vis{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;
+    padding:9px 22px;font-size:13px;line-height:1.45;border-bottom:1px solid}
+  .faixa-off.off{background:#fff6e2;color:#6d4c0c;border-color:#efd59a}
+  .faixa-off.pend{background:#e7f2fb;color:#14517f;border-color:#bcd9f2}
+  .faixa-off.erro{background:#fdecec;color:#8d2020;border-color:#f1b9b9}
+  .faixa-off .fb{display:flex;gap:6px;flex-wrap:wrap}
+  .faixa-off button{border:1px solid currentColor;background:#fff;color:inherit;border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:600}
+  .offbox{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--fg);padding:4px;margin:2px 0 0;cursor:pointer}
+  .offbox input{width:auto;margin:0}
   /* evolução */
   .evo{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
   .evocard{border:1px solid var(--line);border-radius:10px;padding:10px 10px 8px;background:var(--panel-2);
@@ -250,11 +265,14 @@
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
+      <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
+      <div class="muted" id="off-status" style="padding:0 4px;font-size:11px;line-height:1.4"></div>
       <div class="muted" id="versao" style="padding:2px 4px;font-size:11px"></div>
     </div>
   </aside>
 
   <main class="main">
+    <div class="faixa-off" id="faixa-off" role="status" aria-live="polite"></div>
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
       <span class="badge-proto">Protótipo · dados fictícios · não usar com pacientes reais</span>
@@ -400,12 +418,512 @@ function dataBR(s){ if(!s) return ''; const d=new Date(s); return d.toLocaleDate
 let sb=null, pacientes=[], pacienteSel=null, atendAtual=null;
 const examItens=[], prescItens=[];
 
+// =====================================================================
+// MODO OFFLINE
+// ---------------------------------------------------------------------
+// Fica entre o app e o Supabase, no fetch do próprio cliente. Com o modo
+// ligado neste aparelho:
+//   • toda leitura bem-sucedida é espelhada no IndexedDB;
+//   • sem rede, as leituras são respondidas pelo espelho, e as três buscas
+//     (exames, CID-10, medicamentos) rodam sobre os catálogos baixados;
+//   • sem rede, INSERÇÃO de registro clínico vai para uma fila e sobe quando
+//     a conexão voltar — na ordem em que foi feita;
+//   • sem rede, EDIÇÃO e EXCLUSÃO são recusadas, com a mensagem dizendo por
+//     quê. É o que impede uma versão antiga sobrescrever outra em silêncio.
+//
+// Por que inserir é seguro: o ID de cada registro é gerado aqui, antes do
+// primeiro envio. Reenviar o mesmo registro não duplica — o servidor ignora
+// o ID que já tem (ON CONFLICT DO NOTHING).
+//
+// Com o modo DESLIGADO (o padrão), tudo passa direto, como antes.
+// =====================================================================
+const OFF=(()=>{
+  const nativo=window.fetch.bind(window);
+  const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
+    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_atendimento_problemas',
+    'pep_problemas','pep_alergias','pep_resultados'];
+  const REFERENCIA=['pep_profissional','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
+    'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
+  const ESPELHO=new Set([...CLINICAS,...REFERENCIA]);
+  const PK={pep_profissional:'user_id',pep_analitos:'chave',cid10:'codigo',pep_cid10:'codigo',
+            tuss_procedimento:'codigo',sigtap_procedimento:'co_procedimento'};
+  const pkDe=t=>PK[t]||'id';
+  const chaveDe=(t,r)=>String(r[pkDe(t)]);
+  const LS_LIGADO='pep_offline_ligado';
+  const estado={online:true, falhouEm:0, pendentes:0, enviando:false, erro:null,
+                baixando:false, catalogos:null, persistente:null, sw:null};
+  let contEnfileirados=0, loteAtual=0, resumoFila=[]; const rotuloLote={};
+
+  // ---------------- liga / desliga neste aparelho ----------------
+  const ligado=()=>{ try{ return localStorage.getItem(LS_LIGADO)==='1'; }catch(e){ return false; } };
+  function definirLigado(v){ try{ localStorage.setItem(LS_LIGADO,v?'1':'0'); }catch(e){} }
+
+  // ---------------- IndexedDB ----------------
+  let dbp=null;
+  function idb(){
+    if(dbp) return dbp;
+    dbp=new Promise((ok,ko)=>{
+      const r=indexedDB.open('pep-offline',1);
+      r.onupgradeneeded=()=>{ const d=r.result;
+        if(!d.objectStoreNames.contains('tabelas')) d.createObjectStore('tabelas');
+        if(!d.objectStoreNames.contains('fila')) d.createObjectStore('fila',{keyPath:'seq',autoIncrement:true});
+        if(!d.objectStoreNames.contains('meta')) d.createObjectStore('meta'); };
+      r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error);
+    });
+    return dbp;
+  }
+  const req2p=r=>new Promise((ok,ko)=>{ r.onsuccess=()=>ok(r.result); r.onerror=()=>ko(r.error); });
+  async function op(store,modo,fn){
+    const d=await idb(); const t=d.transaction(store,modo); const res=await req2p(fn(t.objectStore(store)));
+    if(modo==='readwrite') await new Promise((ok,ko)=>{ t.oncomplete=ok; t.onerror=()=>ko(t.error); t.onabort=()=>ko(t.error); });
+    return res;
+  }
+  const idbGet=(s,k)=>op(s,'readonly',o=>o.get(k));
+  const idbPut=(s,v,k)=>op(s,'readwrite',o=>k===undefined?o.put(v):o.put(v,k));
+  const idbDel=(s,k)=>op(s,'readwrite',o=>o.delete(k));
+  const idbAll=s=>op(s,'readonly',o=>o.getAll());
+  const idbCount=s=>op(s,'readonly',o=>o.count());
+
+  // ---------------- espelho em memória + disco ----------------
+  const mem={};                 // tabela -> Map(chave -> linha)
+  async function tabela(t){
+    if(!mem[t]){ const arr=(await idbGet('tabelas',t))||[]; mem[t]=new Map(arr.map(r=>[chaveDe(t,r),r])); }
+    return mem[t];
+  }
+  const timers={};
+  function salvarTabela(t,agora){
+    clearTimeout(timers[t]);
+    const gravar=()=>idbPut('tabelas',[...(mem[t]||new Map()).values()],t);
+    if(agora) return gravar();
+    timers[t]=setTimeout(()=>gravar().catch(()=>{}),400);
+  }
+  async function mesclar(t,linhas){
+    if(!ESPELHO.has(t)||!ligado()||!linhas||!linhas.length) return;
+    const m=await tabela(t);
+    for(const r of linhas){ if(!r||r[pkDe(t)]==null) continue;
+      const k=chaveDe(t,r), ex=m.get(k);
+      const novo=Object.assign(ex||{},r); delete novo.__pend; m.set(k,novo); }
+    salvarTabela(t);
+  }
+  async function substituir(t,linhas){
+    const m=await tabela(t), novo=new Map();
+    for(const r of linhas) novo.set(chaveDe(t,r),r);
+    for(const [k,r] of m) if(r.__pend&&!novo.has(k)) novo.set(k,r);   // o que ainda está na fila fica
+    mem[t]=novo; await salvarTabela(t,true);
+  }
+  const limpar=r=>{ const o={}; for(const k in r) if(!k.startsWith('__')) o[k]=r[k]; return o; };
+
+  // ---------------- consulta local (subconjunto do PostgREST) ----------------
+  function parseLista(v){
+    const s=v.replace(/^\(|\)$/g,''), out=[]; let cur='', q=false;
+    for(const ch of s){ if(ch==='"'){ q=!q; continue; } if(ch===','&&!q){ out.push(cur); cur=''; } else cur+=ch; }
+    out.push(cur); return out;
+  }
+  function casaFiltro(r,col,expr){
+    const i=expr.indexOf('.'); if(i<0) return true;
+    const opr=expr.slice(0,i), val=expr.slice(i+1), x=r[col];
+    switch(opr){
+      case 'eq':  return x!=null&&String(x)===val;
+      case 'neq': return x==null||String(x)!==val;
+      case 'in':  return x!=null&&parseLista(val).includes(String(x));
+      case 'is':  return val==='null'?x==null:String(x)===val;
+      case 'gt':  return x!=null&&String(x)>val;
+      case 'gte': return x!=null&&String(x)>=val;
+      case 'lt':  return x!=null&&String(x)<val;
+      case 'lte': return x!=null&&String(x)<=val;
+      case 'like': case 'ilike': {
+        const re=new RegExp('^'+val.replace(/[.+?^${}()|[\]\\]/g,'\\$&').replace(/[%*]/g,'.*')+'$',opr==='ilike'?'i':'');
+        return x!=null&&re.test(String(x)); }
+    }
+    return true;
+  }
+  function comparador(ord){
+    const regras=ord.split(',').map(s=>{ const [c,dir,nul]=s.split('.'); const desc=dir==='desc';
+      return {c,desc,nf:nul==='nullsfirst'?true:nul==='nullslast'?false:desc}; });
+    return (a,b)=>{ for(const g of regras){ const x=a[g.c], y=b[g.c];
+        if(x==null&&y==null) continue; if(x==null) return g.nf?-1:1; if(y==null) return g.nf?1:-1;
+        const c=(typeof x==='number'&&typeof y==='number')?x-y:String(x).localeCompare(String(y),'pt-BR',{numeric:true});
+        if(c) return g.desc?-c:c; }
+      return 0; };
+  }
+  const RESERVADOS=new Set(['select','order','limit','offset','on_conflict','columns']);
+  async function consultar(t,p){
+    let rows=[...(await tabela(t)).values()];
+    for(const [k,v] of p.entries()) if(!RESERVADOS.has(k)) rows=rows.filter(r=>casaFiltro(r,k,v));
+    const ord=p.get('order'); if(ord) rows.sort(comparador(ord));
+    const total=rows.length, off=+(p.get('offset')||0), lim=p.get('limit');
+    if(off||lim) rows=rows.slice(off,lim?off+(+lim):undefined);
+    const sel=p.get('select');
+    const cols=(!sel||sel==='*')?null:sel.split(',').map(s=>s.trim());
+    rows=rows.map(r=>{ const o=limpar(r); if(!cols) return o; const s={}; cols.forEach(c=>{ if(c in o) s[c]=o[c]; }); return s; });
+    return {rows,total};
+  }
+
+  // ---------------- respostas sintéticas ----------------
+  const json=(b,hd={},st=200)=>new Response(b==null?null:JSON.stringify(b),
+    {status:st,headers:Object.assign({'content-type':'application/json','x-pep-offline':'1'},hd)});
+  const erro=(st,msg,code)=>json({message:msg,code:code||'OFFLINE',details:null,hint:null},{},st);
+  const uuid=()=>(crypto.randomUUID?crypto.randomUUID():'10000000-1000-4000-8000-100000000000'.replace(/[018]/g,
+    c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)));
+
+  // ---------------- rede ----------------
+  const redeProvavel=()=>navigator.onLine!==false&&!(estado.online===false&&Date.now()-estado.falhouEm<20000);
+  function marcarOnline(v){
+    const mudou=estado.online!==v; estado.online=v; if(!v) estado.falhouEm=Date.now();
+    if(mudou){ atualizarFaixa(); if(v&&estado.pendentes) enviarFila(); }
+  }
+  function comTempo(input,init,ms){
+    const ac=new AbortController(), tm=setTimeout(()=>ac.abort(),ms);
+    if(init&&init.signal){ if(init.signal.aborted) ac.abort(); else init.signal.addEventListener('abort',()=>ac.abort()); }
+    return nativo(input,Object.assign({},init,{signal:ac.signal})).finally(()=>clearTimeout(tm));
+  }
+  const abortadoPeloApp=(init,e)=>e&&e.name==='AbortError'&&init&&init.signal&&init.signal.aborted;
+
+  // ---------------- o fetch que o Supabase passa a usar ----------------
+  async function fetchPEP(input,init={}){
+    const url=typeof input==='string'?input:input.url;
+    if(!ligado()||!url.includes('/rest/v1/')) return nativo(input,init);      // auth e modo desligado: direto
+    const u=new URL(url), caminho=u.pathname.split('/rest/v1/')[1]||'';
+    const metodo=(init.method||'GET').toUpperCase(), h=new Headers(init.headers||{});
+    if(caminho.startsWith('rpc/')) return rpc(caminho.slice(4),input,init);
+    const t=decodeURIComponent(caminho.split('/')[0]);
+    if(metodo==='GET'||metodo==='HEAD') return leitura(t,u,metodo,h,input,init);
+    return escrita(t,u,metodo,h,input,init);
+  }
+
+  async function leitura(t,u,metodo,h,input,init){
+    if(redeProvavel()){
+      try{
+        const r=await comTempo(input,init,15000);
+        marcarOnline(true);
+        if(r.ok&&metodo==='GET'&&ESPELHO.has(t))
+          r.clone().json().then(j=>mesclar(t,Array.isArray(j)?j:[j])).catch(()=>{});
+        return r;
+      }catch(e){ if(abortadoPeloApp(init,e)) throw e; marcarOnline(false); }
+    }
+    if(!ESPELHO.has(t)) return erro(503,'Sem conexão — esta informação não fica guardada para uso offline.');
+    const {rows,total}=await consultar(t,u.searchParams);
+    if(metodo==='HEAD') return new Response(null,{status:200,headers:{'content-range':'*/'+total,'x-pep-offline':'1'}});
+    if((h.get('accept')||'').includes('vnd.pgrst.object')){
+      if(rows.length!==1) return erro(406,'Registro não encontrado no que está guardado neste aparelho.','PGRST116');
+      return json(rows[0]);
+    }
+    return json(rows,{'content-range':(rows.length?'0-'+(rows.length-1):'*')+'/'+total});
+  }
+
+  async function escrita(t,u,metodo,h,input,init){
+    const clinica=CLINICAS.includes(t);
+    // inserção clínica ganha ID já aqui: se a rede cair no meio do envio, a
+    // cópia da fila tem o MESMO ID e o reenvio não duplica
+    if(clinica&&metodo==='POST'&&init.body){
+      const c=JSON.parse(init.body); (Array.isArray(c)?c:[c]).forEach(r=>{ if(r&&!r.id) r.id=uuid(); });
+      init=Object.assign({},init,{body:JSON.stringify(c)});
+    }
+    // nada clínico passa na frente da fila
+    if(clinica&&estado.pendentes&&redeProvavel()) await enviarFila();
+    if(redeProvavel()&&!(clinica&&estado.pendentes)){
+      try{
+        const r=await nativo(input,init);
+        marcarOnline(true);
+        if(r.ok&&ESPELHO.has(t)) posEscrita(t,u,metodo,init,r.clone()).catch(()=>{});
+        return r;
+      }catch(e){ if(abortadoPeloApp(init,e)) throw e; marcarOnline(false); }
+    }
+    if(!clinica) return erro(503,'Sem conexão — esta operação precisa de internet.');
+    const upsert=/merge-duplicates/.test(h.get('prefer')||'');
+    if(metodo!=='POST'||upsert)
+      return erro(503,estado.pendentes&&navigator.onLine!==false
+        ?'Há registros aguardando envio. Edição e exclusão ficam bloqueadas até que eles subam.'
+        :'Sem conexão — edição e exclusão ficam bloqueadas até a conexão voltar. Registros novos são guardados e enviados depois.');
+    return enfileirar(t,h,init);
+  }
+
+  async function posEscrita(t,u,metodo,init,r){
+    let corpo=null; try{ corpo=await r.json(); }catch(e){}
+    const linhas=corpo?(Array.isArray(corpo)?corpo:[corpo]):null;
+    if(metodo==='POST'){
+      return mesclar(t,linhas||(init.body?[].concat(JSON.parse(init.body)):[]));
+    }
+    const m=await tabela(t);
+    const alvo=[...m.values()].filter(row=>{ for(const [k,v] of u.searchParams.entries())
+      if(!RESERVADOS.has(k)&&!casaFiltro(row,k,v)) return false; return true; });
+    if(metodo==='DELETE'){ alvo.forEach(row=>m.delete(chaveDe(t,row))); salvarTabela(t); return; }
+    if(metodo==='PATCH'){
+      if(linhas) return mesclar(t,linhas);
+      const patch=init.body?JSON.parse(init.body):{}; alvo.forEach(row=>Object.assign(row,patch)); salvarTabela(t);
+    }
+  }
+
+  // ---------------- fila ----------------
+  const PADRAO={pep_atendimentos:{status:'finalizado'}, pep_problemas:{situacao:'ativo'}};
+  async function enfileirar(t,h,init){
+    const corpo=JSON.parse(init.body), lista=Array.isArray(corpo)?corpo:[corpo];
+    if(t==='pep_atendimentos') lista.forEach(r=>{ if(!r.data_atendimento) r.data_atendimento=new Date().toISOString(); });
+    const usuario=(typeof usuarioAtual!=='undefined')?usuarioAtual:null;
+    if(!rotuloLote[loteAtual]) rotuloLote[loteAtual]=t;   // o lote se chama pelo que abriu o salvamento
+    await idbPut('fila',{t,rows:lista,criado:new Date().toISOString(),usuario,status:'pendente',erro:null,
+                         lote:loteAtual,rot:rotuloLote[loteAtual]});
+    const agora=new Date().toISOString(), m=await tabela(t);
+    lista.forEach(r=>m.set(String(r.id),Object.assign({created_at:agora,criado_em:agora,profissional_id:usuario},
+      PADRAO[t]||{},r,{__pend:true})));
+    await salvarTabela(t,true);
+    contEnfileirados++; await contarFila();
+    const prefer=h.get('prefer')||'';
+    if(!/return=representation/.test(prefer)) return new Response(null,{status:201,headers:{'x-pep-offline':'1'}});
+    const saida=lista.map(r=>limpar(m.get(String(r.id))));
+    return json((h.get('accept')||'').includes('vnd.pgrst.object')?saida[0]:saida,{},201);
+  }
+  const NOME_LOTE={pep_atendimentos:['atendimento','atendimentos'],pep_pacientes:['paciente','pacientes'],
+    pep_resultados:['resultado','resultados'],pep_problemas:['problema','problemas'],pep_alergias:['alergia','alergias']};
+  async function contarFila(){
+    try{
+      const itens=(await idbAll('fila')).sort((a,b)=>a.seq-b.seq);
+      estado.pendentes=itens.length;
+      // um atendimento vira vários registros (solicitação, itens, receita…):
+      // agrupa pelo salvamento que os gerou e nomeia pelo primeiro
+      const lotes=new Map();
+      itens.forEach(it=>{ const k=it.lote!=null?'L'+it.lote:'S'+it.seq; if(!lotes.has(k)) lotes.set(k,it.rot||it.t); });
+      const cont={}; for(const t of lotes.values()){ const n=(NOME_LOTE[t]||['registro','registros']); cont[n[0]]=cont[n[0]]||{n:0,pl:n[1]}; cont[n[0]].n++; }
+      resumoFila=Object.entries(cont).map(([sg,v])=>v.n+' '+(v.n>1?v.pl:sg));
+    }catch(e){ estado.pendentes=0; resumoFila=[]; }
+    atualizarFaixa();
+  }
+  const descreverFila=()=>{ const r=resumoFila; if(!r.length) return estado.pendentes+' registro(s)';
+    return r.length===1?r[0]:r.slice(0,-1).join(', ')+' e '+r[r.length-1]; };
+
+  function postar(it,token){
+    return comTempo(SUPABASE_URL+'/rest/v1/'+it.t+'?on_conflict=id',{method:'POST',
+      headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json',
+               Prefer:'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify(it.rows)},20000);
+  }
+  async function desmarcar(it){
+    const m=await tabela(it.t);
+    it.rows.forEach(r=>{ const x=m.get(String(r.id)); if(x) delete x.__pend; });
+    salvarTabela(it.t);
+  }
+  let enviando=null;
+  function enviarFila(){
+    if(enviando) return enviando;
+    enviando=(async()=>{
+      try{
+        const itens=(await idbAll('fila')).sort((a,b)=>a.seq-b.seq);
+        if(!itens.length) return;
+        if(typeof sb==='undefined'||!sb) return;
+        estado.enviando=true; estado.erro=null; atualizarFaixa();
+        const {data}=await sb.auth.getSession();
+        let token=data&&data.session&&data.session.access_token;
+        const eu=data&&data.session&&data.session.user&&data.session.user.id;
+        if(!token) return;
+        for(const it of itens){
+          // registro feito por outra conta neste aparelho espera aquela conta entrar
+          if(it.usuario&&eu&&it.usuario!==eu){ estado.erro='Há registros de outra conta neste aparelho; eles sobem quando ela entrar.'; return; }
+          let r;
+          try{ r=await postar(it,token); }catch(e){ marcarOnline(false); return; }
+          if(r.status===401){
+            const rs=await sb.auth.refreshSession(); token=rs.data&&rs.data.session&&rs.data.session.access_token;
+            if(!token){ it.status='erro'; it.erro='Sessão expirada — entre de novo para enviar.'; await idbPut('fila',it); estado.erro=it.erro; return; }
+            try{ r=await postar(it,token); }catch(e){ marcarOnline(false); return; }
+          }
+          if(r.ok){ await idbDel('fila',it.seq); await desmarcar(it); marcarOnline(true); continue; }
+          if(r.status>=500||r.status===408||r.status===429) return;          // servidor indisponível: tenta depois
+          let msg='HTTP '+r.status; try{ const j=await r.json(); msg=j.message||msg; }catch(e){}
+          it.status='erro'; it.erro=msg; await idbPut('fila',it); estado.erro=msg;
+          return;                                                            // erro definitivo: a fila PARA
+        }
+      } finally { estado.enviando=false; enviando=null; await contarFila(); }
+    })();
+    return enviando;
+  }
+  async function descartarComErro(){
+    const itens=(await idbAll('fila')).sort((a,b)=>a.seq-b.seq), it=itens.find(x=>x.status==='erro');
+    if(!it) return false;
+    await idbDel('fila',it.seq);
+    const m=await tabela(it.t); it.rows.forEach(r=>{ const x=m.get(String(r.id)); if(x&&x.__pend) m.delete(String(r.id)); });
+    await salvarTabela(it.t,true); estado.erro=null; await contarFila(); return true;
+  }
+  async function exportarFila(){
+    const itens=await idbAll('fila');
+    const blob=new Blob([JSON.stringify({exportado_em:new Date().toISOString(),itens},null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='pep-fila-pendente-'+new Date().toISOString().slice(0,16).replace(/[:T]/g,'-')+'.json';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }
+
+  // ---------------- buscas locais (mesma regra do SQL) ----------------
+  const semAcentoOff=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const palavras=t=>semAcentoOff(t).replace(/\./g,'').trim().split(/\s+/).filter(Boolean);
+  const temTodas=(alvo,ws)=>{ const a=semAcentoOff(alvo).replace(/\./g,''); return ws.every(w=>a.includes(w)); };
+  async function buscaExames(a){
+    const ws=palavras(a.p_termo), lim=a.p_limite||20, hoje=new Date().toISOString().slice(0,10);
+    const ini=semAcentoOff(a.p_termo).trim();
+    let fonte=[...(await tabela('tuss_procedimento')).values()], tuss=true;
+    if(!fonte.length){ fonte=[...(await tabela('sigtap_procedimento')).values()]; tuss=false; }
+    const out=[];
+    for(const r of fonte){
+      const co=tuss?r.codigo:r.co_procedimento, no=tuss?r.termo:r.no_procedimento;
+      if(!co||!no) continue;
+      if(tuss&&r.fim_vigencia&&r.fim_vigencia<hoje) continue;
+      if(a.p_grupos&&a.p_grupos.length&&!a.p_grupos.some(g=>co.startsWith(g))) continue;
+      if(!temTodas(tuss?(r.busca||no):no,ws)) continue;
+      const prec=(semAcentoOff(no).startsWith(ini)?0:1)*2+(tuss&&/^(US|RX|TC|RM)\s*-/i.test(no)?0:1);
+      out.push({co_procedimento:co,no_procedimento:no,co_sub_grupo:co.slice(0,4),_p:prec});
+    }
+    out.sort((x,y)=>x._p-y._p||x.no_procedimento.length-y.no_procedimento.length||x.no_procedimento.localeCompare(y.no_procedimento,'pt-BR'));
+    return out.slice(0,lim).map(({_p,...x})=>x);
+  }
+  async function buscaCid(a){
+    const ws=palavras(a.p_termo), lim=a.p_limite||15, ini=semAcentoOff(a.p_termo).replace(/\./g,'').trim();
+    const oficial=[...(await tabela('cid10')).values()], codigos=new Set(oficial.map(c=>c.codigo));
+    const todos=oficial.map(c=>({codigo:c.codigo_fmt,descricao:c.descricao,prec:c.nivel==='subcategoria'?0:1,fonte:0,
+                                alvo:c.codigo_fmt.replace('.','')+' '+c.descricao+' '+(c.descricao_abrev||'')}));
+    for(const p of (await tabela('pep_cid10')).values())
+      if(!codigos.has(String(p.codigo).replace('.',''))) todos.push({codigo:p.codigo,descricao:p.descricao,prec:2,fonte:1,alvo:p.codigo.replace('.','')+' '+p.descricao});
+    return todos.filter(x=>temTodas(x.alvo,ws))
+      .map(x=>Object.assign(x,{_c:semAcentoOff(x.codigo.replace('.','')).startsWith(ini)?0:1}))
+      .sort((x,y)=>x._c-y._c||x.prec-y.prec||x.fonte-y.fonte||x.codigo.localeCompare(y.codigo))
+      .slice(0,lim).map(x=>({codigo:x.codigo,descricao:x.descricao}));
+  }
+  async function buscaMed(a){
+    const ws=palavras(a.p_termo), lim=a.p_limite||15, ini=semAcentoOff(a.p_termo).trim();
+    return [...(await tabela('pep_medicamentos')).values()]
+      .filter(m=>m.ativo!==false&&temTodas((m.nome||'')+' '+(m.apresentacao||''),ws))
+      .map(m=>({m,_a:semAcentoOff(m.nome).startsWith(ini)?0:1,
+                _f:/^remume/.test(m.fonte||'')?0:m.fonte==='rename'?1:2}))
+      .sort((x,y)=>x._a-y._a||x._f-y._f||String(x.m.nome).localeCompare(String(y.m.nome),'pt-BR')||String(x.m.apresentacao).localeCompare(String(y.m.apresentacao),'pt-BR'))
+      .slice(0,lim).map(x=>({nome:x.m.nome,apresentacao:x.m.apresentacao,via:x.m.via}));
+  }
+  async function rpc(nome,input,init){
+    if(redeProvavel()){
+      try{ const r=await comTempo(input,init,15000); marcarOnline(true); return r; }
+      catch(e){ if(abortadoPeloApp(init,e)) throw e; marcarOnline(false); }
+    }
+    const a=init.body?JSON.parse(init.body):{};
+    if(nome==='buscar_exames') return json(await buscaExames(a));
+    if(nome==='buscar_cid10') return json(await buscaCid(a));
+    if(nome==='buscar_medicamentos') return json(await buscaMed(a));
+    return erro(503,'Sem conexão.');
+  }
+
+  // ---------------- baixar tudo para uso offline ----------------
+  async function baixarTabela(t){
+    const linhas=[];
+    for(let a=0;;a+=1000){
+      const {data,error}=await sb.from(t).select('*').order(pkDe(t)).range(a,a+999);
+      if(error) throw error;
+      linhas.push(...data); if(data.length<1000) break;
+    }
+    await substituir(t,linhas); return linhas.length;
+  }
+  async function preparar(){
+    if(!ligado()||estado.baixando||!redeProvavel()||typeof sb==='undefined'||!sb) return;
+    estado.baixando=true; atualizarFaixa();
+    const cont={};
+    try{
+      for(const t of [...CLINICAS,'pep_profissional','pep_analitos','pep_alertas_medicamento'])
+        try{ cont[t]=await baixarTabela(t); }catch(e){}
+      const meta=(await idbGet('meta','catalogos'))||{};
+      const velho=!meta.em||Date.now()-new Date(meta.em).getTime()>7*864e5;
+      const vazio=!(await tabela('cid10')).size&&!(await tabela('pep_cid10')).size;
+      if(velho||vazio){
+        for(const t of ['pep_medicamentos','pep_cid10','cid10','tuss_procedimento'])
+          try{ cont[t]=await baixarTabela(t); }catch(e){}
+        if(!cont.tuss_procedimento) try{ cont.sigtap_procedimento=await baixarTabela('sigtap_procedimento'); }catch(e){}
+        await idbPut('meta',{em:new Date().toISOString(),cont},'catalogos');
+      }
+      estado.catalogos=Object.assign({},(await idbGet('meta','catalogos')||{}).cont||{},cont);
+    } finally { estado.baixando=false; atualizarFaixa(); }
+  }
+  async function apagarTudo(){
+    for(const k of Object.keys(mem)) delete mem[k];
+    const d=await idb();
+    await Promise.all(['tabelas','meta'].map(s=>new Promise((ok,ko)=>{ const t=d.transaction(s,'readwrite');
+      t.objectStore(s).clear(); t.oncomplete=ok; t.onerror=()=>ko(t.error); })));
+    estado.catalogos=null; atualizarFaixa();
+  }
+
+  // ---------------- faixa de aviso ----------------
+  function atualizarFaixa(){
+    const f=document.getElementById('faixa-off'); if(!f) return;
+    const n=estado.pendentes;
+    if(!ligado()&&!n){ f.className='faixa-off'; f.innerHTML=''; atualizarStatus(); return; }
+    let txt='', cls='', btn='';
+    if(estado.erro){
+      cls='erro';
+      txt='<b>Envio interrompido</b> — '+escOff(estado.erro)+' · aguardando: '+escOff(descreverFila())+'.';
+      btn='<button data-off="tentar">Tentar de novo</button><button data-off="exportar">Exportar fila</button><button data-off="descartar">Descartar o item com erro</button>';
+    } else if(n){
+      cls=estado.online===false?'off':'pend';
+      txt=(estado.enviando?'<b>Enviando…</b> ':'')+'<b>Aguardando envio: '+escOff(descreverFila())+'</b>'+
+          (estado.online===false?' — sem conexão. Os dados estão guardados neste aparelho e serão enviados automaticamente quando a internet voltar.':'.');
+      btn='<button data-off="tentar">Enviar agora</button><button data-off="exportar">Exportar fila</button>';
+    } else if(estado.online===false){
+      cls='off';
+      txt='<b>Sem conexão.</b> Você pode consultar e registrar atendimentos novos; edição e exclusão ficam bloqueadas até a internet voltar.';
+    }
+    f.className='faixa-off'+(txt?' vis '+cls:''); f.innerHTML=txt?'<span>'+txt+'</span><span class="fb">'+btn+'</span>':'';
+    f.querySelectorAll('[data-off]').forEach(b=>b.onclick=async()=>{
+      const a=b.dataset.off;
+      if(a==='tentar'){ estado.erro=null; await enviarFila(); }
+      else if(a==='exportar') exportarFila();
+      else if(a==='descartar'){
+        if(!confirm('Descartar o registro que não conseguiu subir?\n\nEle será apagado deste aparelho e NÃO irá para o banco. Exporte a fila antes, se quiser guardar uma cópia.')) return;
+        await descartarComErro(); await enviarFila();
+      }
+    });
+    atualizarStatus();
+  }
+  function atualizarStatus(){
+    const s=document.getElementById('off-status'), cx=document.getElementById('off-ligado'); if(!s) return;
+    if(cx) cx.checked=ligado();
+    if(!ligado()){ s.textContent='Desligado. Ligue só em aparelho seu: os dados dos pacientes ficam guardados nele.'; return; }
+    const c=estado.catalogos||{}, fmt=v=>Number(v||0).toLocaleString('pt-BR');
+    s.textContent=estado.baixando?'Baixando dados para uso offline…'
+      :'Pronto: '+fmt(c.pep_pacientes)+' pacientes · '+fmt(c.tuss_procedimento||c.sigtap_procedimento)+' exames · '+
+       fmt(c.cid10)+' CID · '+fmt(c.pep_medicamentos)+' medicamentos'+
+       (estado.persistente===false?' · o navegador pode apagar estes dados se faltar espaço':'')+
+       (estado.sw===false?' · arquivo sw.js não encontrado: o app não abre sem internet':'');
+  }
+  const escOff=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  // ---------------- início ----------------
+  async function iniciar(){
+    if('serviceWorker' in navigator)
+      navigator.serviceWorker.register('./sw.js').then(()=>{ estado.sw=true; atualizarStatus(); })
+        .catch(()=>{ estado.sw=false; atualizarStatus(); });
+    window.addEventListener('online',()=>{ estado.falhouEm=0; marcarOnline(true); enviarFila(); });
+    window.addEventListener('offline',()=>marcarOnline(false));
+    setInterval(()=>{ if(estado.pendentes&&navigator.onLine!==false) enviarFila(); },20000);
+    try{ await contarFila(); }catch(e){}
+    if(ligado()){
+      try{ estado.persistente=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null; }catch(e){}
+      try{ estado.catalogos=((await idbGet('meta','catalogos'))||{}).cont||null; }catch(e){}
+    }
+    atualizarFaixa();
+  }
+  async function alternar(v){
+    if(v){
+      definirLigado(true);
+      try{ estado.persistente=navigator.storage&&navigator.storage.persist?await navigator.storage.persist():null; }catch(e){}
+      atualizarFaixa(); await preparar(); return true;
+    }
+    if(estado.pendentes){ toast('Há registros aguardando envio — não dá para desligar agora.',true); atualizarStatus(); return false; }
+    if(!confirm('Desligar o uso offline neste aparelho?\n\nOs dados guardados aqui serão apagados.')){ atualizarStatus(); return false; }
+    definirLigado(false); await apagarTudo(); return true;
+  }
+
+  return { fetch:fetchPEP, iniciar, preparar, enviarFila, alternar, ligado,
+           marca:()=>{ loteAtual++; return contEnfileirados; }, enfileirouDesde:m=>contEnfileirados>m,
+           pendentes:()=>estado.pendentes, apagarTudo, estado };
+})();
+
 // ---------- boot/auth ----------
 function show(v){ $('view-login').classList.toggle('hidden', v!=='login'); $('view-app').classList.toggle('hidden', v!=='app'); }
 function boot(){
   if(!window.supabase||!window.supabase.createClient){ show('login'); toast('Falha ao carregar o Supabase',true); return; }
   if(!SUPABASE_ANON_KEY||SUPABASE_ANON_KEY.startsWith('COLE_')){ show('login'); $('cfg').classList.remove('hidden'); $('cfg').textContent='Configure SUPABASE_URL e SUPABASE_ANON_KEY.'; $('li-btn').disabled=true; return; }
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {global:{fetch:OFF.fetch}});
+  OFF.iniciar();
   // IMPORTANTE: nunca chamar o Supabase de dentro do callback de autenticação — a biblioteca
   // trava (deadlock) e nada mais responde. Por isso o tratamento é adiado com setTimeout.
   sb.auth.onAuthStateChange((_e,s)=> setTimeout(()=>aplicarSessao(s),0));
@@ -427,13 +945,18 @@ async function carregarAlertas(){
 async function enter(session){
   show('app');
   const v=$('versao'); if(v) v.textContent='versão '+VERSAO;
-  carregarAnalitos(); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
+  carregarAnalitos();
+  setTimeout(()=>{ OFF.enviarFila(); OFF.preparar(); },1500); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
 }
-$('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({email:$('li-email').value.trim(),password:$('li-pass').value}); if(error) toast(error.message,true); };
+$('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({email:$('li-email').value.trim(),password:$('li-pass').value});
+  if(error) toast(/fetch|network/i.test(error.message||'')||navigator.onLine===false
+    ?'Sem conexão — entrar exige internet. Depois de entrar, o uso offline funciona.':error.message,true); };
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
 $('btn-logout').onclick=async()=>{
+  const n=OFF.pendentes();
+  if(n&&!confirm('Há '+n+' registro(s) aguardando envio.\n\nSe você sair, eles continuam guardados neste aparelho, mas só sobem quando você entrar de novo AQUI. Sair mesmo assim?')) return;
   try{ await sb.auth.signOut(); }catch(e){}
   aplicarSessao(null);   // volta para o login mesmo se a rede falhar
 };
@@ -471,7 +994,10 @@ function abrirModalPaciente(p){
   openM('m-pac');
 }
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
+const salvoMsg=(mk,padrao)=>OFF.enfileirouDesde(mk)
+  ? padrao.replace(' ✓','')+' neste aparelho — sobe quando a conexão voltar' : padrao;
 $('np-save').onclick=async()=>{
+  const mk=OFF.marca();
   const nome=$('np-nome').value.trim(); if(!nome){ toast('Informe o nome',true); return; }
   const rec={ nome, cpf:$('np-cpf').value.trim()||null, cns:$('np-cns').value.trim()||null,
     data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null,
@@ -482,7 +1008,7 @@ $('np-save').onclick=async()=>{
   else res=await sb.from('pep_pacientes').insert(rec).select().single();
   btn.disabled=false;
   if(res.error){ toast('Erro ao salvar: '+res.error.message,true); return; }
-  closeM('m-pac'); toast(pacEditando?'Paciente atualizado ✓':'Paciente cadastrado ✓');
+  closeM('m-pac'); toast(salvoMsg(mk,pacEditando?'Paciente atualizado ✓':'Paciente cadastrado ✓'));
   const novo=res.data; pacEditando=null;
   await carregarPacientes(); pacienteSel=novo; atendAtual=null; renderSideList(); renderMain();
 };
@@ -598,12 +1124,13 @@ function faixaAlergias(){
   return '<div class="alerta"><b>⚠ Alergias:</b> '+alergias.map(a=>esc(a.substancia)+(a.reacao?' ('+esc(a.reacao)+')':'')+(a.gravidade==='grave'?' — GRAVE':'')).join(' · ')+'</div>';
 }
 $('al-save').onclick=async()=>{
+  const mk=OFF.marca();
   const sub=$('al-sub').value.trim(); if(!sub){ toast('Informe a substância',true); return; }
   const {error}=await sb.from('pep_alergias').insert({paciente_id:pacienteSel.id,substancia:sub,
     reacao:$('al-rea').value.trim()||null, gravidade:$('al-grav').value||null});
   if(error){ toast('Erro: '+error.message,true); return; }
   ['al-sub','al-rea'].forEach(x=>$(x).value=''); $('al-grav').value='';
-  closeM('m-alergia'); await carregarProblemasAlergias(); renderMain(); toast('Alergia registrada ✓');
+  closeM('m-alergia'); await carregarProblemasAlergias(); renderMain(); toast(salvoMsg(mk,'Alergia registrada ✓'));
 };
 function abrirResultado(pre){
   if(!pacienteSel){ toast('Selecione um paciente',true); return; }
@@ -635,6 +1162,7 @@ function aplicarAnalito(chave){
 $('rs-analito').onchange=()=>aplicarAnalito(undefined);
 $('rs-exame').addEventListener('blur',()=>{ if(!$('rs-analito').value) aplicarAnalito(analitoDe($('rs-exame').value)); });
 $('rs-save').onclick=async()=>{
+  const mk=OFF.marca();
   const num=id=>{ const v=String($(id).value||'').trim().replace(',','.'); return v===''?null:Number(v); };
   const exame=$('rs-exame').value.trim();
   if(!exame){ toast('Informe o exame',true); return; }
@@ -649,16 +1177,17 @@ $('rs-save').onclick=async()=>{
     observacao:$('rs-obs').value.trim()||null};
   const {error}=await sb.from('pep_resultados').insert(reg);
   if(error){ toast('Erro ao salvar: '+error.message,true); return; }
-  closeM('m-resultado'); await carregarResultados(); renderMain(); toast('Resultado registrado ✓');
+  closeM('m-resultado'); await carregarResultados(); renderMain(); toast(salvoMsg(mk,'Resultado registrado ✓'));
 };
 
 $('pb-save').onclick=async()=>{
+  const mk=OFF.marca();
   const desc=$('pb-desc').value.trim(); if(!desc){ toast('Informe a descrição',true); return; }
   const {error}=await sb.from('pep_problemas').insert({paciente_id:pacienteSel.id,descricao:desc,
     cid10:$('pb-cid').dataset.codigo||null, ciap2:$('pb-ciap').value.trim()||null, inicio:$('pb-inicio').value||null});
   if(error){ toast('Erro: '+error.message,true); return; }
   ['pb-cid','pb-desc','pb-ciap','pb-inicio'].forEach(x=>$(x).value=''); delete $('pb-cid').dataset.codigo;
-  closeM('m-problema'); await carregarProblemasAlergias(); renderMain(); toast('Problema registrado ✓');
+  closeM('m-problema'); await carregarProblemasAlergias(); renderMain(); toast(salvoMsg(mk,'Problema registrado ✓'));
 };
 // Apagar registro clínico pede confirmação, e o resultado é conferido: antes
 // eu ignorava o erro e recarregava a tela, então uma exclusão barrada ficava
@@ -1007,7 +1536,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-11.4 · resultados';
+const VERSAO='2026-11-11.5 · offline';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -1447,6 +1976,7 @@ $('pr-add').onclick=()=>{
 
 // ---------- finalizar: grava tudo no Supabase ----------
 async function finalizar(){
+  const mk=OFF.marca();
   const btn=$('btn-finalizar'); const edit=!!(atendAtual&&atendAtual.editando);
   btn.disabled=true; btn.textContent='Salvando…';
   const num=id=>{ const v=$(id).value.trim(); return v===''?null:Number(v); };
@@ -1499,7 +2029,7 @@ async function finalizar(){
         descricao:x.descricao, ciap2:x.ciap2||null, cid10:x.cid10||null, situacao:x.situacao})));
       if(e7) throw e7;
     }
-    toast(edit?'Alterações salvas ✓':'Atendimento salvo ✓');
+    toast(salvoMsg(mk,edit?'Alterações salvas ✓':'Atendimento salvo ✓'));
     atendAtual={id:at.id}; renderMain();
   }catch(err){ toast('Erro ao salvar: '+(err.message||err),true); }
   finally{ btn.disabled=false; btn.textContent=edit?'Salvar alterações':'Finalizar e salvar atendimento'; }
@@ -1960,6 +2490,12 @@ taBind($('pb-cid'),$('pb-cidlist'),async q=>{
 },opt=>{ const c=opt.value; $('pb-cid').value=c.codigo+' — '+c.descricao; $('pb-cid').dataset.codigo=c.codigo;
   if(!$('pb-desc').value.trim()) $('pb-desc').value=c.descricao; });
 
+$('off-ligado').addEventListener('change',async e=>{
+  const quer=e.target.checked;
+  if(quer&&!confirm('Ligar o uso offline NESTE aparelho?\n\nOs dados dos seus pacientes passam a ficar guardados no navegador, para você consultar e registrar atendimentos sem internet.\n\nNão ligue em computador compartilhado.')){ e.target.checked=false; return; }
+  const ok=await OFF.alternar(quer);
+  if(ok) toast(quer?'Uso offline ligado — baixando os dados':'Uso offline desligado e dados locais apagados');
+});
 boot();
 </script>
 </body>
