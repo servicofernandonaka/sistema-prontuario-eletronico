@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* Paleta clara derivada das cores do e-SUS APS PEC — azul #0a5c9e e o
      azul-marinho #092f4f do cabeçalho —, levantada um tom e com os blocos do
@@ -227,12 +228,12 @@
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
-      <button class="btn ghost" id="btn-sigtap" title="Pacote oficial do DATASUS: TabelaUnificada_AAAAMM_vNNNN.zip">Importar SIGTAP (exames)</button>
-      <input type="file" id="sigtap-file" accept=".zip" class="hidden">
+      <button class="btn ghost" id="btn-sigtap" title="TUSS 22 da ANS (.csv), o mapeamento TUSS x SIGTAP (.csv), ou o pacote da SIGTAP (.zip)">Importar tabela de exames</button>
+      <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
       <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
       <input type="file" id="cid10-file" accept=".zip,.csv,.txt" class="hidden">
       <button class="btn ghost" id="btn-med" title="Planilha salva como CSV, com colunas nome / apresentacao / via">Importar medicamentos (CSV)</button>
-      <input type="file" id="med-file" accept=".csv,.txt" class="hidden">
+      <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
     </div>
@@ -716,27 +717,56 @@ function docAtestado(at,quando){
 // subgrupo. É o subgrupo que diz a que serviço o exame pertence — e por isso
 // radiologia e laboratório não podem sair na mesma guia: vão para lugares
 // diferentes, com agendamento e fluxo próprios.
-const GRUPOS_EXAME=[
-  ['0201','Coleta de material',          1],
-  ['0202','Laboratório clínico',         2],
-  ['0203','Anatomopatologia e citopatologia',3],
-  ['0204','Radiologia',                  4],
-  ['0205','Ultrassonografia',            5],
-  ['0206','Tomografia computadorizada',  6],
-  ['0207','Ressonância magnética',       7],
-  ['0208','Medicina nuclear',            8],
-  ['0209','Endoscopia',                  9],
-  ['0210','Radiologia intervencionista',10],
-  ['0211','Métodos diagnósticos em especialidades',11],
-  ['0212','Hemoterapia e genética',     12]
+// Agrupamento das guias. Os rótulos abaixo foram tirados da própria tabela
+// TUSS 22 que importamos: conferi quais prefixos de 4 dígitos carregam quais
+// exames (4030/4031/4032 = laboratório, 4090 = US, 4100 = TC, 4110 = RM,
+// 4080 = RX e mamografia, e assim por diante), em vez de supor a hierarquia.
+const GRUPOS_TUSS=[
+  ['4030','Laboratório clínico',               1],
+  ['4031','Laboratório clínico',               1],
+  ['4032','Laboratório clínico',               1],
+  ['4040','Imuno-hematologia e hemoterapia',   2],
+  ['4050','Análises do líquor',                3],
+  ['4060','Anatomia patológica e citopatologia',4],
+  ['4080','Radiologia',                        5],
+  ['4090','Ultrassonografia',                  6],
+  ['4100','Tomografia computadorizada',        7],
+  ['4110','Ressonância magnética',             8],
+  ['4070','Medicina nuclear',                  9],
+  ['4071','Medicina nuclear',                  9],
+  ['4020','Endoscopia',                       10],
+  ['4010','Métodos diagnósticos em especialidades',11],
+  ['4130','Oftalmologia',                     12],
+  ['4140','Testes alérgicos',                 13],
+  ['4150','Outros métodos diagnósticos',      14],
+  ['4081','Radiologia intervencionista',      15],
+  ['4120','Radioterapia',                     16]
 ];
+const GRUPOS_SIGTAP=[
+  ['0201','Coleta de material',1],['0202','Laboratório clínico',2],
+  ['0203','Anatomopatologia e citopatologia',3],['0204','Radiologia',4],
+  ['0205','Ultrassonografia',5],['0206','Tomografia computadorizada',6],
+  ['0207','Ressonância magnética',7],['0208','Medicina nuclear',8],
+  ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
+  ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
+];
+const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
-  const pre=String(co||'').slice(0,4);
-  const g=GRUPOS_EXAME.find(x=>x[0]===pre);
-  if(g) return {chave:g[0], rotulo:g[1], ordem:g[2]};
-  const g2=String(co||'').slice(0,2);
-  if(g2==='03') return {chave:'03', rotulo:'Procedimentos clínicos',   ordem:90};
-  if(g2==='04') return {chave:'04', rotulo:'Procedimentos cirúrgicos', ordem:91};
+  const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
+  // TUSS tem 8 dígitos; SIGTAP tem 10 — dá para distinguir pelo tamanho
+  const tab = c.length===10 ? GRUPOS_SIGTAP : GRUPOS_TUSS;
+  const g=tab.find(x=>x[0]===pre);
+  if(g) return {chave:g[1], rotulo:g[1], ordem:g[2]};
+  if(c.length===10){
+    if(p2==='03') return {chave:'clin', rotulo:'Procedimentos clínicos',   ordem:90};
+    if(p2==='04') return {chave:'cir',  rotulo:'Procedimentos cirúrgicos', ordem:91};
+  } else {
+    if(p2==='10') return {chave:'cons', rotulo:'Consultas e atendimentos', ordem:88};
+    if(p2==='20') return {chave:'terap',rotulo:'Procedimentos clínicos e terapias', ordem:89};
+    if(p2==='30'||p2==='31') return {chave:'cir', rotulo:'Procedimentos cirúrgicos', ordem:91};
+    if(p2==='50') return {chave:'fisio',rotulo:'Fisioterapia', ordem:92};
+    if(p2[0]==='8') return {chave:'odo',rotulo:'Odontologia', ordem:93};
+  }
   return {chave:'outros', rotulo:'Outros procedimentos', ordem:99};
 }
 function agruparExames(exames){
@@ -754,7 +784,7 @@ function docsExames(exames,cab,quando){
   const grupos=agruparExames(exames);
   const docs=grupos.map(g=>montarDoc(
     grupos.length>1 ? 'Solicitação de exames — '+g.rotulo : 'Solicitação de exames',
-    g.itens.map(e=>({n:e.no_procedimento, d:'Código SIGTAP '+e.co_procedimento})), obs, quando));
+    g.itens.map(e=>({n:e.no_procedimento, d:'Código '+rotuloTabela(e.co_procedimento)+' '+e.co_procedimento})), obs, quando));
   return docs.some(d=>!d) ? null : docs;
 }
 
@@ -798,7 +828,7 @@ async function renderAtendimentoSalvo(c){
     '<div class="sbox p"><div class="h"><span class="bdg">P</span> Plano</div><div class="bd">'+txt(a.plano)+
       '<h3 style="font-size:14px;margin:18px 0 8px">Exames solicitados</h3>'+
       (exames.length
-        ? '<table><thead><tr><th>Exame</th><th>Código SIGTAP</th></tr></thead><tbody>'+
+        ? '<table><thead><tr><th>Exame</th><th>Código</th></tr></thead><tbody>'+
           agruparExames(exames).map((g,_,ar)=>
             (ar.length>1?'<tr class="gh"><td colspan="2">'+esc(g.rotulo)+'</td></tr>':'')+
             g.itens.map(e=>'<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+'</span></td></tr>').join('')
@@ -927,7 +957,7 @@ function renderAtendimento(c){
       </div>
       <div data-panel="ex">
         <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
-        <table style="margin-top:10px"><thead><tr><th>Exame</th><th>Código SIGTAP</th><th></th></tr></thead><tbody id="ex-tbody"></tbody></table>
+        <table style="margin-top:10px"><thead><tr><th>Exame</th><th>Código</th><th></th></tr></thead><tbody id="ex-tbody"></tbody></table>
         <div id="ex-empty" class="muted" style="margin-top:8px">Nenhum exame adicionado.</div>
         <div id="ex-guias" class="muted" style="margin-top:8px"></div>
       </div>
@@ -1164,7 +1194,8 @@ async function finalizar(){
         .insert({atendimento_id:at.id,tipo:'comum',cid10:$('ex-cid').value||null,justificativa:$('ex-just').value||null}).select().single();
       if(e2) throw e2;
       const {error:e3}=await sb.from('pep_solicitacao_itens')
-        .insert(examItens.map(e=>({solicitacao_id:sol.id,co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento})));
+        .insert(examItens.map(e=>({solicitacao_id:sol.id,co_procedimento:e.co_procedimento,
+          no_procedimento:e.no_procedimento, tabela:String(e.co_procedimento||'').length===10?'sigtap':'tuss'})));
       if(e3) throw e3;
     }
     if(prescItens.length){
@@ -1286,8 +1317,135 @@ async function importarSigtap(file){
     toast('Tabela SIGTAP importada ✓');
   }catch(err){ st.textContent='Falha: '+(err.message||err); toast('Importação falhou: '+(err.message||err),true); }
 }
+// Sinônimos: na TUSS os exames de imagem são nomeados por sigla — "US - Abdome
+// total", "RX - Tórax", "TC - Crânio". Quem digita "ultrassom" ou "raio x" não
+// acharia nada. O campo de busca guarda o termo mais esses sinônimos.
+const SINONIMOS=[
+  [/^US\s*-/i,  'ultrassonografia ultrassom usg ecografia'],
+  [/^RX\s*-/i,  'radiografia raio-x raio x rx'],
+  [/^TC\s*-/i,  'tomografia computadorizada'],
+  [/^RM\s*-/i,  'ressonancia magnetica rnm'],
+  [/^AP\s/i,    'anatomopatologico anatomia patologica biopsia'],
+  [/^PET/i,      'pet ct tomografia por emissao de positrons'],
+  // A TUSS não nomeia a articulação: ressonância de joelho é
+  // "RM - Articular (por articulação)". Sem isto, procurar por "joelho" não
+  // acha nada. Esta linha é acréscimo meu, não vem da ANS — se discordar,
+  // dá para editar a coluna "busca" da tabela tuss_procedimento por SQL.
+  [/por articula[çc]/i, 'joelho ombro cotovelo punho tornozelo quadril coxofemoral mao pe']
+];
+function campoBusca(termo){
+  let extra='';
+  for(const [re,syn] of SINONIMOS) if(re.test(termo)) extra+=' '+syn;
+  return (termo+extra).trim();
+}
+
+// Lê CSV, TXT ou planilha (.xlsx/.xls) e devolve sempre {cols,linhas}, para
+// o resto do importador não precisar saber de que formato veio o arquivo.
+function planilhaParaTabela(buf){
+  if(!window.XLSX) throw new Error('A biblioteca de planilhas não carregou; recarregue a página.');
+  const wb=XLSX.read(buf,{type:'array'});
+  for(const nome of wb.SheetNames){
+    const m=XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,blankrows:false,defval:''});
+    // a primeira linha com pelo menos 2 células preenchidas é o cabeçalho —
+    // as planilhas da ANS trazem título e linhas em branco antes dele
+    const iCab=m.findIndex(l=>l.filter(c=>String(c).trim()!=='').length>=2);
+    if(iCab<0) continue;
+    const cols=m[iCab].map(c=>String(c).trim().toUpperCase().replace(/[^A-Z0-9_]/g,''));
+    const linhas=m.slice(iCab+1).map(l=>{ const o={}; cols.forEach((c,i)=>o[c]=String(l[i]===undefined?'':l[i]).trim()); return o; })
+                  .filter(o=>Object.values(o).some(v=>v!==''));
+    if(cols.filter(Boolean).length>=2 && linhas.length) return {cols,linhas,aba:nome};
+  }
+  throw new Error('Não achei nenhuma aba com tabela nesta planilha.');
+}
+async function lerTabela(file){
+  const buf=await file.arrayBuffer();
+  if(/\.(xlsx|xlsm|xls)$/i.test(file.name)) return planilhaParaTabela(buf);
+  return parseCSV(decodificar(buf));
+}
+
+async function importarTuss(file,tabela){
+  const st=$('sigtap-status');
+  try{
+    st.textContent='Lendo o arquivo…';
+    const {cols,linhas}=tabela||await lerTabela(file);
+    // ---- mapeamento TUSS x SIGTAP ----
+    // Aceita tanto o CSV que eu converti (co_tuss / co_sigtap) quanto a
+    // planilha original da ANS (Código TUSS / Código Sigtap Final).
+    const cTm=acharCol(cols,'COTUSS','CODIGOTUSS',/^CO.*TUSS/,/TUSS$/),
+          cSm=acharCol(cols,'COSIGTAP','CODIGOSIGTAPFINAL',/^CO.*SIGTAP/,/SIGTAP/);
+    if(cTm&&cSm&&cTm!==cSm){
+      const cT=cTm, cS=cSm,
+            cE=acharCol(cols,'EQUIVALENCIA',/EQUIVAL/), cN=acharCol(cols,'TERMOSIGTAP','PROCEDIMENTOSIGTAPFINAL',/PROCEDIMENTOSIGTAP/,/TERMOSIGTAP/);
+      const vistos=new Set(), itens=[];
+      for(const r of linhas){
+        const t=(r[cT]||'').replace(/\D/g,'');
+        let g=(r[cS]||'').replace(/\D/g,'');
+        // o Excel guarda o código SIGTAP como número e come o zero à esquerda
+        if(g.length===9) g='0'+g;
+        if(t.length!==8||g.length!==10) continue;
+        const k=t+'|'+g; if(vistos.has(k)) continue; vistos.add(k);
+        const e=parseInt(cE?r[cE]:'',10);
+        itens.push({co_tuss:t, co_sigtap:g, equivalencia:Number.isFinite(e)?e:null,
+                    termo_sigtap:(cN?r[cN]:'')||null});
+      }
+      if(itens.length<100) throw new Error('Só '+itens.length+' pares lidos — o arquivo não parece o mapeamento. Nada foi gravado.');
+      await upsertLotes('tuss_sigtap',itens,'co_tuss,co_sigtap','Mapeamento');
+      await sb.from('tuss_importacao').insert({qt_mapeamentos:itens.length,arquivo:file.name});
+      st.textContent='Mapeamento TUSS × SIGTAP importado: '+itens.length+' pares.';
+      toast('Mapeamento importado ✓'); return;
+    }
+
+    // ---- TUSS 22 ----
+    const cId=acharCol(cols,'ID','CODIGO','CODIGODOTERMO',/^COD/), cNo=acharCol(cols,'DISPLAYNAME','TERMO',/DISPLAY/,/TERMO/);
+    if(!cId||!cNo) throw new Error('Não reconheci o arquivo como TUSS 22 nem como mapeamento. '+
+      'Colunas lidas: '+(cols.filter(Boolean).join(', ')||'(nenhuma)')+'. '+
+      'A TUSS precisa ter colunas de código e de descrição; o mapeamento, co_tuss e co_sigtap.');
+    const dt=v=>{ const t=(v||'').trim(); return /^\d{4}-\d{2}-\d{2}$/.test(t)?t:null; };
+    const cIni=acharCol(cols,'EXTRASINICIOVIGENCIA',/INICIOVIG/), cFim=acharCol(cols,'EXTRASFIMVIGENCIA',/FIMVIG/),
+          cImp=acharCol(cols,'EXTRASFIMIMPLANTACAO',/IMPLANT/);
+    const vistos=new Set(), itens=[];
+    for(const r of linhas){
+      const cod=(r[cId]||'').replace(/\D/g,''), termo=(r[cNo]||'').trim();
+      if(cod.length!==8||!termo||vistos.has(cod)) continue;
+      vistos.add(cod);
+      itens.push({codigo:cod, termo, busca:campoBusca(termo),
+        inicio_vigencia:dt(cIni?r[cIni]:''), fim_vigencia:dt(cFim?r[cFim]:''), fim_implantacao:dt(cImp?r[cImp]:'')});
+    }
+    if(itens.length<1000) throw new Error('Só '+itens.length+' procedimentos lidos (o esperado é cerca de 5.900). Nada foi gravado.');
+    await upsertLotes('tuss_procedimento',itens,'codigo','TUSS');
+    await sb.from('tuss_importacao').insert({qt_procedimentos:itens.length,arquivo:file.name});
+    const vig=itens.filter(i=>!i.fim_vigencia).length;
+    st.textContent='TUSS 22 importada: '+itens.length+' procedimentos ('+vig+' sem data de encerramento).';
+    toast('TUSS importada ✓');
+  }catch(err){ st.textContent='Falha: '+(err.message||err); toast('Importação falhou: '+(err.message||err),true); }
+}
+
+// Roteia pelo CONTEÚDO, não pela extensão: o ZIP do mapeamento da ANS tem um
+// .xlsx dentro, e o da SIGTAP tem tb_procedimento.txt. Olhar só o ".zip"
+// mandava os dois para o importador errado.
+async function importarExames(file){
+  const st=$('sigtap-status');
+  try{
+    if(/\.zip$/i.test(file.name)){
+      if(!window.JSZip) throw new Error('Biblioteca de ZIP não carregou; recarregue a página.');
+      st.textContent='Abrindo o pacote…';
+      const zip=await JSZip.loadAsync(file);
+      const arqs=Object.values(zip.files).filter(f=>!f.dir);
+      const nome=f=>f.name.split('/').pop();
+      // pacote da SIGTAP: arquivos tb_*.txt com os respectivos *_layout.txt
+      if(arqs.some(f=>/^tb_.*\.txt$/i.test(nome(f))||/_layout\.txt$/i.test(nome(f)))) return importarSigtap(file);
+      const plan=arqs.find(f=>/\.(xlsx|xlsm|xls)$/i.test(nome(f)));
+      if(plan){ st.textContent='Lendo a planilha de dentro do ZIP…';
+        return importarTuss({name:nome(plan)}, planilhaParaTabela(await plan.async('arraybuffer'))); }
+      const csv=arqs.find(f=>/\.csv$/i.test(nome(f)));
+      if(csv){ return importarTuss({name:nome(csv)}, parseCSV(decodificar(await csv.async('uint8array')))); }
+      throw new Error('O ZIP tem '+arqs.length+' arquivo(s) e nenhum reconhecível: '+arqs.slice(0,4).map(nome).join(', ')+'.');
+    }
+    return importarTuss(file);
+  }catch(err){ st.textContent='Falha: '+(err.message||err); toast('Importação falhou: '+(err.message||err),true); }
+}
 $('btn-sigtap').onclick=()=>$('sigtap-file').click();
-$('sigtap-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarSigtap(f); });
+$('sigtap-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarExames(f); });
 
 // ---------- CSV: leitor tolerante (delimitador e cabeçalho variáveis) ----------
 // Lê CSV com ; ou , ou TAB, respeita campos entre aspas, e devolve
@@ -1322,8 +1480,14 @@ function parseCSV(txt){
   const linhas=brutas.slice(1).map(l=>{ const o={}; cols.forEach((c,i)=>o[c]=(l[i]===undefined?'':String(l[i]).trim())); return o; });
   return {cols,linhas};
 }
-// acha a coluna cujo nome casa com um dos padrões, na ordem dada
-const acharCol=(cols,...pads)=>{ for(const p of pads){ const c=cols.find(x=>p instanceof RegExp?p.test(x):x===p); if(c) return c; } return null; };
+// Acha a coluna cujo nome casa com um dos padrões, na ordem dada. Compara
+// tanto o nome como veio quanto sem sublinhados, porque os arquivos oficiais
+// alternam entre "CO_TUSS" e "COTUSS", "EXTRAS_FIM_VIGENCIA" e sem o "_".
+const acharCol=(cols,...pads)=>{
+  const casa=(x,p)=>{ const y=x.replace(/_/g,''); return p instanceof RegExp ? (p.test(x)||p.test(y)) : (x===p||y===p||y===String(p).replace(/_/g,'')); };
+  for(const p of pads){ const c=cols.find(x=>casa(x,p)); if(c) return c; }
+  return null;
+};
 
 // ---------- importar a CID-10 oficial (CID10CSV.zip do DATASUS) ----------
 // Aceita o ZIP inteiro ou um único .csv de dentro dele.
@@ -1470,7 +1634,7 @@ async function importarMedicamentos(file){
   const st=$('sigtap-status');
   try{
     st.textContent='Lendo a planilha…';
-    const {cols,linhas}=parseCSV(decodificar(await file.arrayBuffer()));
+    const {cols,linhas}=await lerTabela(file);
     const cNome=acharCol(cols,'NOME','MEDICAMENTO','PRINCIPIOATIVO',/PRINCIPIO/,/MEDICAM/,/^NOME/);
     if(!cNome) throw new Error('Não achei a coluna do nome do medicamento. Colunas lidas: '+(cols.join(', ')||'(nenhuma)'));
     const cApr=acharCol(cols,'APRESENTACAO',/APRESENT/,/^FORMA/,/DOSAGEM/);
