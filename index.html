@@ -6,6 +6,7 @@
 <title>PEP Clínico</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
   :root{
     --bg:#0b1220; --panel:#111c2e; --panel-2:#16233a; --card:#152238; --line:#243246;
@@ -91,6 +92,19 @@
   .atd-row.click:hover{background:var(--panel-2)}
   .ro{white-space:pre-wrap;font-size:14px}
   .ro.vazio{color:var(--muted);font-style:italic}
+  .alerta{background:#3a1416;border:1px solid #7c2d2d;color:#ffb3ab;border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:13.5px}
+  .alerta b{color:#ff8c80}
+  .resumo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  @media (max-width:760px){.resumo{grid-template-columns:1fr}}
+  .resumo .card{padding:0}
+  .resumo .ch{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px}
+  .resumo .cb{padding:11px 14px;display:flex;flex-direction:column;gap:7px;font-size:13.5px}
+  .lin{display:flex;align-items:flex-start;gap:8px}
+  .lin .x{margin-left:auto;color:var(--err);border:0;background:transparent;font-size:15px}
+  .tagc{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--brand-050);color:var(--brand)}
+  .tagr{background:#3a1416;color:#ff8c80}
+  .chkp{display:flex;align-items:flex-start;gap:9px;padding:7px 0;font-size:13.5px;color:var(--fg);font-weight:400}
+  .chkp input{width:auto;margin-top:3px}
   .atd-row .dt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 150px}
   .atd-row .tp{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
   .chip{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line)}
@@ -158,6 +172,7 @@
     #print-area .pr-corpo{min-height:95mm}
     #print-area .it{margin-bottom:13px;page-break-inside:avoid}
     #print-area .it .n{font-weight:bold}
+    #print-area .it .p{text-align:justify;line-height:1.7}
     #print-area .it .d{padding-left:17px;font-size:11pt}
     #print-area .pr-obs{margin-top:14px;font-size:11pt;border-top:1px dotted #555;padding-top:8px}
     #print-area .pr-ass{margin-top:26mm;text-align:center;page-break-inside:avoid}
@@ -198,8 +213,12 @@
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
-      <button class="btn ghost" id="btn-sigtap" title="Carrega o pacote oficial do DATASUS (.zip)">Importar tabela SIGTAP</button>
+      <button class="btn ghost" id="btn-sigtap" title="Pacote oficial do DATASUS: TabelaUnificada_AAAAMM_vNNNN.zip">Importar SIGTAP (exames)</button>
       <input type="file" id="sigtap-file" accept=".zip" class="hidden">
+      <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
+      <input type="file" id="cid10-file" accept=".zip,.csv,.txt" class="hidden">
+      <button class="btn ghost" id="btn-med" title="Planilha salva como CSV, com colunas nome / apresentacao / via">Importar medicamentos (CSV)</button>
+      <input type="file" id="med-file" accept=".csv,.txt" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
     </div>
@@ -217,7 +236,7 @@
 
 <!-- ======= MODAL: Novo paciente ======= -->
 <div class="overlay" id="m-pac"><div class="modal">
-  <div class="mh"><span>Novo paciente</span><button class="x" data-close>✕</button></div>
+  <div class="mh"><span id="np-titulo">Novo paciente</span><button class="x" data-close>✕</button></div>
   <div class="mb">
     <div class="grid">
       <div class="field" style="grid-column:1/-1"><label>Nome completo *</label><input id="np-nome" class="f" placeholder="Nome do paciente"></div>
@@ -233,6 +252,33 @@
 </div></div>
 
 <!-- ======= MODAL: Exame ======= -->
+<div class="overlay" id="m-alergia"><div class="modal">
+  <div class="mh"><span>Alergia / reação adversa</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Substância *</label><input id="al-sub" class="f" placeholder="Ex.: Dipirona, Penicilina, AAS"></div>
+    <div class="grid">
+      <div class="field"><label>Reação</label><input id="al-rea" class="f" placeholder="Ex.: urticária, angioedema"></div>
+      <div class="field"><label>Gravidade</label><select id="al-grav" class="f"><option value="">—</option><option value="leve">Leve</option><option value="moderada">Moderada</option><option value="grave">Grave</option></select></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="al-save">Salvar</button></div>
+</div></div>
+
+<div class="overlay" id="m-problema"><div class="modal">
+  <div class="mh"><span>Problema / condição</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field"><label>CID-10 (busque pelo nome ou código)</label>
+      <div class="ta"><input id="pb-cid" class="f" placeholder="Ex.: hipertensão, diabetes, I10" autocomplete="off"><div class="ta-list" id="pb-cidlist"></div></div>
+    </div>
+    <div class="field"><label>Descrição *</label><input id="pb-desc" class="f" placeholder="Preenchida pelo CID ou escreva livremente"></div>
+    <div class="grid">
+      <div class="field"><label>CIAP-2 (opcional)</label><input id="pb-ciap" class="f" placeholder="Ex.: K86"></div>
+      <div class="field"><label>Início (opcional)</label><input id="pb-inicio" class="f" type="date"></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pb-save">Salvar</button></div>
+</div></div>
+
 <div class="overlay" id="m-exam"><div class="modal">
   <div class="mh"><span>Solicitar exame</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -270,10 +316,12 @@
 <div class="overlay" id="m-prof"><div class="modal">
   <div class="mh"><span>Dados para impressão</span><button class="x" data-close>✕</button></div>
   <div class="mb">
-    <div class="muted" style="margin-bottom:12px">Aparecem no cabeçalho e na assinatura da receita e da solicitação de exames. Ficam salvos neste navegador.</div>
+    <div class="muted" style="margin-bottom:12px">Aparecem no cabeçalho e na assinatura da receita e da solicitação de exames. Ficam salvos na sua conta, então valem em qualquer computador.</div>
     <div class="field"><label>Nome do profissional *</label><input id="pf-nome" class="f" placeholder="Dr(a). Nome Sobrenome"></div>
     <div class="grid">
-      <div class="field"><label>CRM</label><input id="pf-crm" class="f" placeholder="SP 000000"></div>
+      <div class="field"><label>CRM</label><input id="pf-crm" class="f" placeholder="000000"></div>
+      <div class="field"><label>UF do CRM</label><input id="pf-uf" class="f" placeholder="SP" maxlength="2"></div>
+      <div class="field"><label>Especialidade</label><input id="pf-esp" class="f" placeholder="Clínica Médica"></div>
       <div class="field"><label>Unidade / consultório</label><input id="pf-unidade" class="f" placeholder="UBS ..."></div>
     </div>
   </div>
@@ -315,7 +363,11 @@ function aplicarSessao(s){
   if(s){ if(usuarioAtual!==s.user.id){ usuarioAtual=s.user.id; enter(s); } }
   else { usuarioAtual=null; pacienteSel=null; atendAtual=null; show('login'); }
 }
-async function enter(session){ $('who').innerHTML='<b>'+esc(session.user.email||'Profissional')+'</b> · Clínica Médica'; show('app'); await carregarPacientes(); renderMain(); }
+async function enter(session){
+  show('app'); await carregarPacientes(); renderMain(); await carregarProf();
+  const d=dadosProf();
+  $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
+}
 $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({email:$('li-email').value.trim(),password:$('li-pass').value}); if(error) toast(error.message,true); };
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
 $('btn-logout').onclick=async()=>{
@@ -337,7 +389,7 @@ function renderSideList(){
   pacientes.forEach(p=>{
     const b=el('button','side-item'+(pacienteSel&&pacienteSel.id===p.id?' active':''));
     b.innerHTML='<span class="nm">'+esc(p.nome||'(sem nome)')+'</span><span class="mt">'+[idade(p.data_nascimento),p.cpf].filter(Boolean).map(esc).join(' · ')+'</span>';
-    b.onclick=()=>{ pacienteSel=p; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain(); };
+    b.onclick=async()=>{ pacienteSel=p; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain(); await carregarProblemasAlergias(); renderMain(); };
     box.appendChild(b);
   });
 }
@@ -345,23 +397,75 @@ let searchTimer;
 $('pac-search').addEventListener('input',e=>{ clearTimeout(searchTimer); searchTimer=setTimeout(()=>carregarPacientes(e.target.value.trim()),250); });
 
 // Novo paciente
-$('btn-novo-pac').onclick=()=> openM('m-pac');
+let pacEditando=null;
+function abrirModalPaciente(p){
+  pacEditando=p||null;
+  $('np-titulo').textContent=p?'Editar paciente':'Novo paciente';
+  $('np-nome').value=p?(p.nome||''):''; $('np-cpf').value=p?(p.cpf||''):''; $('np-cns').value=p?(p.cns||''):'';
+  $('np-nasc').value=p?(p.data_nascimento||''):''; $('np-sexo').value=p?(p.sexo||''):'';
+  $('np-mae').value=p?(p.nome_mae||''):''; $('np-tel').value=p?(p.telefone||''):'';
+  openM('m-pac');
+}
+$('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('np-save').onclick=async()=>{
   const nome=$('np-nome').value.trim(); if(!nome){ toast('Informe o nome',true); return; }
   const rec={ nome, cpf:$('np-cpf').value.trim()||null, cns:$('np-cns').value.trim()||null,
-    data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null, nome_mae:$('np-mae').value.trim()||null, telefone:$('np-tel').value.trim()||null };
-  const {data,error}=await sb.from('pep_pacientes').insert(rec).select().single();
-  if(error){ toast('Erro ao salvar: '+error.message,true); return; }
-  ['np-nome','np-cpf','np-cns','np-nasc','np-mae','np-tel'].forEach(i=>$(i).value=''); $('np-sexo').value='';
-  closeM('m-pac'); toast('Paciente cadastrado ✓');
-  await carregarPacientes(); pacienteSel=data; atendAtual=null; renderSideList(); renderMain();
+    data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null,
+    nome_mae:$('np-mae').value.trim()||null, telefone:$('np-tel').value.trim()||null };
+  const btn=$('np-save'); btn.disabled=true;
+  let res;
+  if(pacEditando) res=await sb.from('pep_pacientes').update(rec).eq('id',pacEditando.id).select().single();
+  else res=await sb.from('pep_pacientes').insert(rec).select().single();
+  btn.disabled=false;
+  if(res.error){ toast('Erro ao salvar: '+res.error.message,true); return; }
+  closeM('m-pac'); toast(pacEditando?'Paciente atualizado ✓':'Paciente cadastrado ✓');
+  const novo=res.data; pacEditando=null;
+  await carregarPacientes(); pacienteSel=novo; atendAtual=null; renderSideList(); renderMain();
 };
+
+// ---------- problemas e alergias do paciente ----------
+let problemas=[], alergias=[];
+async function carregarProblemasAlergias(){
+  problemas=[]; alergias=[];
+  if(!pacienteSel) return;
+  const [rp,ra]=await Promise.all([
+    sb.from('pep_problemas').select('*').eq('paciente_id',pacienteSel.id).order('criado_em',{ascending:true}),
+    sb.from('pep_alergias').select('*').eq('paciente_id',pacienteSel.id).order('criado_em',{ascending:true})]);
+  if(rp.error&&/does not exist|schema cache/i.test(rp.error.message||'')) toast('Rode o melhorias_schema.sql no Supabase',true);
+  problemas=rp.data||[]; alergias=ra.data||[];
+}
+function faixaAlergias(){
+  if(!alergias.length) return '';
+  return '<div class="alerta"><b>⚠ Alergias:</b> '+alergias.map(a=>esc(a.substancia)+(a.reacao?' ('+esc(a.reacao)+')':'')+(a.gravidade==='grave'?' — GRAVE':'')).join(' · ')+'</div>';
+}
+$('al-save').onclick=async()=>{
+  const sub=$('al-sub').value.trim(); if(!sub){ toast('Informe a substância',true); return; }
+  const {error}=await sb.from('pep_alergias').insert({paciente_id:pacienteSel.id,substancia:sub,
+    reacao:$('al-rea').value.trim()||null, gravidade:$('al-grav').value||null});
+  if(error){ toast('Erro: '+error.message,true); return; }
+  ['al-sub','al-rea'].forEach(x=>$(x).value=''); $('al-grav').value='';
+  closeM('m-alergia'); await carregarProblemasAlergias(); renderMain(); toast('Alergia registrada ✓');
+};
+$('pb-save').onclick=async()=>{
+  const desc=$('pb-desc').value.trim(); if(!desc){ toast('Informe a descrição',true); return; }
+  const {error}=await sb.from('pep_problemas').insert({paciente_id:pacienteSel.id,descricao:desc,
+    cid10:$('pb-cid').dataset.codigo||null, ciap2:$('pb-ciap').value.trim()||null, inicio:$('pb-inicio').value||null});
+  if(error){ toast('Erro: '+error.message,true); return; }
+  ['pb-cid','pb-desc','pb-ciap','pb-inicio'].forEach(x=>$(x).value=''); delete $('pb-cid').dataset.codigo;
+  closeM('m-problema'); await carregarProblemasAlergias(); renderMain(); toast('Problema registrado ✓');
+};
+async function removerProblema(id){ await sb.from('pep_problemas').delete().eq('id',id); await carregarProblemasAlergias(); renderMain(); }
+async function removerAlergia(id){ await sb.from('pep_alergias').delete().eq('id',id); await carregarProblemasAlergias(); renderMain(); }
+async function resolverProblema(pb){
+  await sb.from('pep_problemas').update({situacao: pb.situacao==='ativo'?'resolvido':'ativo'}).eq('id',pb.id);
+  await carregarProblemasAlergias(); renderMain();
+}
 
 // ---------- render principal ----------
 function renderMain(){
   const c=$('main-content'); c.innerHTML='';
   if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
-  if(atendAtual){ atendAtual.id?renderAtendimentoSalvo(c):renderAtendimento(c); return; }
+  if(atendAtual){ (atendAtual.id && !atendAtual.editando)?renderAtendimentoSalvo(c):renderAtendimento(c); return; }
   renderFichaPaciente(c);
 }
 
@@ -370,10 +474,42 @@ async function renderFichaPaciente(c){
   const head=el('div','phead');
   const ini=(p.nome||'?').trim().split(/\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase();
   head.innerHTML='<div class="avatar">'+esc(ini)+'</div><div><div class="nm">'+esc(p.nome)+'</div>'+
-    '<div class="mt">'+[p.sexo,idade(p.data_nascimento),p.cpf?('CPF '+esc(p.cpf)):''].filter(Boolean).map(esc).join(' · ')+'</div></div>'+
+    '<div class="mt">'+[p.sexo,idade(p.data_nascimento),p.cpf?('CPF '+p.cpf):'',p.telefone||''].filter(Boolean).map(esc).join(' · ')+'</div></div>'+
     '<div class="sp"></div>';
+  const bEdit=el('button','btn ghost','Editar'); bEdit.onclick=()=>abrirModalPaciente(p); head.appendChild(bEdit);
   const bNovo=el('button','btn primary','+ Novo atendimento'); bNovo.onclick=novoAtendimento; head.appendChild(bNovo);
   c.appendChild(head);
+
+  if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
+
+  // resumo: problemas e alergias
+  const res=el('div','resumo');
+  const cardP=el('div','card'), cardA=el('div','card');
+  cardP.innerHTML='<div class="ch">Problemas e condições</div>';
+  cardA.innerHTML='<div class="ch">Alergias e reações</div>';
+  const bP=el('button','btn ghost sm','+ Adicionar'); bP.onclick=()=>openM('m-problema'); cardP.firstChild.appendChild(bP);
+  const bA=el('button','btn ghost sm','+ Adicionar'); bA.onclick=()=>openM('m-alergia'); cardA.firstChild.appendChild(bA);
+  const bodyP=el('div','cb'), bodyA=el('div','cb');
+  if(!problemas.length) bodyP.appendChild(el('div','muted','Nenhum problema registrado.'));
+  problemas.forEach(pb=>{
+    const l=el('div','lin');
+    l.innerHTML='<span>'+esc(pb.descricao)+(pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+
+      (pb.situacao==='resolvido'?' <span class="tagc">resolvido</span>':'')+'</span>';
+    const bR=el('button','btn ghost sm',pb.situacao==='ativo'?'Resolver':'Reativar'); bR.onclick=()=>resolverProblema(pb);
+    const bX=el('button','x','✕'); bX.title='Remover'; bX.onclick=()=>removerProblema(pb.id);
+    const w=el('span','lin'); w.style.marginLeft='auto'; w.appendChild(bR); w.appendChild(bX); l.appendChild(w);
+    bodyP.appendChild(l);
+  });
+  if(!alergias.length) bodyA.appendChild(el('div','muted','Nenhuma alergia registrada.'));
+  alergias.forEach(a=>{
+    const l=el('div','lin');
+    l.innerHTML='<span><b>'+esc(a.substancia)+'</b>'+(a.reacao?' — '+esc(a.reacao):'')+
+      (a.gravidade?' <span class="tagc tagr">'+esc(a.gravidade)+'</span>':'')+'</span>';
+    const bX=el('button','x','✕'); bX.onclick=()=>removerAlergia(a.id); l.appendChild(bX);
+    bodyA.appendChild(l);
+  });
+  cardP.appendChild(bodyP); cardA.appendChild(bodyA);
+  res.appendChild(cardP); res.appendChild(cardA); c.appendChild(res);
 
   c.appendChild(el('div','sec-title','Atendimentos'));
   const card=el('div','card'); c.appendChild(card);
@@ -392,47 +528,157 @@ async function renderFichaPaciente(c){
 }
 
 // ---------- dados do profissional (ficam neste navegador) ----------
-function dadosProf(){ let d={nome:'',crm:'',unidade:''};
-  try{ d=Object.assign(d,JSON.parse(localStorage.getItem('pep_prof')||'{}')); }catch(e){}
-  return d; }
-$('btn-prof').onclick=()=>{ const d=dadosProf(); $('pf-nome').value=d.nome; $('pf-crm').value=d.crm; $('pf-unidade').value=d.unidade; openM('m-prof'); };
-$('pf-save').onclick=()=>{
-  const d={nome:$('pf-nome').value.trim(),crm:$('pf-crm').value.trim(),unidade:$('pf-unidade').value.trim()};
+let profCache={nome:'',crm:'',uf_crm:'',especialidade:'',unidade:''};
+function dadosProf(){ return profCache; }
+function lerProfLocal(){ try{ return JSON.parse(localStorage.getItem('pep_prof')||'{}'); }catch(e){ return {}; } }
+async function carregarProf(){
+  const {data,error}=await sb.from('pep_profissional').select('nome,crm,uf_crm,especialidade,unidade').maybeSingle();
+  if(error){ if(/does not exist|schema cache/i.test(error.message||'')) toast('Rode o profissional_schema.sql no Supabase',true);
+             profCache=Object.assign(profCache,lerProfLocal()); return; }
+  if(data){ profCache=Object.assign(profCache,data); return; }
+  // ainda não há registro: aproveita o que estava salvo neste navegador
+  const loc=lerProfLocal();
+  if(loc&&loc.nome){ profCache=Object.assign(profCache,loc);
+    const {error:e2}=await sb.from('pep_profissional').upsert(Object.assign({user_id:(await sb.auth.getUser()).data.user.id},profCache),{onConflict:'user_id'});
+    if(!e2){ try{ localStorage.removeItem('pep_prof'); }catch(e){} toast('Seus dados de impressão foram salvos na conta ✓'); }
+  }
+}
+$('btn-prof').onclick=()=>{ const d=dadosProf();
+  $('pf-nome').value=d.nome||''; $('pf-crm').value=d.crm||''; $('pf-uf').value=d.uf_crm||'';
+  $('pf-esp').value=d.especialidade||''; $('pf-unidade').value=d.unidade||''; openM('m-prof'); };
+$('pf-save').onclick=async()=>{
+  const d={nome:$('pf-nome').value.trim(),crm:$('pf-crm').value.trim(),uf_crm:$('pf-uf').value.trim().toUpperCase(),
+           especialidade:$('pf-esp').value.trim(),unidade:$('pf-unidade').value.trim()};
   if(!d.nome){ toast('Informe o nome do profissional',true); return; }
-  try{ localStorage.setItem('pep_prof',JSON.stringify(d)); }catch(e){ toast('Não foi possível salvar neste navegador',true); return; }
-  closeM('m-prof'); toast('Dados salvos ✓');
+  const btn=$('pf-save'); btn.disabled=true;
+  const u=(await sb.auth.getUser()).data.user;
+  const {error}=await sb.from('pep_profissional').upsert(Object.assign({user_id:u.id},d),{onConflict:'user_id'});
+  btn.disabled=false;
+  if(error){ toast('Erro ao salvar: '+error.message,true); return; }
+  profCache=Object.assign(profCache,d); closeM('m-prof'); toast('Dados salvos na sua conta ✓');
 };
 
 // ---------- impressão (receita / solicitação de exames) ----------
 function dataBRsimples(iso){ if(!iso) return ''; const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso+'T12:00:00':iso); return d.toLocaleDateString('pt-BR'); }
-function imprimirDoc(titulo,itensHTML,obsHTML,quando){
+function montarDoc(titulo,itens,obs,quando){
   const pr=dadosProf(), p=pacienteSel||{};
-  if(!pr.nome){ toast('Preencha os dados para impressão primeiro',true); $('btn-prof').click(); return; }
-  const ident=[['Paciente',p.nome],['Nascimento',p.data_nascimento?dataBRsimples(p.data_nascimento)+' ('+idade(p.data_nascimento)+')':''],
-               ['CPF',p.cpf],['CNS',p.cns]].filter(x=>x[1]);
+  if(!pr.nome){ toast('Preencha os dados para impressão primeiro',true); $('btn-prof').click(); return null; }
+  return { titulo, itens, obs:obs||[], quando: quando||new Date().toISOString(), prof:pr,
+    ident:[['Paciente',p.nome],['Nascimento',p.data_nascimento?dataBRsimples(p.data_nascimento)+' ('+idade(p.data_nascimento)+')':''],
+           ['CPF',p.cpf],['CNS',p.cns]].filter(x=>x[1]),
+    assinatura:[pr.nome, pr.crm?('CRM '+[pr.uf_crm,pr.crm].filter(Boolean).join(' ')):'', pr.especialidade||''].filter(Boolean) };
+}
+function imprimirDoc(d){
+  if(!d) return;
   $('print-area').innerHTML=
-    '<div class="pr-cab">'+(pr.unidade?'<div class="pr-un">'+esc(pr.unidade)+'</div>':'')+'<h1>'+esc(titulo)+'</h1></div>'+
-    '<div class="pr-pac">'+ident.map(x=>'<div><b>'+esc(x[0])+':</b> '+esc(x[1])+'</div>').join('')+'</div>'+
-    '<div class="pr-corpo">'+itensHTML+'</div>'+(obsHTML||'')+
-    '<div class="pr-ass"><div class="pr-linha"></div><div>'+esc(pr.nome)+'</div>'+
-      (pr.crm?'<div>CRM '+esc(pr.crm)+'</div>':'')+
-      '<div class="pr-data">'+esc(dataBRsimples(quando||new Date().toISOString()))+'</div></div>';
+    '<div class="pr-cab">'+(d.prof.unidade?'<div class="pr-un">'+esc(d.prof.unidade)+'</div>':'')+'<h1>'+esc(d.titulo)+'</h1></div>'+
+    '<div class="pr-pac">'+d.ident.map(x=>'<div><b>'+esc(x[0])+':</b> '+esc(x[1])+'</div>').join('')+'</div>'+
+    '<div class="pr-corpo">'+d.itens.map((it,i)=>'<div class="it"><div class="'+(d.semNumero?'p':'n')+'">'+
+        (d.semNumero?'':(i+1)+'. ')+esc(it.n)+'</div>'+
+        (it.d?'<div class="d">'+esc(it.d)+'</div>':'')+'</div>').join('')+'</div>'+
+    (d.obs.length?'<div class="pr-obs">'+d.obs.map(o=>'<b>'+esc(o[0])+':</b> '+esc(o[1])).join('<br>')+'</div>':'')+
+    '<div class="pr-ass"><div class="pr-linha"></div>'+d.assinatura.map(l=>'<div>'+esc(l)+'</div>').join('')+
+      '<div class="pr-data">'+esc(dataBRsimples(d.quando))+'</div></div>';
   window.print();
 }
-function imprimirReceita(meds,quando){
-  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return; }
-  imprimirDoc('Receituário', meds.map((m,i)=>{
-    const pos=[m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(', ');
-    return '<div class="it"><div class="n">'+(i+1)+'. '+esc(m.medicamento)+(m.quantidade?' &mdash; '+esc(m.quantidade):'')+
-           (m.uso_continuo?' (uso contínuo)':'')+'</div>'+(pos?'<div class="d">'+esc(pos)+'</div>':'')+'</div>';
-  }).join(''), '', quando);
+// ---------- PDF (arquivo de verdade; é o que será assinado digitalmente) ----------
+const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:'?');};
+const limpar=t=>String(t==null?'':t).split('').map(WIN).join('');
+async function gerarPDF(d){
+  if(!d) return null;
+  if(!window.PDFLib) { toast('Biblioteca de PDF não carregou; recarregue a página',true); return null; }
+  const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  const doc=await PDFDocument.create();
+  doc.setTitle(limpar(d.titulo)); doc.setCreator('PEP Clínico'); doc.setProducer('PEP Clínico');
+  const normal=await doc.embedFont(StandardFonts.Helvetica), negrito=await doc.embedFont(StandardFonts.HelveticaBold);
+  const L=40, R=555.28, TOPO=801.89, BASE=60;
+  let pg=doc.addPage([595.28,841.89]), y=TOPO;
+  const novaPagina=()=>{ pg=doc.addPage([595.28,841.89]); y=TOPO; };
+  const espaco=h=>{ if(y-h<BASE) novaPagina(); };
+  const quebrar=(txt,f,t,larg)=>{ const out=[]; let linha='';
+    for(const w of limpar(txt).split(/\s+/)){ const tent=linha?linha+' '+w:w;
+      if(f.widthOfTextAtSize(tent,t)>larg && linha){ out.push(linha); linha=w; } else linha=tent; }
+    if(linha) out.push(linha); return out; };
+  const escrever=(txt,{f=normal,t=11,x=L,gap=14,centro=false,larg=R-L}={})=>{
+    for(const ln of quebrar(txt,f,t,larg)){ espaco(gap);
+      const px=centro?(L+(larg-f.widthOfTextAtSize(ln,t))/2):x;
+      pg.drawText(ln,{x:px,y:y-t,size:t,font:f,color:rgb(0,0,0)}); y-=gap; } };
+  const linhaH=(x1,x2,g=10)=>{ espaco(g); pg.drawLine({start:{x:x1,y:y-4},end:{x:x2,y:y-4},thickness:1,color:rgb(0,0,0)}); y-=g; };
+
+  if(d.prof.unidade) escrever(d.prof.unidade,{t:11,centro:true,gap:15});
+  escrever(d.titulo.toUpperCase(),{f:negrito,t:14,centro:true,gap:20});
+  linhaH(L,R,14);
+  for(const [k,v] of d.ident){ espaco(14);
+    pg.drawText(limpar(k+':'),{x:L,y:y-10,size:10,font:negrito});
+    pg.drawText(limpar(v),{x:L+negrito.widthOfTextAtSize(limpar(k+':'),10)+4,y:y-10,size:10,font:normal}); y-=14; }
+  y-=10;
+  d.itens.forEach((it,i)=>{ espaco(30);
+    if(d.semNumero) escrever(it.n,{t:11,gap:17});
+    else escrever((i+1)+'. '+it.n,{f:negrito,t:11,gap:15});
+    if(it.d) escrever(it.d,{t:10,x:L+16,gap:13,larg:R-L-16});
+    y-=d.semNumero?10:6; });
+  if(d.obs.length){ y-=8; linhaH(L,R,12);
+    for(const [k,v] of d.obs) escrever(k+': '+v,{t:10,gap:13}); }
+
+  // assinatura no rodapé da última página
+  const alturaAss=22+d.assinatura.length*13+20;
+  if(y-alturaAss<BASE) novaPagina();
+  y=Math.max(BASE+alturaAss, 170);
+  pg.drawLine({start:{x:197,y:y},end:{x:398,y:y},thickness:1,color:rgb(0,0,0)}); y-=16;
+  for(const ln of d.assinatura){ const w=normal.widthOfTextAtSize(limpar(ln),10);
+    pg.drawText(limpar(ln),{x:(595.28-w)/2,y:y,size:10,font:normal}); y-=13; }
+  const dt=dataBRsimples(d.quando), wd=normal.widthOfTextAtSize(limpar(dt),10);
+  pg.drawText(limpar(dt),{x:(595.28-wd)/2,y:y-8,size:10,font:normal});
+  return doc.save();
 }
-function imprimirExames(exames,cab,quando){
-  if(!exames||!exames.length){ toast('Não há exames nesta solicitação',true); return; }
-  const obs=[cab&&cab.cid10?'<b>CID-10:</b> '+esc(cab.cid10):'',cab&&cab.justificativa?'<b>Justificativa:</b> '+esc(cab.justificativa):''].filter(Boolean).join('<br>');
-  imprimirDoc('Solicitação de exames',
-    exames.map((e,i)=>'<div class="it"><div class="n">'+(i+1)+'. '+esc(e.no_procedimento)+'</div><div class="d">Código SIGTAP '+esc(e.co_procedimento)+'</div></div>').join(''),
-    obs?'<div class="pr-obs">'+obs+'</div>':'', quando);
+const sluga=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();
+function nomeArquivo(d){
+  return [sluga(d.titulo), sluga(pacienteSel&&pacienteSel.nome||'paciente'), dataBRsimples(d.quando).replace(/\//g,'-')].filter(Boolean).join('-')+'.pdf';
+}
+async function baixarPDF(d){
+  const bytes=await gerarPDF(d); if(!bytes) return;
+  const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+  const a=document.createElement('a'); a.href=url; a.download=nomeArquivo(d); document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  toast('PDF gerado ✓');
+}
+function docReceita(meds,quando){
+  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
+  return montarDoc('Receituário', meds.map(m=>({
+    n: m.medicamento+(m.quantidade?' - '+m.quantidade:'')+(m.uso_continuo?' (uso contínuo)':''),
+    d: [m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(', ') })), [], quando);
+}
+function docAtestado(at,quando){
+  if(!at) return null;
+  const p=pacienteSel||{};
+  const rot={afastamento:'Atestado médico',comparecimento:'Declaração de comparecimento',
+             acompanhante:'Declaração de acompanhante',aptidao:'Atestado de aptidão física'};
+  let corpo;
+  const ext=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze',
+    'dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco',
+    'vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta','trinta e um'];
+  const diasTxt=n=> n==null||n==='' ? '___ dias' : (ext[n]? n+' ('+ext[n]+') '+(n==1?'dia':'dias') : n+(n==1?' dia':' dias'));
+  if(at.tipo==='afastamento')
+    corpo='Atesto, para os devidos fins, que o(a) paciente acima necessita de afastamento de suas atividades por '+
+          diasTxt(at.dias)+', a partir desta data.';
+  else if(at.tipo==='comparecimento')
+    corpo='Declaro, para os devidos fins, que o(a) paciente acima compareceu a esta consulta médica nesta data.';
+  else if(at.tipo==='acompanhante')
+    corpo='Declaro, para os devidos fins, que o(a) acima identificado(a) acompanhou paciente a esta consulta médica nesta data.';
+  else
+    corpo='Atesto, para os devidos fins, que o(a) paciente acima foi avaliado(a) e encontra-se apto(a) para a prática de atividade física.';
+  const itens=[{n:corpo,d:''}];
+  if(at.texto) itens.push({n:at.texto,d:''});
+  const obs=at.cid10?[['CID-10',at.cid10]]:[];
+  const d=montarDoc(rot[at.tipo]||'Atestado', itens, obs, quando);
+  if(d) d.semNumero=true;
+  return d;
+}
+function docExames(exames,cab,quando){
+  if(!exames||!exames.length){ toast('Não há exames nesta solicitação',true); return null; }
+  const obs=[]; if(cab&&cab.cid10) obs.push(['CID-10',cab.cid10]); if(cab&&cab.justificativa) obs.push(['Justificativa',cab.justificativa]);
+  return montarDoc('Solicitação de exames',
+    exames.map(e=>({n:e.no_procedimento, d:'Código SIGTAP '+e.co_procedimento})), obs, quando);
 }
 
 // ---------- ver um atendimento já salvo (somente leitura) ----------
@@ -453,6 +699,9 @@ async function renderAtendimentoSalvo(c){
   if(sols&&sols.length){ cab=sols[0];
     const {data:it}=await sb.from('pep_solicitacao_itens').select('co_procedimento,no_procedimento').in('solicitacao_id',sols.map(x=>x.id));
     exames=it||[]; }
+  let atest=null;
+  const {data:ats2}=await sb.from('pep_atestados').select('*').eq('atendimento_id',a.id);
+  if(ats2&&ats2.length) atest=ats2[0];
   const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',a.id);
   if(recs&&recs.length){
     const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(x=>x.id)).order('ordem',{ascending:true});
@@ -482,24 +731,75 @@ async function renderAtendimentoSalvo(c){
           meds.map(m=>'<tr><td>'+esc(m.medicamento)+(m.uso_continuo?' <span class="chip">contínuo</span>':'')+'</td><td class="muted">'+
             esc([m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td></tr>').join('')+'</tbody></table>'
         : '<div class="muted">Nenhum medicamento prescrito.</div>')+
+      (atest?'<h3 style="font-size:14px;margin:18px 0 8px">Atestado</h3><div class="ro">'+
+        esc({afastamento:'Afastamento',comparecimento:'Comparecimento',acompanhante:'Acompanhante',aptidao:'Aptidão física'}[atest.tipo]||atest.tipo)+
+        (atest.dias?' — '+esc(atest.dias)+' dia(s)':'')+(atest.cid10?' · CID-10 '+esc(atest.cid10):'')+'</div>':'')+
     '</div></div>';
 
   const acoes=el('div','', '');
   acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
-  if(exames.length){ const b=el('button','btn ghost','Imprimir solicitação de exames'); b.onclick=()=>imprimirExames(exames,cab,a.data_atendimento); acoes.appendChild(b); }
-  if(meds.length){ const b=el('button','btn primary','Imprimir receita'); b.onclick=()=>imprimirReceita(meds,a.data_atendimento); acoes.appendChild(b); }
+  if(exames.length){
+    const b1=el('button','btn ghost','Imprimir exames'); b1.onclick=()=>imprimirDoc(docExames(exames,cab,a.data_atendimento)); acoes.appendChild(b1);
+    const b2=el('button','btn ghost','PDF dos exames'); b2.onclick=()=>baixarPDF(docExames(exames,cab,a.data_atendimento)); acoes.appendChild(b2); }
+  if(meds.length){
+    const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento)); acoes.appendChild(b3);
+    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento)); acoes.appendChild(b4); }
+  if(atest){
+    const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento)); acoes.appendChild(b5);
+    const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento)); acoes.appendChild(b6); }
+  const bEd=el('button','btn ghost','Editar atendimento');
+  bEd.onclick=()=>{
+    examItens.length=0; prescItens.length=0; probSel=new Set();
+    exames.forEach(e=>examItens.push({co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento}));
+    meds.forEach(m=>prescItens.push({medicamento:m.medicamento,via:m.via||'',dose:m.dose||'',frequencia:m.frequencia||'',
+      duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo}));
+    exameCab=cab?{cid10:cab.cid10||'',justificativa:cab.justificativa||''}:null;
+    atestado=atest?{tipo:atest.tipo,dias:atest.dias,cid10:atest.cid10,texto:atest.texto}:null;
+    atendAtual={id:a.id,editando:true,dados:a}; renderMain();
+  };
+  acoes.insertBefore(bEd,acoes.firstChild);
   if(acoes.children.length) box.appendChild(acoes);
 }
 
 // ---------- atendimento (SOAP) ----------
-function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; renderMain(); }
+let atestado=null, probSel=new Set();
+function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; atestado=null; probSel=new Set(); exameCab=null; renderMain(); }
+let exameCab=null;
+
+async function repetirUltima(){
+  const {data:ats}=await sb.from('pep_atendimentos').select('id,data_atendimento').eq('paciente_id',pacienteSel.id)
+    .order('data_atendimento',{ascending:false}).limit(1);
+  if(!ats||!ats.length){ toast('Não há atendimento anterior',true); return; }
+  const id=ats[0].id;
+  const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',id);
+  if(recs&&recs.length){
+    const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(r=>r.id)).order('ordem',{ascending:true});
+    (mi||[]).forEach(m=>prescItens.push({medicamento:m.medicamento,via:m.via||'',dose:m.dose||'',frequencia:m.frequencia||'',
+      duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo}));
+  }
+  const {data:sols}=await sb.from('pep_solicitacoes_exames').select('id,cid10,justificativa').eq('atendimento_id',id);
+  if(sols&&sols.length){
+    exameCab={cid10:sols[0].cid10||'',justificativa:sols[0].justificativa||''};
+    const {data:it}=await sb.from('pep_solicitacao_itens').select('co_procedimento,no_procedimento').in('solicitacao_id',sols.map(x=>x.id));
+    (it||[]).forEach(e=>{ if(!examItens.find(x=>x.co_procedimento===e.co_procedimento)) examItens.push({co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento}); });
+  }
+  const n=prescItens.length, m=examItens.length;
+  if(!n&&!m){ toast('O atendimento anterior não tinha receita nem exames',true); return; }
+  renderMain();
+  toast('Trazido de '+dataBR(ats[0].data_atendimento)+': '+n+' medicamento(s), '+m+' exame(s)');
+}
+
 function renderAtendimento(c){
-  const p=pacienteSel;
+  const p=pacienteSel, edit=!!(atendAtual&&atendAtual.editando);
   const head=el('div','phead');
-  head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">Novo atendimento · '+[p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
+  head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">'+(edit?'Editando atendimento':'Novo atendimento')+' · '+
+    [p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
+  if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
   const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
   c.appendChild(head);
+  if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
 
+  const ativos=problemas.filter(x=>x.situacao==='ativo');
   c.insertAdjacentHTML('beforeend', `
    <div class="soap">
     <div class="sbox"><div class="h">Tipo de atendimento</div><div class="bd">
@@ -523,13 +823,22 @@ function renderAtendimento(c){
       </div></div></div>
 
     <div class="sbox a"><div class="h"><span class="bdg">A</span> Avaliação</div><div class="bd">
-      <textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div></div>
+      <div class="field"><textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
+      <label style="margin-bottom:6px">Problemas avaliados nesta consulta</label>
+      <div id="f-probs">`+
+        (ativos.length ? ativos.map(pb=>'<label class="chkp"><input type="checkbox" value="'+pb.id+'"> '+esc(pb.descricao)+
+            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</label>').join('')
+          : '<div class="muted">Nenhum problema ativo. Use o botão abaixo para registrar.</div>')+`
+      </div>
+      <button class="btn ghost sm" id="f-addprob" style="margin-top:8px">+ Novo problema / condição</button>
+    </div></div>
 
     <div class="sbox p"><div class="h"><span class="bdg">P</span> Plano</div><div class="bd">
       <div class="field"><textarea id="f-p" class="f" placeholder="Plano de cuidado…"></textarea></div>
       <div class="ptabs">
         <button class="ptab active" data-pt="ex">Exames</button>
         <button class="ptab" data-pt="rx">Prescrição</button>
+        <button class="ptab" data-pt="at">Atestado</button>
       </div>
       <div data-panel="ex">
         <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
@@ -541,23 +850,49 @@ function renderAtendimento(c){
         <table style="margin-top:10px"><thead><tr><th>Medicamento</th><th>Posologia</th><th>Qtd.</th><th></th></tr></thead><tbody id="rx-tbody"></tbody></table>
         <div id="rx-empty" class="muted" style="margin-top:8px">Nenhum medicamento prescrito.</div>
       </div>
+      <div data-panel="at" class="hidden">
+        <div class="grid">
+          <div class="field"><label>Tipo</label><select id="at-tipo" class="f">
+            <option value="">Não emitir atestado</option>
+            <option value="afastamento">Afastamento do trabalho</option>
+            <option value="comparecimento">Comparecimento à consulta</option>
+            <option value="acompanhante">Acompanhante</option>
+            <option value="aptidao">Aptidão física</option></select></div>
+          <div class="field"><label>Dias de afastamento</label><input id="at-dias" class="f" type="number" min="1" placeholder="Ex.: 3"></div>
+          <div class="field"><label>CID-10 (opcional)</label><input id="at-cid" class="f" placeholder="Ex.: J06"></div>
+        </div>
+        <div class="field" style="margin:0"><label>Observação</label><textarea id="at-obs" class="f" placeholder="Texto adicional do atestado (opcional)"></textarea></div>
+        <div class="muted" style="margin-top:8px">O CID só deve constar com autorização do paciente.</div>
+      </div>
     </div></div>
 
     <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:30px">
       <button class="btn ghost" id="btn-cancelar">Cancelar</button>
-      <button class="btn primary" id="btn-finalizar">Finalizar e salvar atendimento</button>
+      <button class="btn primary" id="btn-finalizar">`+(edit?'Salvar alterações':'Finalizar e salvar atendimento')+`</button>
     </div>
    </div>`);
 
-  // tabs do plano
   c.querySelectorAll('.ptab').forEach(t=>t.onclick=()=>{
     c.querySelectorAll('.ptab').forEach(x=>x.classList.toggle('active',x===t));
     c.querySelectorAll('[data-panel]').forEach(pn=>pn.classList.toggle('hidden',pn.dataset.panel!==t.dataset.pt));
   });
   $('open-exam').onclick=()=>{ renderExChips(); exDiag(''); openM('m-exam'); };
   $('open-presc').onclick=()=> openM('m-presc');
+  $('f-addprob').onclick=()=> openM('m-problema');
   $('btn-cancelar').onclick=()=>{ atendAtual=null; renderMain(); };
   $('btn-finalizar').onclick=finalizar;
+  c.querySelectorAll('#f-probs input').forEach(cb=>{
+    cb.checked=probSel.has(cb.value);
+    cb.onchange=()=>{ cb.checked?probSel.add(cb.value):probSel.delete(cb.value); };
+  });
+  if(exameCab){ $('ex-cid').value=exameCab.cid10||''; $('ex-just').value=exameCab.justificativa||''; }
+  if(atestado){ $('at-tipo').value=atestado.tipo||''; $('at-dias').value=atestado.dias||''; $('at-cid').value=atestado.cid10||''; $('at-obs').value=atestado.texto||''; }
+  if(atendAtual&&atendAtual.dados){ const d=atendAtual.dados;
+    $('f-tipo').value=d.tipo_atendimento||'no_dia'; $('f-s').value=d.subjetivo||''; $('f-o').value=d.objetivo||'';
+    $('f-a').value=d.avaliacao||''; $('f-p').value=d.plano||'';
+    [['f-pas','pa_sistolica'],['f-pad','pa_diastolica'],['f-fc','fc'],['f-peso','peso_kg'],['f-alt','altura_cm'],['f-gli','glicemia_capilar']]
+      .forEach(([el2,k])=>{ if(d[k]!=null) $(el2).value=d[k]; });
+  }
   renderExTable(); renderRxTable();
 }
 
@@ -608,20 +943,36 @@ $('pr-add').onclick=()=>{
 
 // ---------- finalizar: grava tudo no Supabase ----------
 async function finalizar(){
-  const btn=$('btn-finalizar'); btn.disabled=true; btn.textContent='Salvando…';
+  const btn=$('btn-finalizar'); const edit=!!(atendAtual&&atendAtual.editando);
+  btn.disabled=true; btn.textContent='Salvando…';
   const num=id=>{ const v=$(id).value.trim(); return v===''?null:Number(v); };
   try{
-    const {data:at,error:e1}=await sb.from('pep_atendimentos').insert({
-      paciente_id:pacienteSel.id, tipo_atendimento:$('f-tipo').value,
+    const campos={ tipo_atendimento:$('f-tipo').value,
       subjetivo:$('f-s').value||null, objetivo:$('f-o').value||null, avaliacao:$('f-a').value||null, plano:$('f-p').value||null,
-      pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'), altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'),
-      status:'finalizado'
-    }).select().single();
-    if(e1) throw e1;
+      pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'),
+      altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'), status:'finalizado' };
+    let at;
+    if(edit){
+      const {data,error}=await sb.from('pep_atendimentos').update(campos).eq('id',atendAtual.id).select().single();
+      if(error) throw error; at=data;
+      // substitui os filhos para não duplicar
+      const {data:sols}=await sb.from('pep_solicitacoes_exames').select('id').eq('atendimento_id',at.id);
+      if(sols&&sols.length) await sb.from('pep_solicitacoes_exames').delete().eq('atendimento_id',at.id);
+      const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',at.id);
+      if(recs&&recs.length) await sb.from('pep_prescricoes').delete().eq('atendimento_id',at.id);
+      await sb.from('pep_atestados').delete().eq('atendimento_id',at.id);
+      await sb.from('pep_atendimento_problemas').delete().eq('atendimento_id',at.id);
+    } else {
+      const {data,error}=await sb.from('pep_atendimentos').insert(Object.assign({paciente_id:pacienteSel.id},campos)).select().single();
+      if(error) throw error; at=data;
+    }
+
     if(examItens.length){
-      const {data:sol,error:e2}=await sb.from('pep_solicitacoes_exames').insert({atendimento_id:at.id,tipo:'comum',cid10:$('ex-cid').value||null,justificativa:$('ex-just').value||null}).select().single();
+      const {data:sol,error:e2}=await sb.from('pep_solicitacoes_exames')
+        .insert({atendimento_id:at.id,tipo:'comum',cid10:$('ex-cid').value||null,justificativa:$('ex-just').value||null}).select().single();
       if(e2) throw e2;
-      const {error:e3}=await sb.from('pep_solicitacao_itens').insert(examItens.map(e=>({solicitacao_id:sol.id,co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento})));
+      const {error:e3}=await sb.from('pep_solicitacao_itens')
+        .insert(examItens.map(e=>({solicitacao_id:sol.id,co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento})));
       if(e3) throw e3;
     }
     if(prescItens.length){
@@ -630,9 +981,23 @@ async function finalizar(){
       const {error:e5}=await sb.from('pep_prescricao_itens').insert(prescItens.map((m,i)=>({prescricao_id:rec.id,...m,ordem:i+1})));
       if(e5) throw e5;
     }
-    toast('Atendimento salvo ✓'); atendAtual={id:at.id}; renderMain();
+    const tipoAt=$('at-tipo')?$('at-tipo').value:'';
+    if(tipoAt){
+      const dias=$('at-dias').value.trim();
+      const {error:e6}=await sb.from('pep_atestados').insert({atendimento_id:at.id,tipo:tipoAt,
+        dias:dias===''?null:Number(dias), cid10:$('at-cid').value.trim()||null, texto:$('at-obs').value.trim()||null});
+      if(e6) throw e6;
+    }
+    if(probSel.size){
+      const sel=problemas.filter(x=>probSel.has(x.id));
+      const {error:e7}=await sb.from('pep_atendimento_problemas').insert(sel.map(x=>({atendimento_id:at.id,
+        descricao:x.descricao, ciap2:x.ciap2||null, cid10:x.cid10||null, situacao:x.situacao})));
+      if(e7) throw e7;
+    }
+    toast(edit?'Alterações salvas ✓':'Atendimento salvo ✓');
+    atendAtual={id:at.id}; renderMain();
   }catch(err){ toast('Erro ao salvar: '+(err.message||err),true); }
-  finally{ btn.disabled=false; btn.textContent='Finalizar e salvar atendimento'; }
+  finally{ btn.disabled=false; btn.textContent=edit?'Salvar alterações':'Finalizar e salvar atendimento'; }
 }
 
 // ---------- utils ----------
@@ -731,6 +1096,220 @@ async function importarSigtap(file){
 }
 $('btn-sigtap').onclick=()=>$('sigtap-file').click();
 $('sigtap-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarSigtap(f); });
+
+// ---------- CSV: leitor tolerante (delimitador e cabeçalho variáveis) ----------
+// Lê CSV com ; ou , ou TAB, respeita campos entre aspas, e devolve
+// {cols:[NOMES_EM_MAIUSCULA], linhas:[{COL:valor}]}. Encoding ISO-8859-1 (DATASUS)
+// com queda para UTF-8 quando o arquivo vier do Excel moderno.
+function decodificar(buf){
+  const latin=new TextDecoder('iso-8859-1').decode(buf);
+  try{ const utf=new TextDecoder('utf-8',{fatal:true}).decode(buf);
+       // se decodifica como UTF-8 sem erro e tem acento, é UTF-8
+       if(/[\u00c0-\u00ff]/.test(utf)||!/[\u00c0-\u00ff]/.test(latin)) return utf;
+  }catch(e){}
+  return latin;
+}
+function parseCSV(txt){
+  txt=txt.replace(/^\ufeff/,'');
+  const prim=(txt.split(/\r?\n/).find(l=>l.trim())||'');
+  const cont=d=>(prim.split(d).length-1);
+  const delim=[';','\t',','].sort((a,b)=>cont(b)-cont(a))[0];
+  const linhasTxt=[]; let campo='',linha=[],aspas=false;
+  for(let i=0;i<txt.length;i++){ const ch=txt[i];
+    if(aspas){ if(ch==='"'){ if(txt[i+1]==='"'){campo+='"';i++;} else aspas=false; } else campo+=ch; continue; }
+    if(ch==='"'){ aspas=true; continue; }
+    if(ch===delim){ linha.push(campo); campo=''; continue; }
+    if(ch==='\n'){ linha.push(campo); linhasTxt.push(linha); linha=[]; campo=''; continue; }
+    if(ch==='\r') continue;
+    campo+=ch;
+  }
+  if(campo!==''||linha.length){ linha.push(campo); linhasTxt.push(linha); }
+  const brutas=linhasTxt.filter(l=>l.some(c=>String(c).trim()!==''));
+  if(!brutas.length) return {cols:[],linhas:[]};
+  const cols=brutas[0].map(c=>String(c).trim().toUpperCase().replace(/[^A-Z0-9_]/g,''));
+  const linhas=brutas.slice(1).map(l=>{ const o={}; cols.forEach((c,i)=>o[c]=(l[i]===undefined?'':String(l[i]).trim())); return o; });
+  return {cols,linhas};
+}
+// acha a coluna cujo nome casa com um dos padrões, na ordem dada
+const acharCol=(cols,...pads)=>{ for(const p of pads){ const c=cols.find(x=>p instanceof RegExp?p.test(x):x===p); if(c) return c; } return null; };
+
+// ---------- importar a CID-10 oficial (CID10CSV.zip do DATASUS) ----------
+// Aceita o ZIP inteiro ou um único .csv de dentro dele.
+async function importarCid10(file){
+  const st=$('sigtap-status');
+  const fmt=c=>{ c=(c||'').toUpperCase().replace(/[^A-Z0-9]/g,''); return c.length>3 ? c.slice(0,3)+'.'+c.slice(3) : c; };
+  try{
+    st.textContent='Lendo o arquivo…';
+    // 1) junta os CSVs que interessam, venham do ZIP ou soltos
+    const arquivos={};   // chave lógica -> texto
+    const classificar=(nome,txt)=>{
+      const n=nome.toUpperCase();
+      if(/SUBCATEG/.test(n)) arquivos.sub=txt;
+      else if(/CATEG/.test(n)) arquivos.cat=txt;
+      else if(/CAPITULO/.test(n)) arquivos.cap=txt;
+      else if(/GRUPO/.test(n)) arquivos.gru=txt;
+      else { // csv solto sem nome reconhecível: decide pelo cabeçalho
+        const {cols}=parseCSV(txt);
+        if(cols.includes('SUBCAT')) arquivos.sub=txt;
+        else if(cols.includes('CAT')) arquivos.cat=txt;
+        else if(cols.includes('NUMCAP')) arquivos.cap=txt;
+        else if(cols.includes('CATINIC')) arquivos.gru=txt;
+      }
+    };
+    let doSigtap=null;
+    if(/\.zip$/i.test(file.name)){
+      if(!window.JSZip) throw new Error('Biblioteca de ZIP não carregou; recarregue a página.');
+      const zip=await JSZip.loadAsync(file);
+      // O pacote da SIGTAP traz uma tabela de CID (tb_cid.txt) com o seu
+      // próprio layout. Serve de alternativa quando o CID10CSV.zip do DATASUS
+      // não está acessível — um download resolve exames e CID.
+      const temCid=Object.values(zip.files).some(f=>!f.dir&&/^tb_cid\.txt$/i.test(f.name.split('/').pop()));
+      if(temCid){ doSigtap=await lerTabelaZip(zip,'tb_cid'); }
+      else{
+        const csvs=Object.values(zip.files).filter(f=>!f.dir&&/\.csv$/i.test(f.name));
+        if(!csvs.length) throw new Error('O ZIP não tem .csv da CID-10 nem tb_cid.txt da SIGTAP dentro.');
+        for(const f of csvs) classificar(f.name.split('/').pop(), decodificar(await f.async('uint8array')));
+      }
+    } else {
+      classificar(file.name, decodificar(await file.arrayBuffer()));
+    }
+
+    // ---- caminho SIGTAP: tb_cid.txt (largura fixa, lido pelo próprio layout)
+    if(doSigtap){
+      const cod=r=>(r.CO_CID||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+      const linhas=doSigtap.map(r=>({codigo:cod(r), codigo_fmt:fmt(cod(r)), descricao:(r.NO_CID||'').trim(),
+          descricao_abrev:null, nivel:cod(r).length>3?'subcategoria':'categoria',
+          restr_sexo:/^[MF]$/i.test(r.TP_SEXO||'')?(r.TP_SEXO||'').toUpperCase():null,
+          causa_obito:null, capitulo:null}))
+        .filter(c=>/^[A-Z]\d{2,3}$/.test(c.codigo)&&c.descricao);
+      if(linhas.length<1000)
+        throw new Error('Só '+linhas.length+' códigos lidos de tb_cid.txt — o pacote não parece completo. Nada foi gravado.');
+      await upsertLotes('cid10',linhas,'codigo','CID-10');
+      await sb.from('cid10_importacao').insert({qt_categorias:linhas.filter(c=>c.nivel==='categoria').length,
+        qt_subcategorias:linhas.filter(c=>c.nivel==='subcategoria').length, arquivo:file.name+' (tb_cid.txt da SIGTAP)'});
+      st.textContent='CID-10 importada da SIGTAP: '+linhas.length+' códigos.';
+      toast('CID-10 importada ✓'); return;
+    }
+
+    if(!arquivos.sub && !arquivos.cat)
+      throw new Error('Não encontrei o arquivo de categorias nem de subcategorias da CID-10 neste pacote.');
+
+    // 2) capítulos e grupos (hierarquia — opcionais)
+    let caps=[];
+    if(arquivos.cap){
+      const {cols,linhas}=parseCSV(arquivos.cap);
+      const cNum=acharCol(cols,'NUMCAP',/^NUM/), cIni=acharCol(cols,'CATINIC',/INIC/),
+            cFim=acharCol(cols,'CATFIM',/FIM/),  cDes=acharCol(cols,'DESCRICAO',/^DESCRICAO/,/^DESCR/);
+      caps=linhas.filter(r=>r[cDes]).map(r=>({numero:parseInt(r[cNum],10),cat_inicial:(r[cIni]||'').toUpperCase(),
+            cat_final:(r[cFim]||'').toUpperCase(),descricao:r[cDes]})).filter(c=>Number.isFinite(c.numero));
+    }
+    let grus=[];
+    if(arquivos.gru){
+      const {cols,linhas}=parseCSV(arquivos.gru);
+      const cIni=acharCol(cols,'CATINIC',/INIC/), cFim=acharCol(cols,'CATFIM',/FIM/),
+            cDes=acharCol(cols,'DESCRICAO',/^DESCRICAO/,/^DESCR/);
+      grus=linhas.filter(r=>r[cIni]&&r[cFim]&&r[cDes]).map(r=>({cat_inicial:(r[cIni]||'').toUpperCase(),
+            cat_final:(r[cFim]||'').toUpperCase(),descricao:r[cDes]}));
+    }
+    const capDe=cod=>{ const c3=(cod||'').slice(0,3).toUpperCase();
+      const c=caps.find(x=>x.cat_inicial&&x.cat_final&&c3>=x.cat_inicial&&c3<=x.cat_final); return c?c.numero:null; };
+
+    // 3) categorias e subcategorias
+    const ler=(txt,nivel)=>{
+      if(!txt) return [];
+      const {cols,linhas}=parseCSV(txt);
+      const cCod=acharCol(cols, nivel==='subcategoria'?'SUBCAT':'CAT', /^SUBCAT/, /^CAT$/, /^COD/) || cols[0];
+      const cDes=acharCol(cols,'DESCRICAO',/^DESCRICAO/,/^DESCR(?!ABREV)/) ;
+      const cAbr=acharCol(cols,'DESCRABREV',/ABREV/);
+      const cSex=acharCol(cols,'RESTRSEXO',/SEXO/);
+      const cObi=acharCol(cols,'CAUSAOBITO',/OBITO/);
+      if(!cDes) throw new Error('O arquivo de '+nivel+'s não tem coluna de descrição (colunas: '+cols.join(', ')+').');
+      const out=[];
+      for(const r of linhas){
+        const cod=(r[cCod]||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+        const des=(r[cDes]||'').trim();
+        if(!cod||!des) continue;
+        out.push({codigo:cod, codigo_fmt:fmt(cod), descricao:des,
+          descricao_abrev:(cAbr?r[cAbr]:'')||null, nivel,
+          restr_sexo:(cSex&&/^[MF]$/i.test(r[cSex]||''))?r[cSex].toUpperCase():null,
+          causa_obito:cObi?/^[1STY]$/i.test(r[cObi]||''):null,
+          capitulo:capDe(cod)});
+      }
+      return out;
+    };
+    const cats=ler(arquivos.cat,'categoria');
+    const subs=ler(arquivos.sub,'subcategoria');
+
+    // 4) trava de segurança: só grava se o formato está coerente
+    const todos=cats.concat(subs);
+    const ruins=todos.filter(c=>!/^[A-Z]\d{2,3}$/.test(c.codigo)).length;
+    if(!todos.length) throw new Error('Nenhum código lido. Nada foi gravado.');
+    if(ruins>todos.length*0.02)
+      throw new Error('O arquivo não foi lido no formato esperado ('+ruins+' de '+todos.length+' códigos inválidos). Nada foi gravado.');
+    if(arquivos.sub && subs.length<5000)
+      throw new Error('Só '+subs.length+' subcategorias foram lidas (o esperado é cerca de 12.400). Nada foi gravado.');
+
+    // 5) grava
+    if(caps.length) await upsertLotes('cid10_capitulo',caps,'numero','Capítulos');
+    if(grus.length) await upsertLotes('cid10_grupo',grus,'cat_inicial,cat_final','Grupos');
+    const limpos=todos.filter(c=>/^[A-Z]\d{2,3}$/.test(c.codigo));
+    await upsertLotes('cid10',limpos,'codigo','CID-10');
+    await sb.from('cid10_importacao').insert({qt_categorias:cats.length,qt_subcategorias:subs.length,arquivo:file.name});
+    st.textContent='CID-10 importada: '+cats.length+' categorias e '+subs.length+' subcategorias.';
+    toast('CID-10 importada ✓');
+  }catch(err){ st.textContent='Falha: '+(err.message||err); toast('Importação falhou: '+(err.message||err),true); }
+}
+$('btn-cid10').onclick=()=>$('cid10-file').click();
+$('cid10-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarCid10(f); });
+
+// ---------- importar medicamentos de uma planilha salva em CSV ----------
+// Colunas aceitas (em qualquer ordem, acento e maiúscula indiferentes):
+//   nome | medicamento | principio_ativo      (obrigatória)
+//   apresentacao | forma | concentracao | dosagem
+//   via | componente | fonte | observacao
+async function importarMedicamentos(file){
+  const st=$('sigtap-status');
+  try{
+    st.textContent='Lendo a planilha…';
+    const {cols,linhas}=parseCSV(decodificar(await file.arrayBuffer()));
+    const cNome=acharCol(cols,'NOME','MEDICAMENTO','PRINCIPIOATIVO',/PRINCIPIO/,/MEDICAM/,/^NOME/);
+    if(!cNome) throw new Error('Não achei a coluna do nome do medicamento. Colunas lidas: '+(cols.join(', ')||'(nenhuma)'));
+    const cApr=acharCol(cols,'APRESENTACAO',/APRESENT/,/^FORMA/,/DOSAGEM/);
+    const cCon=acharCol(cols,'CONCENTRACAO',/CONCENTR/);
+    const cVia=acharCol(cols,'VIA',/^VIA/);
+    const cCmp=acharCol(cols,'COMPONENTE',/COMPONENT/);
+    const cFon=acharCol(cols,'FONTE',/FONTE/);
+    const cObs=acharCol(cols,'OBSERVACAO',/OBSERV/);
+    const semAcento=v=>(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    const comp=v=>{ const t=semAcento(v);
+      if(/bas/.test(t)) return 'basico'; if(/estrat/.test(t)) return 'estrategico';
+      if(/especial/.test(t)) return 'especializado'; return t?'outro':null; };
+    const vistos=new Set(); const itens=[];
+    for(const r of linhas){
+      const nome=(r[cNome]||'').trim(); if(!nome||/^nome$/i.test(nome)) continue;
+      const apr=((cApr?r[cApr]:'')||(cCon?r[cCon]:'')||'—').trim()||'—';
+      const chave=(nome+'|'+apr).toLowerCase(); if(vistos.has(chave)) continue; vistos.add(chave);
+      itens.push({nome, apresentacao:apr, via:(cVia?r[cVia]:'')||null,
+        concentracao:(cCon?r[cCon]:'')||null, componente:comp(cCmp?r[cCmp]:''),
+        fonte:((cFon?r[cFon]:'')||'importado').trim().toLowerCase().replace(/\s+/g,'_'),
+        observacao:(cObs?r[cObs]:'')||null, ativo:true});
+    }
+    if(!itens.length) throw new Error('Nenhuma linha com nome de medicamento. Nada foi gravado.');
+    await upsertLotes('pep_medicamentos',itens,'nome,apresentacao','Medicamentos');
+    st.textContent=itens.length+' medicamento(s) importado(s).';
+    toast('Medicamentos importados ✓');
+  }catch(err){ st.textContent='Falha: '+(err.message||err); toast('Importação falhou: '+(err.message||err),true); }
+}
+$('btn-med').onclick=()=>$('med-file').click();
+$('med-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarMedicamentos(f); });
+
+// ---------- busca de CID-10 ----------
+taBind($('pb-cid'),$('pb-cidlist'),async q=>{
+  const {data,error}=await sb.rpc('buscar_cid10',{p_termo:q});
+  if(error) return [];
+  return (data||[]).map(c=>({label:c.codigo+' — '+c.descricao,sub:'',value:c}));
+},opt=>{ const c=opt.value; $('pb-cid').value=c.codigo+' — '+c.descricao; $('pb-cid').dataset.codigo=c.codigo;
+  if(!$('pb-desc').value.trim()) $('pb-desc').value=c.descricao; });
 
 boot();
 </script>
