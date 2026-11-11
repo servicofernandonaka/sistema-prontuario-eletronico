@@ -102,8 +102,8 @@
   .resumo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
   @media (max-width:760px){.resumo{grid-template-columns:1fr}}
   .resumo .card{padding:0}
-  .resumo .ch{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px}
-  .resumo .cb{padding:11px 14px;display:flex;flex-direction:column;gap:7px;font-size:13.5px}
+  .ch{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px}
+  .cb{padding:11px 14px;display:flex;flex-direction:column;gap:7px;font-size:13.5px}
   .lin{display:flex;align-items:flex-start;gap:8px}
   .lin .x{margin-left:auto;color:var(--err);border:0;background:transparent;font-size:15px}
   .tagc{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--brand-050);color:var(--brand)}
@@ -174,6 +174,18 @@
   .avso.renal{background:#e7f2fb;border-color:#1b74c4;color:#14517f}
   .avso.outro{background:#f1f5fa;border-color:#9bb0c7;color:#3f5570}
   .avso .muted{color:inherit;opacity:.78}
+  /* evolução */
+  .evo{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .evocard{border:1px solid var(--line);border-radius:10px;padding:10px 10px 8px;background:var(--panel-2);
+    display:flex;flex-direction:column;overflow:hidden}
+  .evocard svg{display:block;width:100%;height:auto}
+  .evoh{font-size:13px;font-weight:700;color:var(--fg);margin-bottom:2px}
+  .evoh span{font-weight:600;color:var(--muted);font-size:11.5px}
+  .evof{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .evocard .hit{cursor:crosshair}
+  td.fora{color:#8d2020;font-weight:600}
+  .viztip{position:fixed;z-index:90;display:none;background:#13293f;color:#fff;font-size:12px;
+    padding:6px 9px;border-radius:7px;pointer-events:none;box-shadow:0 6px 18px rgba(17,42,68,.22);max-width:260px}
 
   /* ---------- impressão ---------- */
   #print-area{display:none}
@@ -297,6 +309,29 @@
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pb-save">Salvar</button></div>
 </div></div>
 
+<div class="overlay" id="m-resultado"><div class="modal">
+  <div class="mh"><span id="rs-titulo">Registrar resultado</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Exame *</label><input id="rs-exame" class="f" placeholder="Ex.: Hemoglobina glicada"></div>
+    <div class="grid">
+      <div class="field"><label>Analito (para a evolução)</label><select id="rs-analito" class="f"></select></div>
+      <div class="field"><label>Data da coleta *</label><input id="rs-data" class="f" type="date"></div>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Valor</label><input id="rs-valor" class="f" inputmode="decimal" placeholder="7,2"></div>
+      <div class="field"><label>Unidade</label><input id="rs-unidade" class="f" placeholder="%"></div>
+    </div>
+    <div class="field"><label>Resultado não numérico (opcional)</label><input id="rs-texto" class="f" placeholder="Ex.: não reagente"></div>
+    <div class="grid">
+      <div class="field"><label>Referência — mínimo</label><input id="rs-refmin" class="f" inputmode="decimal"></div>
+      <div class="field"><label>Referência — máximo</label><input id="rs-refmax" class="f" inputmode="decimal"></div>
+    </div>
+    <div class="muted" style="margin:-6px 0 12px">A faixa de referência é a do laboratório que fez o exame — não embuti valores meus, porque variam por método e por idade. O app repete a última que você usou para o mesmo analito.</div>
+    <div class="field"><label>Observação</label><input id="rs-obs" class="f"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="rs-save">Salvar resultado</button></div>
+</div></div>
+
 <div class="overlay" id="m-exam"><div class="modal">
   <div class="mh"><span>Solicitar exame</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -391,7 +426,8 @@ async function carregarAlertas(){
 }
 async function enter(session){
   show('app');
-  const v=$('versao'); if(v) v.textContent='versão '+VERSAO; await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
+  const v=$('versao'); if(v) v.textContent='versão '+VERSAO;
+  carregarAnalitos(); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
 }
@@ -416,7 +452,8 @@ function renderSideList(){
   pacientes.forEach(p=>{
     const b=el('button','side-item'+(pacienteSel&&pacienteSel.id===p.id?' active':''));
     b.innerHTML='<span class="nm">'+esc(p.nome||'(sem nome)')+'</span><span class="mt">'+[idade(p.data_nascimento),p.cpf].filter(Boolean).map(esc).join(' · ')+'</span>';
-    b.onclick=async()=>{ pacienteSel=p; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain(); await carregarProblemasAlergias(); renderMain(); };
+    b.onclick=async()=>{ pacienteSel=p; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain();
+      await carregarProblemasAlergias(); await carregarResultados(); renderMain(); };
     box.appendChild(b);
   });
 }
@@ -450,6 +487,101 @@ $('np-save').onclick=async()=>{
   await carregarPacientes(); pacienteSel=novo; atendAtual=null; renderSideList(); renderMain();
 };
 
+// ---------- resultados de exames ----------
+let analitos=[], resultados=[];
+async function carregarAnalitos(){
+  const {data}=await sb.from('pep_analitos').select('*').order('ordem');
+  analitos=data||[];
+}
+async function carregarResultados(){
+  resultados=[];
+  if(!pacienteSel) return;
+  const {data,error}=await sb.from('pep_resultados').select('*')
+    .eq('paciente_id',pacienteSel.id).order('data_coleta',{ascending:true});
+  if(error&&/does not exist|schema cache/i.test(error.message||''))
+    toast('Rode o resultados_schema.sql no Supabase',true);
+  resultados=data||[];
+}
+// sugere o analito a partir do nome do exame
+function analitoDe(nomeExame){
+  const n=semAc(nomeExame);
+  for(const a of analitos) for(const pad of (a.padroes||[])) if(n.includes(semAc(pad))) return a.chave;
+  return '';
+}
+
+// ---------- gráfico de evolução ----------
+// Uma série por analito, cada uma com a SUA escala e o seu quadro — nunca dois
+// eixos no mesmo gráfico. Série única dispensa legenda: o título nomeia o que
+// está sendo mostrado. Ponto fora da referência ganha cor de status E rótulo
+// visível, para a informação não depender só da cor.
+const VIZ={linha:'#0a6fbd', fora:'#c62828', grade:'#e3ebf3', eixo:'#8ea6c0', banda:'#eef5fb'};
+function fmtNum(v,casas){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:casas,maximumFractionDigits:casas}); }
+function graficoEvolucao(pontos,meta){
+  const L=46,R=12,T=14,B=26,W=330,H=150, w=W-L-R, h=H-T-B;
+  const xs=pontos.map(p=>new Date(p.data_coleta+'T12:00:00').getTime());
+  const ys=pontos.map(p=>Number(p.valor));
+  let lo=Math.min(...ys), hi=Math.max(...ys);
+  const rmin=pontos.find(p=>p.ref_min!=null)?Number(pontos.find(p=>p.ref_min!=null).ref_min):null;
+  const rmax=pontos.find(p=>p.ref_max!=null)?Number(pontos.find(p=>p.ref_max!=null).ref_max):null;
+  if(rmin!=null) lo=Math.min(lo,rmin); if(rmax!=null) hi=Math.max(hi,rmax);
+  if(lo===hi){ lo-=1; hi+=1; }
+  const pad=(hi-lo)*0.12; lo-=pad; hi+=pad;
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  const px=t=>L+(x1===x0?w/2:(t-x0)/(x1-x0)*w);
+  const py=v=>T+h-(v-lo)/(hi-lo)*h;
+  const casas=meta.casas==null?2:meta.casas;
+  let g='';
+  // banda de referência, quando o laboratório informou
+  if(rmin!=null&&rmax!=null)
+    g+='<rect x="'+L+'" y="'+py(rmax).toFixed(1)+'" width="'+w+'" height="'+Math.max(1,(py(rmin)-py(rmax))).toFixed(1)+
+       '" fill="'+VIZ.banda+'"></rect>';
+  // grade recessiva: três linhas horizontais
+  for(let i=0;i<=2;i++){ const v=lo+(hi-lo)*i/2, y=py(v).toFixed(1);
+    g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="'+VIZ.grade+'" stroke-width="1"></line>'+
+       '<text x="'+(L-6)+'" y="'+(+y+4)+'" text-anchor="end" font-size="10" fill="'+VIZ.eixo+'">'+esc(fmtNum(v,casas))+'</text>'; }
+  g+='<polyline fill="none" stroke="'+VIZ.linha+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="'+
+     pontos.map((p,i)=>px(xs[i]).toFixed(1)+','+py(ys[i]).toFixed(1)).join(' ')+'"></polyline>';
+  pontos.forEach((p,i)=>{
+    const fx=(rmin!=null&&ys[i]<rmin)||(rmax!=null&&ys[i]>rmax);
+    const cx=px(xs[i]).toFixed(1), cy=py(ys[i]).toFixed(1);
+    g+='<circle cx="'+cx+'" cy="'+cy+'" r="4.5" fill="'+(fx?VIZ.fora:VIZ.linha)+'" stroke="#fff" stroke-width="2"></circle>';
+    // só o primeiro, o último e os fora da referência ganham rótulo
+    if(fx||i===0||i===pontos.length-1){
+      // encosta o rótulo das pontas para dentro, senão o primeiro cai sobre os
+      // números do eixo e o último sai do quadro
+      const nas=pontos.length>1&&(i===0||i===pontos.length-1);
+      const anc=nas?(i===0?'start':'end'):'middle';
+      const dx=nas?(i===0?6:-6):0;
+      g+='<text x="'+(+cx+dx)+'" y="'+(+cy-9)+'" text-anchor="'+anc+'" font-size="10.5" font-weight="700" fill="'+
+         (fx?VIZ.fora:'#13293f')+'">'+esc(fmtNum(ys[i],casas))+(fx?' !':'')+'</text>';
+    }
+    g+='<rect x="'+(+cx-14)+'" y="'+T+'" width="28" height="'+h+'" fill="transparent" class="hit"'+
+       ' data-t="'+esc(dataBRsimples(p.data_coleta)+' · '+fmtNum(ys[i],casas)+' '+(p.unidade||meta.unidade||'')+
+         (fx?' — fora da referência':'')+((p.ref_min!=null||p.ref_max!=null)?' (ref. '+[p.ref_min,p.ref_max].filter(v=>v!=null).join('–')+')':''))+'"></rect>';
+  });
+  // datas nas pontas
+  g+='<text x="'+L+'" y="'+(H-8)+'" font-size="10" fill="'+VIZ.eixo+'">'+esc(dataBRsimples(pontos[0].data_coleta))+'</text>';
+  if(pontos.length>1) g+='<text x="'+(W-R)+'" y="'+(H-8)+'" text-anchor="end" font-size="10" fill="'+VIZ.eixo+'">'+
+      esc(dataBRsimples(pontos[pontos.length-1].data_coleta))+'</text>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" height="auto" role="img" aria-label="Evolução de '+esc(meta.rotulo)+'">'+g+'</svg>';
+}
+
+// um balão só, reaproveitado por todos os gráficos
+let vizTip=null;
+document.addEventListener('mouseover',e=>{
+  const hit=e.target.closest&&e.target.closest('.hit'); if(!hit) return;
+  if(!vizTip){ vizTip=document.createElement('div'); vizTip.className='viztip'; document.body.appendChild(vizTip); }
+  vizTip.textContent=hit.dataset.t; vizTip.style.display='block';
+});
+document.addEventListener('mousemove',e=>{
+  if(!vizTip||vizTip.style.display==='none') return;
+  vizTip.style.left=Math.min(window.innerWidth-vizTip.offsetWidth-10,e.clientX+12)+'px';
+  vizTip.style.top=(e.clientY-34)+'px';
+});
+document.addEventListener('mouseout',e=>{
+  if(vizTip&&e.target.closest&&e.target.closest('.hit')) vizTip.style.display='none';
+});
+
 // ---------- problemas e alergias do paciente ----------
 let problemas=[], alergias=[];
 async function carregarProblemasAlergias(){
@@ -473,6 +605,53 @@ $('al-save').onclick=async()=>{
   ['al-sub','al-rea'].forEach(x=>$(x).value=''); $('al-grav').value='';
   closeM('m-alergia'); await carregarProblemasAlergias(); renderMain(); toast('Alergia registrada ✓');
 };
+function abrirResultado(pre){
+  if(!pacienteSel){ toast('Selecione um paciente',true); return; }
+  const sel=$('rs-analito');
+  sel.innerHTML='<option value="">— sem evolução —</option>'+
+    analitos.map(a=>'<option value="'+esc(a.chave)+'">'+esc(a.rotulo)+(a.unidade?' ('+esc(a.unidade)+')':'')+'</option>').join('');
+  $('rs-exame').value=pre.exame||'';
+  $('rs-data').value=(pre.data||new Date().toISOString().slice(0,10));
+  ['rs-valor','rs-unidade','rs-texto','rs-refmin','rs-refmax','rs-obs'].forEach(i=>$(i).value='');
+  $('rs-exame').dataset.co=pre.co_procedimento||'';
+  $('rs-exame').dataset.atend=pre.atendimento_id||'';
+  $('rs-titulo').textContent=pre.exame?('Resultado — '+pre.exame):'Registrar resultado';
+  aplicarAnalito(analitoDe(pre.exame||''));
+  openM('m-resultado');
+  setTimeout(()=>$(pre.exame?'rs-valor':'rs-exame').focus(),60);
+}
+// ao escolher o analito, repete unidade e faixa do último resultado dele
+function aplicarAnalito(chave){
+  const sel=$('rs-analito'); if(chave!==undefined) sel.value=chave||'';
+  const a=analitos.find(x=>x.chave===sel.value);
+  if(a&&!$('rs-unidade').value) $('rs-unidade').value=a.unidade||'';
+  const ant=resultados.filter(r=>r.analito===sel.value).slice(-1)[0];
+  if(ant){
+    if(!$('rs-unidade').value&&ant.unidade) $('rs-unidade').value=ant.unidade;
+    if(!$('rs-refmin').value&&ant.ref_min!=null) $('rs-refmin').value=ant.ref_min;
+    if(!$('rs-refmax').value&&ant.ref_max!=null) $('rs-refmax').value=ant.ref_max;
+  }
+}
+$('rs-analito').onchange=()=>aplicarAnalito(undefined);
+$('rs-exame').addEventListener('blur',()=>{ if(!$('rs-analito').value) aplicarAnalito(analitoDe($('rs-exame').value)); });
+$('rs-save').onclick=async()=>{
+  const num=id=>{ const v=String($(id).value||'').trim().replace(',','.'); return v===''?null:Number(v); };
+  const exame=$('rs-exame').value.trim();
+  if(!exame){ toast('Informe o exame',true); return; }
+  if(!$('rs-data').value){ toast('Informe a data da coleta',true); return; }
+  const valor=num('rs-valor'), texto=$('rs-texto').value.trim();
+  if(valor===null&&!texto){ toast('Informe o valor ou o resultado em texto',true); return; }
+  if(valor!==null&&!Number.isFinite(valor)){ toast('Valor não é um número',true); return; }
+  const reg={paciente_id:pacienteSel.id, exame, analito:$('rs-analito').value||null,
+    co_procedimento:$('rs-exame').dataset.co||null, atendimento_id:$('rs-exame').dataset.atend||null,
+    data_coleta:$('rs-data').value, valor, valor_texto:texto||null,
+    unidade:$('rs-unidade').value.trim()||null, ref_min:num('rs-refmin'), ref_max:num('rs-refmax'),
+    observacao:$('rs-obs').value.trim()||null};
+  const {error}=await sb.from('pep_resultados').insert(reg);
+  if(error){ toast('Erro ao salvar: '+error.message,true); return; }
+  closeM('m-resultado'); await carregarResultados(); renderMain(); toast('Resultado registrado ✓');
+};
+
 $('pb-save').onclick=async()=>{
   const desc=$('pb-desc').value.trim(); if(!desc){ toast('Informe a descrição',true); return; }
   const {error}=await sb.from('pep_problemas').insert({paciente_id:pacienteSel.id,descricao:desc,
@@ -552,6 +731,65 @@ async function renderFichaPaciente(c){
   });
   cardP.appendChild(bodyP); cardA.appendChild(bodyA);
   res.appendChild(cardP); res.appendChild(cardA); c.appendChild(res);
+
+  // ---------- resultados e evolução ----------
+  const tit=el('div','sec-title','Resultados de exames');
+  c.appendChild(tit);
+  const cardR=el('div','card'); c.appendChild(cardR);
+  const chR=el('div','ch'); chR.innerHTML='<span>Evolução</span>';
+  const bR2=el('button','btn ghost sm','+ Registrar resultado'); bR2.onclick=()=>abrirResultado({}); chR.appendChild(bR2);
+  cardR.appendChild(chR);
+  const bodyR=el('div','cb'); cardR.appendChild(bodyR);
+
+  if(!resultados.length){
+    bodyR.appendChild(el('div','muted','Nenhum resultado registrado. Use o botão acima, ou o botão “Resultado” ao lado de cada exame de um atendimento salvo.'));
+  } else {
+    // uma série por analito, só com ponto numérico e pelo menos dois deles
+    const porAnalito=new Map();
+    resultados.filter(r=>r.analito&&r.valor!=null).forEach(r=>{
+      if(!porAnalito.has(r.analito)) porAnalito.set(r.analito,[]);
+      porAnalito.get(r.analito).push(r); });
+    const series=[...porAnalito.entries()]
+      .map(([k,v])=>({meta:analitos.find(a=>a.chave===k)||{chave:k,rotulo:k,casas:2},pontos:v}))
+      .filter(x=>x.pontos.length>=2)
+      .sort((a,b)=>(a.meta.ordem||99)-(b.meta.ordem||99));
+    if(series.length){
+      const grid=el('div','evo');
+      series.forEach(sr=>{
+        const box=el('div','evocard');
+        const ult=sr.pontos[sr.pontos.length-1];
+        box.innerHTML='<div class="evoh">'+esc(sr.meta.rotulo)+(sr.meta.unidade?' <span>'+esc(sr.meta.unidade)+'</span>':'')+'</div>'+
+          graficoEvolucao(sr.pontos,sr.meta)+
+          '<div class="evof">último: '+esc(fmtNum(ult.valor,sr.meta.casas==null?2:sr.meta.casas))+' '+
+          esc(ult.unidade||sr.meta.unidade||'')+' em '+esc(dataBRsimples(ult.data_coleta))+' · '+sr.pontos.length+' medidas</div>';
+        grid.appendChild(box);
+      });
+      bodyR.appendChild(grid);
+    } else {
+      bodyR.appendChild(el('div','muted','Ainda não há dois resultados do mesmo analito para traçar uma evolução. Os valores estão na tabela abaixo.'));
+    }
+    // tabela — a mesma informação em forma de texto, e onde ficam os não numéricos
+    const tb=el('div'); tb.style.marginTop='12px';
+    tb.innerHTML='<table><thead><tr><th>Data</th><th>Exame</th><th>Resultado</th><th>Referência</th><th></th></tr></thead><tbody>'+
+      resultados.slice().reverse().map(r=>{
+        const meta=analitos.find(a=>a.chave===r.analito)||{casas:2};
+        const val=r.valor!=null?fmtNum(r.valor,meta.casas==null?2:meta.casas)+' '+(r.unidade||meta.unidade||''):(r.valor_texto||'—');
+        const fora=r.valor!=null&&((r.ref_min!=null&&Number(r.valor)<Number(r.ref_min))||(r.ref_max!=null&&Number(r.valor)>Number(r.ref_max)));
+        const ref=(r.ref_min!=null||r.ref_max!=null)?[r.ref_min,r.ref_max].filter(v=>v!=null).join(' – '):(r.ref_texto||'—');
+        return '<tr><td>'+esc(dataBRsimples(r.data_coleta))+'</td><td>'+esc(r.exame)+'</td><td'+(fora?' class="fora"':'')+'>'+
+               esc(val)+(fora?' <span class="tagc tagr">fora da referência</span>':'')+'</td><td class="muted">'+esc(ref)+
+               '</td><td><button class="rm" data-rr="'+r.id+'" title="Remover">✕</button></td></tr>'; }).join('')+'</tbody></table>';
+    bodyR.appendChild(tb);
+    tb.querySelectorAll('[data-rr]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Remover este resultado do prontuário?')) return;
+      const {data,error}=await sb.from('pep_resultados').delete().eq('id',b.dataset.rr).select();
+      if(error){ toast('Não foi possível remover: '+error.message,true); return; }
+      if(!data||!data.length){ toast('Nada foi removido — o banco recusou.',true); return; }
+      await carregarResultados(); renderMain(); toast('Resultado removido ✓');
+    });
+  }
+  // dica de leitura do gráfico, já que ponto fora da referência muda de cor
+  bodyR.appendChild(el('div','muted','No gráfico, a faixa clara é a referência do laboratório e o ponto vermelho marcado com “!” está fora dela. Passe o mouse para ver data e valor.'));
 
   c.appendChild(el('div','sec-title','Atendimentos'));
   const card=el('div','card'); c.appendChild(card);
@@ -769,7 +1007,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-11.3 · TUSS';
+const VERSAO='2026-11-11.4 · resultados';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -865,6 +1103,9 @@ async function renderAtendimentoSalvo(c){
         esc({afastamento:'Afastamento',comparecimento:'Comparecimento',acompanhante:'Acompanhante',aptidao:'Aptidão física'}[atest.tipo]||atest.tipo)+
         (atest.dias?' — '+esc(atest.dias)+' dia(s)':'')+(atest.cid10?' · CID-10 '+esc(atest.cid10):'')+'</div>':'')+
     '</div></div>';
+
+  box.querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>abrirResultado(
+    {exame:b.dataset.res, co_procedimento:b.dataset.co, atendimento_id:a.id, data:(a.data_atendimento||'').slice(0,10)}));
 
   const acoes=el('div','', '');
   acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
@@ -1034,12 +1275,14 @@ function renderAtendimento(c){
      ['f-gli','glicemia_capilar'],['f-creat','creatinina']]
       .forEach(([el2,k])=>{ if(d[k]!=null && $(el2)) $(el2).value=d[k]; });
   }
-  ['f-peso','f-creat'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input',()=>{ renderClCr(); renderAvisosRx(); }); });
+  ['f-peso','f-creat'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input',()=>{
+    if(id==='f-creat') delete e.dataset.origem; renderClCr(); renderAvisosRx(); }); });
   c.querySelectorAll('#f-probs .chkp span').forEach(sp=>sp.onclick=()=>{
     const cx=sp.parentElement.querySelector('input'); cx.checked=!cx.checked; cx.dispatchEvent(new Event('change',{bubbles:true})); });
   c.querySelectorAll('#f-probs [data-rm]').forEach(b=>b.onclick=async ev=>{
     ev.preventDefault(); ev.stopPropagation();
     if(await removerProblema(b.dataset.rm,b.dataset.desc)) renderMain(); });
+  preencherCreatinina();
   renderExTable(); renderRxTable(); renderClCr(); renderAvisosRx();
 }
 
@@ -1089,6 +1332,17 @@ const semAc=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toL
 // Cockcroft-Gault — é a fórmula que as bulas usam para ajuste de dose.
 // Para ESTADIAMENTO da doença renal a referência é a CKD-EPI; são coisas
 // diferentes e não devem ser trocadas uma pela outra.
+// Se o paciente já tem creatinina registrada em resultados, preenche o campo
+// sozinho — era o passo manual que sobrava no apoio à prescrição.
+function preencherCreatinina(){
+  const campo=$('f-creat'); if(!campo||campo.value) return;
+  const r=(resultados||[]).filter(x=>x.analito==='creatinina'&&x.valor!=null).slice(-1)[0];
+  if(!r) return;
+  campo.value=r.valor;
+  const alvo=$('o-clcr');
+  if(alvo) campo.dataset.origem='creatinina de '+dataBRsimples(r.data_coleta);
+  renderClCr(); renderAvisosRx();
+}
 function calcClCr(){
   const p=pacienteSel||{};
   const cr=parseFloat(String(($('f-creat')||{}).value||'').replace(',','.'));
@@ -1111,7 +1365,8 @@ function renderClCr(){
   const c=calcClCr();
   const txt = c
     ? 'ClCr estimada (Cockcroft-Gault): <b>'+c.valor+' mL/min</b> — '+faixaClCr(c.valor)+
-      '. <span class="muted">'+c.idade+' anos, '+c.peso+' kg, creatinina '+c.cr+' mg/dL'+(c.fem?', sexo feminino':'')+
+      '. <span class="muted">'+c.idade+' anos, '+c.peso+' kg, creatinina '+c.cr+' mg/dL'+
+      (($('f-creat')||{}).dataset&&$('f-creat').dataset.origem?' ('+$('f-creat').dataset.origem+')':'')+(c.fem?', sexo feminino':'')+
       '. Para estadiamento da DRC use a CKD-EPI; esta fórmula é a do ajuste de dose. No obeso, considere o peso ajustado.</span>'
     : '<span class="muted">Preencha peso e creatinina para estimar a ClCr.</span>';
   alvo.innerHTML=txt; if(painel) painel.innerHTML=txt;
