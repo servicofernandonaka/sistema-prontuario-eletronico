@@ -172,6 +172,13 @@
     #print-area .pr-corpo{min-height:95mm}
     #print-area .it{margin-bottom:13px;page-break-inside:avoid}
     #print-area .it .n{font-weight:bold}
+    #print-area .pr-folha{break-after:auto}
+    tr.gh td{background:#1b2436;color:#9fb3d1;font-size:12px;font-weight:600;letter-spacing:.02em;padding-top:10px}
+    .avso{border-radius:8px;padding:9px 11px;margin-bottom:7px;font-size:13px;line-height:1.45;border-left:3px solid}
+    .avso.alergia{background:#3a1416;border-color:#e5484d;color:#ffc9cb}
+    .avso.idoso{background:#352610;border-color:#e9a13b;color:#ffdca8}
+    .avso.renal{background:#102a35;border-color:#3b9fe9;color:#b3e0ff}
+    .avso.outro{background:#1b2436;border-color:#5b6b85;color:#c3d0e4}
     #print-area .it .p{text-align:justify;line-height:1.7}
     #print-area .it .d{padding-left:17px;font-size:11pt}
     #print-area .pr-obs{margin-top:14px;font-size:11pt;border-top:1px dotted #555;padding-top:8px}
@@ -363,8 +370,13 @@ function aplicarSessao(s){
   if(s){ if(usuarioAtual!==s.user.id){ usuarioAtual=s.user.id; enter(s); } }
   else { usuarioAtual=null; pacienteSel=null; atendAtual=null; show('login'); }
 }
+let alertasMed=[];
+async function carregarAlertas(){
+  const {data}=await sb.from('pep_alertas_medicamento').select('padrao,tipo,mensagem,idade_min,clcr_max').eq('ativo',true);
+  alertasMed=data||[];
+}
 async function enter(session){
-  show('app'); await carregarPacientes(); renderMain(); await carregarProf();
+  show('app'); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
 }
@@ -568,10 +580,8 @@ function montarDoc(titulo,itens,obs,quando){
            ['CPF',p.cpf],['CNS',p.cns]].filter(x=>x[1]),
     assinatura:[pr.nome, pr.crm?('CRM '+[pr.uf_crm,pr.crm].filter(Boolean).join(' ')):'', pr.especialidade||''].filter(Boolean) };
 }
-function imprimirDoc(d){
-  if(!d) return;
-  $('print-area').innerHTML=
-    '<div class="pr-cab">'+(d.prof.unidade?'<div class="pr-un">'+esc(d.prof.unidade)+'</div>':'')+'<h1>'+esc(d.titulo)+'</h1></div>'+
+function umaGuiaHTML(d){
+  return '<div class="pr-cab">'+(d.prof.unidade?'<div class="pr-un">'+esc(d.prof.unidade)+'</div>':'')+'<h1>'+esc(d.titulo)+'</h1></div>'+
     '<div class="pr-pac">'+d.ident.map(x=>'<div><b>'+esc(x[0])+':</b> '+esc(x[1])+'</div>').join('')+'</div>'+
     '<div class="pr-corpo">'+d.itens.map((it,i)=>'<div class="it"><div class="'+(d.semNumero?'p':'n')+'">'+
         (d.semNumero?'':(i+1)+'. ')+esc(it.n)+'</div>'+
@@ -579,17 +589,27 @@ function imprimirDoc(d){
     (d.obs.length?'<div class="pr-obs">'+d.obs.map(o=>'<b>'+esc(o[0])+':</b> '+esc(o[1])).join('<br>')+'</div>':'')+
     '<div class="pr-ass"><div class="pr-linha"></div>'+d.assinatura.map(l=>'<div>'+esc(l)+'</div>').join('')+
       '<div class="pr-data">'+esc(dataBRsimples(d.quando))+'</div></div>';
+}
+// Aceita uma guia ou uma lista delas; cada guia sai numa folha.
+function imprimirDoc(d){
+  if(!d) return;
+  const docs=Array.isArray(d)?d.filter(Boolean):[d];
+  if(!docs.length) return;
+  $('print-area').innerHTML=docs.map((x,i)=>
+    '<div class="pr-folha"'+(i<docs.length-1?' style="page-break-after:always"':'')+'>'+umaGuiaHTML(x)+'</div>').join('');
   window.print();
 }
 // ---------- PDF (arquivo de verdade; é o que será assinado digitalmente) ----------
 const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:'?');};
 const limpar=t=>String(t==null?'':t).split('').map(WIN).join('');
-async function gerarPDF(d){
-  if(!d) return null;
+async function gerarPDF(entrada){
+  if(!entrada) return null;
+  const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
+  if(!docs.length) return null;
   if(!window.PDFLib) { toast('Biblioteca de PDF não carregou; recarregue a página',true); return null; }
   const {PDFDocument,StandardFonts,rgb}=PDFLib;
   const doc=await PDFDocument.create();
-  doc.setTitle(limpar(d.titulo)); doc.setCreator('PEP Clínico'); doc.setProducer('PEP Clínico');
+  doc.setTitle(limpar(docs[0].titulo)); doc.setCreator('PEP Clínico'); doc.setProducer('PEP Clínico');
   const normal=await doc.embedFont(StandardFonts.Helvetica), negrito=await doc.embedFont(StandardFonts.HelveticaBold);
   const L=40, R=555.28, TOPO=801.89, BASE=60;
   let pg=doc.addPage([595.28,841.89]), y=TOPO;
@@ -605,6 +625,8 @@ async function gerarPDF(d){
       pg.drawText(ln,{x:px,y:y-t,size:t,font:f,color:rgb(0,0,0)}); y-=gap; } };
   const linhaH=(x1,x2,g=10)=>{ espaco(g); pg.drawLine({start:{x:x1,y:y-4},end:{x:x2,y:y-4},thickness:1,color:rgb(0,0,0)}); y-=g; };
 
+  docs.forEach((d,iDoc)=>{
+  if(iDoc>0) novaPagina();           // cada guia começa numa folha nova
   if(d.prof.unidade) escrever(d.prof.unidade,{t:11,centro:true,gap:15});
   escrever(d.titulo.toUpperCase(),{f:negrito,t:14,centro:true,gap:20});
   linhaH(L,R,14);
@@ -629,18 +651,24 @@ async function gerarPDF(d){
     pg.drawText(limpar(ln),{x:(595.28-w)/2,y:y,size:10,font:normal}); y-=13; }
   const dt=dataBRsimples(d.quando), wd=normal.widthOfTextAtSize(limpar(dt),10);
   pg.drawText(limpar(dt),{x:(595.28-wd)/2,y:y-8,size:10,font:normal});
+  });
   return doc.save();
 }
 const sluga=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();
-function nomeArquivo(d){
-  return [sluga(d.titulo), sluga(pacienteSel&&pacienteSel.nome||'paciente'), dataBRsimples(d.quando).replace(/\//g,'-')].filter(Boolean).join('-')+'.pdf';
+function nomeArquivo(entrada){
+  const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
+  const d=docs[0]; if(!d) return 'documento.pdf';
+  // várias guias no mesmo PDF: o nome não leva o rótulo de um grupo só
+  const titulo=docs.length>1 ? sluga(d.titulo.split('—')[0]) : sluga(d.titulo);
+  return [titulo, sluga(pacienteSel&&pacienteSel.nome||'paciente'),
+          dataBRsimples(d.quando).replace(/\//g,'-')].filter(Boolean).join('-')+'.pdf';
 }
 async function baixarPDF(d){
   const bytes=await gerarPDF(d); if(!bytes) return;
   const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
   const a=document.createElement('a'); a.href=url; a.download=nomeArquivo(d); document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),4000);
-  toast('PDF gerado ✓');
+  toast(Array.isArray(d)&&d.length>1 ? 'PDF com '+d.length+' guias gerado ✓' : 'PDF gerado ✓');
 }
 function docReceita(meds,quando){
   if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
@@ -674,11 +702,50 @@ function docAtestado(at,quando){
   if(d) d.semNumero=true;
   return d;
 }
-function docExames(exames,cab,quando){
+// Os dois primeiros dígitos do código SIGTAP são o grupo e os dois seguintes o
+// subgrupo. É o subgrupo que diz a que serviço o exame pertence — e por isso
+// radiologia e laboratório não podem sair na mesma guia: vão para lugares
+// diferentes, com agendamento e fluxo próprios.
+const GRUPOS_EXAME=[
+  ['0201','Coleta de material',          1],
+  ['0202','Laboratório clínico',         2],
+  ['0203','Anatomopatologia e citopatologia',3],
+  ['0204','Radiologia',                  4],
+  ['0205','Ultrassonografia',            5],
+  ['0206','Tomografia computadorizada',  6],
+  ['0207','Ressonância magnética',       7],
+  ['0208','Medicina nuclear',            8],
+  ['0209','Endoscopia',                  9],
+  ['0210','Radiologia intervencionista',10],
+  ['0211','Métodos diagnósticos em especialidades',11],
+  ['0212','Hemoterapia e genética',     12]
+];
+function grupoDe(co){
+  const pre=String(co||'').slice(0,4);
+  const g=GRUPOS_EXAME.find(x=>x[0]===pre);
+  if(g) return {chave:g[0], rotulo:g[1], ordem:g[2]};
+  const g2=String(co||'').slice(0,2);
+  if(g2==='03') return {chave:'03', rotulo:'Procedimentos clínicos',   ordem:90};
+  if(g2==='04') return {chave:'04', rotulo:'Procedimentos cirúrgicos', ordem:91};
+  return {chave:'outros', rotulo:'Outros procedimentos', ordem:99};
+}
+function agruparExames(exames){
+  const mapa=new Map();
+  (exames||[]).forEach(e=>{ const g=grupoDe(e.co_procedimento);
+    if(!mapa.has(g.chave)) mapa.set(g.chave,{...g,itens:[]});
+    mapa.get(g.chave).itens.push(e); });
+  return [...mapa.values()].sort((a,b)=>a.ordem-b.ordem);
+}
+// Devolve UMA GUIA POR GRUPO. Se só houver um grupo, sai uma guia só, com o
+// título de sempre.
+function docsExames(exames,cab,quando){
   if(!exames||!exames.length){ toast('Não há exames nesta solicitação',true); return null; }
   const obs=[]; if(cab&&cab.cid10) obs.push(['CID-10',cab.cid10]); if(cab&&cab.justificativa) obs.push(['Justificativa',cab.justificativa]);
-  return montarDoc('Solicitação de exames',
-    exames.map(e=>({n:e.no_procedimento, d:'Código SIGTAP '+e.co_procedimento})), obs, quando);
+  const grupos=agruparExames(exames);
+  const docs=grupos.map(g=>montarDoc(
+    grupos.length>1 ? 'Solicitação de exames — '+g.rotulo : 'Solicitação de exames',
+    g.itens.map(e=>({n:e.no_procedimento, d:'Código SIGTAP '+e.co_procedimento})), obs, quando));
+  return docs.some(d=>!d) ? null : docs;
 }
 
 // ---------- ver um atendimento já salvo (somente leitura) ----------
@@ -722,7 +789,10 @@ async function renderAtendimentoSalvo(c){
       '<h3 style="font-size:14px;margin:18px 0 8px">Exames solicitados</h3>'+
       (exames.length
         ? '<table><thead><tr><th>Exame</th><th>Código SIGTAP</th></tr></thead><tbody>'+
-          exames.map(e=>'<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+'</span></td></tr>').join('')+'</tbody></table>'+
+          agruparExames(exames).map((g,_,ar)=>
+            (ar.length>1?'<tr class="gh"><td colspan="2">'+esc(g.rotulo)+'</td></tr>':'')+
+            g.itens.map(e=>'<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+'</span></td></tr>').join('')
+          ).join('')+'</tbody></table>'+
           ((cab&&(cab.cid10||cab.justificativa))?'<div class="muted" style="margin-top:8px">'+[cab.cid10?'CID-10 '+esc(cab.cid10):'',cab.justificativa?esc(cab.justificativa):''].filter(Boolean).join(' · ')+'</div>':'')
         : '<div class="muted">Nenhum exame solicitado.</div>')+
       '<h3 style="font-size:14px;margin:18px 0 8px">Prescrição</h3>'+
@@ -739,8 +809,11 @@ async function renderAtendimentoSalvo(c){
   const acoes=el('div','', '');
   acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
   if(exames.length){
-    const b1=el('button','btn ghost','Imprimir exames'); b1.onclick=()=>imprimirDoc(docExames(exames,cab,a.data_atendimento)); acoes.appendChild(b1);
-    const b2=el('button','btn ghost','PDF dos exames'); b2.onclick=()=>baixarPDF(docExames(exames,cab,a.data_atendimento)); acoes.appendChild(b2); }
+    const ng=agruparExames(exames).length;
+    const b1=el('button','btn ghost',ng>1?'Imprimir exames ('+ng+' guias)':'Imprimir exames');
+    b1.onclick=()=>imprimirDoc(docsExames(exames,cab,a.data_atendimento)); acoes.appendChild(b1);
+    const b2=el('button','btn ghost',ng>1?'PDF dos exames ('+ng+' guias)':'PDF dos exames');
+    b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento)); acoes.appendChild(b2); }
   if(meds.length){
     const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento)); acoes.appendChild(b3);
     const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento)); acoes.appendChild(b4); }
@@ -820,7 +893,9 @@ function renderAtendimento(c){
         <div class="field"><label>Peso (kg)</label><input id="f-peso" class="f" type="number" step="0.1"></div>
         <div class="field"><label>Altura (cm)</label><input id="f-alt" class="f" type="number" step="0.1"></div>
         <div class="field"><label>Glicemia (mg/dL)</label><input id="f-gli" class="f" type="number"></div>
-      </div></div></div>
+        <div class="field"><label>Creatinina (mg/dL)</label><input id="f-creat" class="f" type="number" step="0.01" placeholder="1,0"></div>
+      </div>
+      <div id="o-clcr" class="muted" style="margin-top:10px"></div></div></div>
 
     <div class="sbox a"><div class="h"><span class="bdg">A</span> Avaliação</div><div class="bd">
       <div class="field"><textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
@@ -844,11 +919,14 @@ function renderAtendimento(c){
         <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
         <table style="margin-top:10px"><thead><tr><th>Exame</th><th>Código SIGTAP</th><th></th></tr></thead><tbody id="ex-tbody"></tbody></table>
         <div id="ex-empty" class="muted" style="margin-top:8px">Nenhum exame adicionado.</div>
+        <div id="ex-guias" class="muted" style="margin-top:8px"></div>
       </div>
       <div data-panel="rx" class="hidden">
         <button class="btn primary sm" id="open-presc">+ Adicionar medicamento</button>
+        <div id="rx-clcr" class="muted" style="margin:8px 0"></div>
         <table style="margin-top:10px"><thead><tr><th>Medicamento</th><th>Posologia</th><th>Qtd.</th><th></th></tr></thead><tbody id="rx-tbody"></tbody></table>
         <div id="rx-empty" class="muted" style="margin-top:8px">Nenhum medicamento prescrito.</div>
+        <div id="rx-avisos" style="margin-top:10px"></div>
       </div>
       <div data-panel="at" class="hidden">
         <div class="grid">
@@ -890,10 +968,12 @@ function renderAtendimento(c){
   if(atendAtual&&atendAtual.dados){ const d=atendAtual.dados;
     $('f-tipo').value=d.tipo_atendimento||'no_dia'; $('f-s').value=d.subjetivo||''; $('f-o').value=d.objetivo||'';
     $('f-a').value=d.avaliacao||''; $('f-p').value=d.plano||'';
-    [['f-pas','pa_sistolica'],['f-pad','pa_diastolica'],['f-fc','fc'],['f-peso','peso_kg'],['f-alt','altura_cm'],['f-gli','glicemia_capilar']]
-      .forEach(([el2,k])=>{ if(d[k]!=null) $(el2).value=d[k]; });
+    [['f-pas','pa_sistolica'],['f-pad','pa_diastolica'],['f-fc','fc'],['f-peso','peso_kg'],['f-alt','altura_cm'],
+     ['f-gli','glicemia_capilar'],['f-creat','creatinina']]
+      .forEach(([el2,k])=>{ if(d[k]!=null && $(el2)) $(el2).value=d[k]; });
   }
-  renderExTable(); renderRxTable();
+  ['f-peso','f-creat'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input',()=>{ renderClCr(); renderAvisosRx(); }); });
+  renderExTable(); renderRxTable(); renderClCr();
 }
 
 // ---------- busca de exames (SIGTAP via RPC) ----------
@@ -903,8 +983,17 @@ function renderExChips(){
 }
 function renderExTable(){
   const tb=$('ex-tbody'); if(!tb) return;
-  tb.innerHTML=examItens.map((e,i)=>'<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+'</span></td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
+  const grupos=agruparExames(examItens);
+  tb.innerHTML=grupos.map(g=>
+    (grupos.length>1?'<tr class="gh"><td colspan="3">'+esc(g.rotulo)+' · '+g.itens.length+' exame'+(g.itens.length>1?'s':'')+'</td></tr>':'')+
+    g.itens.map(e=>{ const i=examItens.indexOf(e);
+      return '<tr><td>'+esc(e.no_procedimento)+'</td><td><span class="chip">'+esc(e.co_procedimento)+
+             '</span></td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>'; }).join('')
+  ).join('');
   $('ex-empty').style.display=examItens.length?'none':'block';
+  const aviso=$('ex-guias');
+  if(aviso) aviso.textContent = grupos.length>1
+    ? 'Sairão ' + grupos.length + ' guias separadas: ' + grupos.map(g=>g.rotulo).join(', ') + '.' : '';
   tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ examItens.splice(+b.dataset.i,1); renderExTable(); });
 }
 $('ex-add').onclick=()=>{ renderExTable(); closeM('m-exam'); };
@@ -927,16 +1016,84 @@ taBind($('ex-search'),$('ex-list'),async q=>{
   return data.map(e=>({label:e.no_procedimento,sub:'Código '+e.co_procedimento,value:e}));
 },opt=>{ const e=opt.value; if(!examItens.find(x=>x.co_procedimento===e.co_procedimento)) examItens.push({co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento}); $('ex-search').value=''; renderExChips(); });
 
+// ---------- apoio à prescrição ----------
+const semAc=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+// Cockcroft-Gault — é a fórmula que as bulas usam para ajuste de dose.
+// Para ESTADIAMENTO da doença renal a referência é a CKD-EPI; são coisas
+// diferentes e não devem ser trocadas uma pela outra.
+function calcClCr(){
+  const p=pacienteSel||{};
+  const cr=parseFloat(String(($('f-creat')||{}).value||'').replace(',','.'));
+  const peso=parseFloat(String(($('f-peso')||{}).value||'').replace(',','.'));
+  const anos=p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null;
+  if(!(cr>0)||!(peso>0)||!(anos>0)) return null;
+  const fem=/^f/i.test(p.sexo||'');
+  const v=((140-anos)*peso)/(72*cr)*(fem?0.85:1);
+  return {valor:Math.round(v), idade:anos, peso, cr, fem};
+}
+function faixaClCr(v){
+  if(v>=90) return 'função renal preservada';
+  if(v>=60) return 'redução leve';
+  if(v>=30) return 'redução moderada — revise doses';
+  if(v>=15) return 'redução grave — revise doses';
+  return 'muito reduzida — revise doses';
+}
+function renderClCr(){
+  const alvo=$('o-clcr'), painel=$('rx-clcr'); if(!alvo) return;
+  const c=calcClCr();
+  const txt = c
+    ? 'ClCr estimada (Cockcroft-Gault): <b>'+c.valor+' mL/min</b> — '+faixaClCr(c.valor)+
+      '. <span class="muted">'+c.idade+' anos, '+c.peso+' kg, creatinina '+c.cr+' mg/dL'+(c.fem?', sexo feminino':'')+
+      '. Para estadiamento da DRC use a CKD-EPI; esta fórmula é a do ajuste de dose. No obeso, considere o peso ajustado.</span>'
+    : '<span class="muted">Preencha peso e creatinina para estimar a ClCr.</span>';
+  alvo.innerHTML=txt; if(painel) painel.innerHTML=txt;
+}
+// Confere o nome do medicamento contra as alergias registradas e contra a
+// tabela de alertas. É casamento por trecho do NOME — não conhece princípio
+// ativo nem reatividade cruzada. Serve de lembrete, não de barreira.
+function avisosPara(nome){
+  const n=semAc(nome), out=[];
+  (alergias||[]).forEach(a=>{ const sub=semAc(a.substancia);
+    if(sub && sub.length>3 && (n.includes(sub)||sub.includes(n)))
+      out.push({t:'alergia', m:'ALERGIA registrada: '+a.substancia+(a.reacao?' ('+a.reacao+')':'')}); });
+  const c=calcClCr();
+  const p=pacienteSel||{};
+  const anos=p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null;
+  alertasMed.forEach(al=>{
+    if(!n.includes(semAc(al.padrao))) return;
+    if(al.tipo==='idoso'){ if(anos!=null && anos>=(al.idade_min||65)) out.push({t:'idoso', m:al.mensagem}); }
+    else if(al.tipo==='renal'){ if(c && al.clcr_max!=null && c.valor<Number(al.clcr_max))
+        out.push({t:'renal', m:'ClCr '+c.valor+' mL/min — '+al.mensagem}); }
+    else out.push({t:'outro', m:al.mensagem});
+  });
+  return out;
+}
+function renderAvisosRx(){
+  const box=$('rx-avisos'); if(!box) return;
+  const todos=[];
+  prescItens.forEach(m=>avisosPara(m.medicamento).forEach(a=>todos.push({...a, med:m.medicamento})));
+  const vistos=new Set();
+  const unicos=todos.filter(a=>{ const k=a.med+'|'+a.m; if(vistos.has(k)) return false; vistos.add(k); return true; });
+  box.innerHTML=unicos.length
+    ? unicos.map(a=>'<div class="avso '+a.t+'"><b>'+esc(a.med)+'</b> — '+esc(a.m)+'</div>').join('')
+    : '';
+}
+
 // ---------- prescrição ----------
 function renderRxTable(){
   const tb=$('rx-tbody'); if(!tb) return;
   tb.innerHTML=prescItens.map((m,i)=>'<tr><td>'+esc(m.medicamento)+'</td><td class="muted">'+esc([m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
   $('rx-empty').style.display=prescItens.length?'none':'block';
   tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ prescItens.splice(+b.dataset.i,1); renderRxTable(); });
+  renderClCr(); renderAvisosRx();
 }
 $('pr-add').onclick=()=>{
   const med=$('pr-med').value.trim(); if(!med){ toast('Informe o medicamento',true); return; }
   prescItens.push({medicamento:med,via:$('pr-via').value,dose:$('pr-dose').value,frequencia:$('pr-freq').value,duracao:$('pr-dur').value,quantidade:$('pr-qtd').value,uso_continuo:$('pr-cont').checked});
+  const av=avisosPara(med);
+  if(av.some(a=>a.t==='alergia')) toast('Atenção: '+med+' bate com uma alergia registrada',true);
+  else if(av.length) toast(av.length+' aviso(s) para '+med);
   ['pr-med','pr-dose','pr-freq','pr-dur','pr-qtd'].forEach(i=>$(i).value=''); $('pr-cont').checked=false;
   renderRxTable(); closeM('m-presc');
 };
@@ -950,7 +1107,7 @@ async function finalizar(){
     const campos={ tipo_atendimento:$('f-tipo').value,
       subjetivo:$('f-s').value||null, objetivo:$('f-o').value||null, avaliacao:$('f-a').value||null, plano:$('f-p').value||null,
       pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'),
-      altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'), status:'finalizado' };
+      altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'), creatinina:num('f-creat'), status:'finalizado' };
     let at;
     if(edit){
       const {data,error}=await sb.from('pep_atendimentos').update(campos).eq('id',atendAtual.id).select().single();
