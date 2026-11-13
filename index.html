@@ -189,6 +189,20 @@
   .faixa-off button{border:1px solid currentColor;background:#fff;color:inherit;border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:600}
   .offbox{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--fg);padding:4px;margin:2px 0 0;cursor:pointer}
   .offbox input{width:auto;margin:0}
+  /* unidades */
+  .tb-dir{display:flex;align-items:center;gap:12px;margin-left:auto}
+  .unid-sel{border:1px solid var(--line);background:var(--brand-050);color:var(--fg);border-radius:9px;padding:7px 10px;font-size:13px;font-weight:600;max-width:240px}
+  .unid-card{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--panel-2)}
+  .unid-card.ativa{border-color:#8ec1ea;background:var(--brand-050)}
+  .unid-card .lg{width:46px;height:46px;border-radius:8px;background:#fff;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;flex:0 0 auto;font-size:10px;color:var(--muted)}
+  .unid-card .lg img{max-width:100%;max-height:100%}
+  .unid-card .tx{flex:1;min-width:0;font-size:13px;line-height:1.35}
+  .unid-card .tx b{display:block;font-size:13.5px}
+  .unid-card .tx span{color:var(--muted);font-size:12px}
+  .unid-card .ac{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .logo-up{display:flex;align-items:center;gap:12px}
+  .logo-prev{width:96px;height:96px;border:1px dashed var(--line);border-radius:10px;display:grid;place-items:center;overflow:hidden;background:#fff;font-size:11px;color:var(--muted);text-align:center}
+  .logo-prev img{max-width:100%;max-height:100%}
   /* evolução */
   .evo{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
   .evocard{border:1px solid var(--line);border-radius:10px;padding:10px 10px 8px;background:var(--panel-2);
@@ -205,23 +219,63 @@
   /* ---------- impressão ---------- */
   #print-area{display:none}
   @media print{
-    @page{size:A4;margin:16mm 14mm}
+    @page{size:A4;margin:13mm 15mm 12mm}
     body>*{display:none!important}
-    #print-area{display:block!important;background:#fff;color:#000;font-family:Georgia,'Times New Roman',serif;font-size:12pt;line-height:1.45}
-    #print-area .pr-cab{text-align:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:14px}
-    #print-area .pr-un{font-size:12pt;letter-spacing:.06em;text-transform:uppercase}
-    #print-area h1{font-size:15pt;letter-spacing:.12em;margin:6px 0 0;text-transform:uppercase}
-    #print-area .pr-pac{display:flex;flex-wrap:wrap;gap:4px 26px;margin-bottom:16px;font-size:11pt}
-    #print-area .pr-corpo{min-height:95mm}
-    #print-area .it{margin-bottom:13px;page-break-inside:avoid}
-    #print-area .it .n{font-weight:bold}
-    #print-area .pr-folha{break-after:auto}
-    #print-area .it .p{text-align:justify;line-height:1.7}
-    #print-area .it .d{padding-left:17px;font-size:11pt}
-    #print-area .pr-obs{margin-top:14px;font-size:11pt;border-top:1px dotted #555;padding-top:8px}
-    #print-area .pr-ass{margin-top:26mm;text-align:center;page-break-inside:avoid}
-    #print-area .pr-linha{border-top:1px solid #000;width:72mm;margin:0 auto 5px}
-    #print-area .pr-data{margin-top:12px;font-size:11pt}
+    #print-area{display:block!important;background:#fff;color:#13293f;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11pt;line-height:1.45;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #print-area .pr-folha{min-height:270mm;display:flex;flex-direction:column}
+    /* cabeçalho da unidade */
+    #print-area .pr-hd{display:flex;align-items:center;gap:12px;padding-bottom:8px;border-bottom:2.2px solid #0a6fbd;margin-bottom:14px}
+    #print-area .pr-hd.vazio{padding:0}
+    #print-area .pr-logo{flex:0 0 30mm;height:22mm;display:flex;align-items:center}
+    #print-area .pr-logo.dir{justify-content:flex-end}
+    #print-area .pr-logo img{max-height:22mm;max-width:30mm;object-fit:contain}
+    #print-area .pr-un{flex:1;text-align:center;line-height:1.3}
+    #print-area .pr-org{font-size:10.5pt;font-weight:700;letter-spacing:.03em}
+    #print-area .pr-sec{font-size:10pt}
+    #print-area .pr-un .pr-un{font-size:11.5pt}
+    #print-area .pr-un>.pr-un{font-weight:700;font-size:11.5pt;color:#0a6fbd}
+    #print-area .pr-det{font-size:8.3pt;color:#5e7490}
+    /* título */
+    #print-area .pr-tit{text-align:center;margin:4px 0 12px}
+    #print-area h1{font-size:15pt;letter-spacing:.14em;margin:0;text-transform:uppercase;color:#13293f}
+    #print-area .pr-sub{font-size:10.5pt;color:#0a6fbd;margin-top:3px}
+    /* quadro do paciente */
+    #print-area .pr-pac{display:grid;grid-template-columns:repeat(3,1fr);gap:7px 12px;background:#f4f7fb;border:1px solid #d1dbe7;
+      border-radius:2.5mm;padding:8px 11px;margin-bottom:16px}
+    #print-area .pr-pac .c span{display:block;font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5e7490}
+    #print-area .pr-pac .c b{font-weight:400;font-size:10.5pt}
+    #print-area .pr-pac .c.s2{grid-column:span 2} #print-area .pr-pac .c.s3{grid-column:span 3}
+    #print-area .pr-pac .c:first-child b{font-weight:700}
+    /* corpo */
+    #print-area .pr-corpo{flex:0 0 auto}
+    #print-area .pr-gt{font-size:9.5pt;font-weight:700;color:#0a6fbd;letter-spacing:.04em;margin:6px 0 8px;
+      display:inline-block;border-bottom:1px solid #0a6fbd;padding-bottom:1px}
+    #print-area .pr-it{margin-bottom:11px;page-break-inside:avoid}
+    #print-area .pr-l1{display:flex;align-items:baseline;gap:6px;font-weight:700}
+    #print-area .pr-num{flex:0 0 auto;min-width:14px}
+    #print-area .pr-nm{flex:0 1 auto}
+    #print-area .pr-dots{flex:1 1 auto;border-bottom:1.2px dotted #c3cfdd;min-width:18px;transform:translateY(-3px)}
+    #print-area .pr-q{flex:0 0 auto}
+    #print-area .pr-cod{flex:0 0 auto;font-weight:400;font-size:8.6pt;color:#5e7490}
+    #print-area .pr-pos{padding-left:20px;font-size:10pt;color:#3f5570;margin-top:2px}
+    #print-area .pr-par{text-align:justify;line-height:1.75;font-size:11.5pt;margin:0 0 10px}
+    #print-area .pr-sec{margin:0 0 12px;page-break-inside:avoid}
+    #print-area .pr-fim{page-break-inside:avoid}
+    #print-area .pr-fecho{margin:0 0 6mm}
+    #print-area .pr-sec .pr-gt{text-transform:uppercase}
+    #print-area .pr-sec .pr-par{font-size:11pt;line-height:1.55;margin:0 0 3px}
+    #print-area .pr-obs{border:1px solid #d1dbe7;border-radius:2mm;padding:7px 10px;font-size:9.8pt;margin-top:8px;page-break-inside:avoid}
+    #print-area .pr-obs-t{font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5e7490;margin-bottom:3px}
+    /* assinatura e rodapé — empurrados para o pé da folha */
+    #print-area .pr-fim{margin-top:auto;padding-top:14mm}
+    #print-area .pr-ass{text-align:center;page-break-inside:avoid}
+    #print-area .pr-local{font-size:10.5pt;margin-bottom:14mm}
+    #print-area .pr-linha{border-top:1px solid #13293f;width:78mm;margin:0 auto 5px}
+    #print-area .pr-cn{font-weight:700;font-size:10.5pt}
+    #print-area .pr-ci{font-size:9.5pt;color:#5e7490}
+    #print-area .pr-ft{border-top:1px solid #d1dbe7;margin-top:8mm;padding-top:4px;text-align:center;font-size:8pt;color:#3f5570;line-height:1.35}
+    #print-area .pr-emit{font-size:6.8pt;color:#8ea6c0;margin-top:2px}
   }
   @media (max-width:760px){
     .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
@@ -276,7 +330,8 @@
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
       <span class="badge-proto">Protótipo · dados fictícios · não usar com pacientes reais</span>
-      <span class="who" id="who"></span>
+      <span class="tb-dir"><select id="unid-ativa" class="unid-sel hidden" title="Unidade onde você está atendendo hoje"></select>
+      <span class="who" id="who"></span></span>
     </div>
     <div class="content"><div class="maxw" id="main-content"></div></div>
   </main>
@@ -387,16 +442,69 @@
 <div class="overlay" id="m-prof"><div class="modal">
   <div class="mh"><span>Dados para impressão</span><button class="x" data-close>✕</button></div>
   <div class="mb">
-    <div class="muted" style="margin-bottom:12px">Aparecem no cabeçalho e na assinatura da receita e da solicitação de exames. Ficam salvos na sua conta, então valem em qualquer computador.</div>
+    <div class="muted" style="margin-bottom:12px">Saem no cabeçalho e no carimbo de receitas, guias e atestados. Ficam salvos na sua conta, então valem em qualquer computador.</div>
+    <div class="sec-title" style="margin-top:0">Profissional</div>
     <div class="field"><label>Nome do profissional *</label><input id="pf-nome" class="f" placeholder="Dr(a). Nome Sobrenome"></div>
     <div class="grid">
       <div class="field"><label>CRM</label><input id="pf-crm" class="f" placeholder="000000"></div>
       <div class="field"><label>UF do CRM</label><input id="pf-uf" class="f" placeholder="SP" maxlength="2"></div>
       <div class="field"><label>Especialidade</label><input id="pf-esp" class="f" placeholder="Clínica Médica"></div>
-      <div class="field"><label>Unidade / consultório</label><input id="pf-unidade" class="f" placeholder="UBS ..."></div>
+      <div class="field"><label>RQE (se houver)</label><input id="pf-rqe" class="f" placeholder="00000"></div>
     </div>
+    <div class="sec-title" style="margin-top:6px;display:flex;align-items:center;justify-content:space-between">
+      <span>Unidades onde você atende</span><button class="btn ghost sm" id="pf-addunid">+ Adicionar unidade</button></div>
+    <div id="pf-unidades"></div>
+    <div class="muted" id="pf-unid-dica" style="margin-top:6px">A unidade marcada como ativa é a que sai nos documentos dos atendimentos novos. Cada atendimento guarda a sua, então reimprimir depois não troca o cabeçalho.</div>
+    <input type="hidden" id="pf-unidade">
   </div>
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pf-save">Salvar</button></div>
+</div></div>
+
+<div class="overlay" id="m-unid"><div class="modal">
+  <div class="mh"><span id="un-titulo">Unidade de saúde</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="grid">
+      <div class="field"><label>Órgão</label><input id="un-orgao" class="f" placeholder="Prefeitura Municipal de Itapevi"></div>
+      <div class="field"><label>Secretaria</label><input id="un-secr" class="f" placeholder="Secretaria de Saúde"></div>
+    </div>
+    <div class="field"><label>Nome da unidade *</label><input id="un-nome" class="f" placeholder="USF Jardim Vitápolis"></div>
+    <div class="grid">
+      <div class="field"><label>CNES</label><input id="un-cnes" class="f" inputmode="numeric" maxlength="7" placeholder="7 dígitos"></div>
+      <div class="field"><label>Telefone</label><input id="un-tel" class="f" placeholder="(11) 0000-0000"></div>
+    </div>
+    <div class="field"><label>Endereço</label><input id="un-end" class="f" placeholder="Rua, número"></div>
+    <div class="grid">
+      <div class="field"><label>Bairro</label><input id="un-bairro" class="f"></div>
+      <div class="field"><label>Município</label><input id="un-mun" class="f" placeholder="Itapevi"></div>
+      <div class="field"><label>UF</label><input id="un-uf" class="f" maxlength="2" placeholder="SP"></div>
+      <div class="field"><label>CEP</label><input id="un-cep" class="f" placeholder="00000-000"></div>
+    </div>
+    <div class="field"><label>E-mail (opcional)</label><input id="un-email" class="f"></div>
+    <div class="grid">
+      <div class="field"><label>Logotipo da esquerda (brasão)</label>
+        <div class="logo-up">
+          <div class="logo-prev" id="un-logo-prev">sem logotipo</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn ghost sm" id="un-logo-btn" type="button">Escolher</button>
+            <button class="btn ghost sm" id="un-logo-rm" type="button">Remover</button>
+          </div>
+          <input type="file" id="un-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" class="hidden">
+        </div></div>
+      <div class="field"><label>Logotipo da direita (opcional)</label>
+        <div class="logo-up">
+          <div class="logo-prev" id="un-logo2-prev">sem logotipo</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn ghost sm" id="un-logo2-btn" type="button">Escolher</button>
+            <button class="btn ghost sm" id="un-logo2-rm" type="button">Remover</button>
+          </div>
+          <input type="file" id="un-logo2-file" accept="image/png,image/jpeg,image/svg+xml,image/webp" class="hidden">
+        </div></div>
+    </div>
+    <div class="muted" style="margin:-4px 0 12px">As imagens são reduzidas automaticamente. Dica: no modelo do Word da prefeitura, clique no brasão com o botão direito → <i>Salvar como imagem</i>.</div>
+    <div class="field"><label>Rodapé (endereço da Secretaria, telefone, site)</label>
+      <textarea id="un-rodape" class="f" style="min-height:58px" placeholder="Rua ..., 470 | Cidade Saúde | Itapevi | SP | CEP 06693-070&#10;Tel. (11) 0000-0000 | sec.saude@..."></textarea></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="un-save">Salvar unidade</button></div>
 </div></div>
 
 <div class="toast" id="toast"></div>
@@ -440,9 +548,9 @@ const examItens=[], prescItens=[];
 const OFF=(()=>{
   const nativo=window.fetch.bind(window);
   const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
-    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_atendimento_problemas',
+    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_atendimento_problemas',
     'pep_problemas','pep_alergias','pep_resultados'];
-  const REFERENCIA=['pep_profissional','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
+  const REFERENCIA=['pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
     'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
   const ESPELHO=new Set([...CLINICAS,...REFERENCIA]);
   const PK={pep_profissional:'user_id',pep_analitos:'chave',cid10:'codigo',pep_cid10:'codigo',
@@ -820,7 +928,7 @@ const OFF=(()=>{
     estado.baixando=true; atualizarFaixa();
     const cont={};
     try{
-      for(const t of [...CLINICAS,'pep_profissional','pep_analitos','pep_alertas_medicamento'])
+      for(const t of [...CLINICAS,'pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento'])
         try{ cont[t]=await baixarTabela(t); }catch(e){}
       const meta=(await idbGet('meta','catalogos'))||{};
       const velho=!meta.em||Date.now()-new Date(meta.em).getTime()>7*864e5;
@@ -946,7 +1054,7 @@ async function enter(session){
   show('app');
   const v=$('versao'); if(v) v.textContent='versão '+VERSAO;
   carregarAnalitos();
-  setTimeout(()=>{ OFF.enviarFila(); OFF.preparar(); },1500); await carregarPacientes(); renderMain(); await carregarProf(); carregarAlertas();
+  setTimeout(()=>{ OFF.enviarFila(); OFF.preparar(); },1500); await carregarPacientes(); renderMain(); await carregarProf(); await carregarUnidades(); carregarAlertas();
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
 }
@@ -1337,11 +1445,11 @@ async function renderFichaPaciente(c){
 }
 
 // ---------- dados do profissional (ficam neste navegador) ----------
-let profCache={nome:'',crm:'',uf_crm:'',especialidade:'',unidade:''};
+let profCache={nome:'',crm:'',uf_crm:'',especialidade:'',unidade:'',rqe:'',unidade_ativa:null};
 function dadosProf(){ return profCache; }
 function lerProfLocal(){ try{ return JSON.parse(localStorage.getItem('pep_prof')||'{}'); }catch(e){ return {}; } }
 async function carregarProf(){
-  const {data,error}=await sb.from('pep_profissional').select('nome,crm,uf_crm,especialidade,unidade').maybeSingle();
+  const {data,error}=await sb.from('pep_profissional').select('*').maybeSingle();
   if(error){ if(/does not exist|schema cache/i.test(error.message||'')) toast('Rode o profissional_schema.sql no Supabase',true);
              profCache=Object.assign(profCache,lerProfLocal()); return; }
   if(data){ profCache=Object.assign(profCache,data); return; }
@@ -1352,12 +1460,132 @@ async function carregarProf(){
     if(!e2){ try{ localStorage.removeItem('pep_prof'); }catch(e){} toast('Seus dados de impressão foram salvos na conta ✓'); }
   }
 }
-$('btn-prof').onclick=()=>{ const d=dadosProf();
+// ---------- unidades de saúde ----------
+let unidades=[], unidadesOK=false;
+async function carregarUnidades(){
+  const {data,error}=await sb.from('pep_unidades').select('*').order('ordem').order('created_at');
+  unidadesOK=!error; unidades=data||[];
+  renderSeletorUnidade();
+}
+function unidadeAtiva(){ return unidades.find(u=>u.id===profCache.unidade_ativa)||unidades[0]||null; }
+function unidadePorId(id){ return (id&&unidades.find(u=>u.id===id))||unidadeAtiva(); }
+function renderSeletorUnidade(){
+  const sel=$('unid-ativa'); if(!sel) return;
+  if(unidades.length<1){ sel.classList.add('hidden'); return; }
+  const at=unidadeAtiva();
+  sel.innerHTML=unidades.map(u=>'<option value="'+u.id+'"'+(at&&u.id===at.id?' selected':'')+'>'+esc(u.nome)+'</option>').join('');
+  sel.classList.toggle('hidden',unidades.length<2);      // com uma unidade só, não há o que trocar
+}
+async function definirUnidadeAtiva(id){
+  const u=(await sb.auth.getUser()).data.user;
+  const {error}=await sb.from('pep_profissional').upsert({user_id:u.id,nome:profCache.nome||'Profissional',unidade_ativa:id},{onConflict:'user_id'});
+  if(error){ toast('Não foi possível trocar a unidade: '+error.message,true); renderSeletorUnidade(); return false; }
+  profCache.unidade_ativa=id; renderSeletorUnidade();
+  const un=unidadeAtiva(); toast('Atendendo em: '+(un?un.nome:'—'));
+  return true;
+}
+$('unid-ativa').onchange=e=>definirUnidadeAtiva(e.target.value);
+
+function renderUnidadesModal(){
+  const box=$('pf-unidades'); if(!box) return;
+  if(!unidadesOK){ box.innerHTML='<div class="cfg">Para cadastrar unidades com CNES e logotipo, rode o <b>documentos_schema.sql</b> no Supabase.</div>'; return; }
+  if(!unidades.length){ box.innerHTML='<div class="muted" style="padding:6px 0 8px">Nenhuma unidade cadastrada ainda.</div>'; return; }
+  const at=unidadeAtiva();
+  box.innerHTML=unidades.map(u=>'<div class="unid-card'+(at&&u.id===at.id?' ativa':'')+'">'+
+    '<div class="lg">'+(u.logo?'<img src="'+u.logo+'" alt="">':'sem logo')+'</div>'+
+    '<div class="tx"><b>'+esc(u.nome)+'</b><span>'+
+      esc([u.cnes?'CNES '+u.cnes:'CNES não informado', [u.municipio,u.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '))+'</span></div>'+
+    '<div class="ac">'+(at&&u.id===at.id?'<span class="tagc">ativa</span>':'<button class="btn ghost sm" data-ativar="'+u.id+'">Usar hoje</button>')+
+      '<button class="btn ghost sm" data-editar="'+u.id+'">Editar</button>'+
+      '<button class="x" data-remover="'+u.id+'" title="Remover">✕</button></div></div>').join('');
+  box.querySelectorAll('[data-ativar]').forEach(b=>b.onclick=async()=>{ if(await definirUnidadeAtiva(b.dataset.ativar)) renderUnidadesModal(); });
+  box.querySelectorAll('[data-editar]').forEach(b=>b.onclick=()=>abrirUnidade(unidades.find(u=>u.id===b.dataset.editar)));
+  box.querySelectorAll('[data-remover]').forEach(b=>b.onclick=async()=>{
+    const u=unidades.find(x=>x.id===b.dataset.remover);
+    if(!confirm('Remover a unidade "'+u.nome+'"?\n\nOs atendimentos feitos nela continuam no prontuário, mas os documentos reimpressos passam a sair com o cabeçalho da unidade ativa.')) return;
+    const {data,error}=await sb.from('pep_unidades').delete().eq('id',u.id).select();
+    if(error){ toast('Não foi possível remover: '+error.message,true); return; }
+    if(!data||!data.length){ toast('Nada foi removido — o banco recusou.',true); return; }
+    await carregarUnidades(); renderUnidadesModal(); toast('Unidade removida ✓');
+  });
+}
+
+let unidEditando=null, logoNovo=undefined, logo2Novo=undefined;
+function abrirUnidade(u){
+  unidEditando=u||null; logoNovo=undefined;
+  $('un-titulo').textContent=u?'Editar unidade':'Nova unidade';
+  const v=(id,val)=>{ $(id).value=val||''; };
+  v('un-nome',u&&u.nome); v('un-cnes',u&&u.cnes); v('un-tel',u&&u.telefone); v('un-end',u&&u.endereco);
+  v('un-bairro',u&&u.bairro); v('un-mun',u&&u.municipio); v('un-uf',u&&u.uf); v('un-cep',u&&u.cep); v('un-email',u&&u.email);
+  v('un-orgao',u&&u.orgao); v('un-secr',u&&u.secretaria); v('un-rodape',u&&u.rodape);
+  logo2Novo=undefined; mostrarLogo2(u&&u.logo2);
+  // primeira unidade: aproveita o nome que estava no campo antigo
+  if(!u&&!unidades.length&&profCache.unidade) $('un-nome').value=profCache.unidade;
+  mostrarLogo(u&&u.logo);
+  openM('m-unid');
+}
+function mostrarLogo(src){ $('un-logo-prev').innerHTML=src?'<img src="'+src+'" alt="">':'sem logotipo'; }
+function mostrarLogo2(src){ $('un-logo2-prev').innerHTML=src?'<img src="'+src+'" alt="">':'sem logotipo'; }
+// reduz a imagem antes de guardar: um logotipo de 3 MB vira algumas dezenas de KB
+async function reduzirImagem(file){
+  const url=await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>ko(r.error); r.readAsDataURL(file); });
+  const img=await new Promise((ok,ko)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=()=>ko(new Error('Imagem não reconhecida')); i.src=url; });
+  const w=img.naturalWidth||img.width||360, h=img.naturalHeight||img.height||360, k=Math.min(1,360/Math.max(w,h));
+  const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL('image/png');
+}
+$('un-logo-btn').onclick=()=>$('un-logo-file').click();
+$('un-logo-file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ logoNovo=await reduzirImagem(f); mostrarLogo(logoNovo);
+       if(logoNovo.length>450000) toast('Logotipo grande ('+Math.round(logoNovo.length/1024)+' KB) — funciona, mas uma imagem mais simples deixa o PDF mais leve'); }
+  catch(err){ toast('Não consegui ler a imagem: '+(err.message||err),true); }
+});
+$('un-logo-rm').onclick=()=>{ logoNovo=null; mostrarLogo(null); };
+$('un-logo2-btn').onclick=()=>$('un-logo2-file').click();
+$('un-logo2-file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  try{ logo2Novo=await reduzirImagem(f); mostrarLogo2(logo2Novo); }
+  catch(err){ toast('Não consegui ler a imagem: '+(err.message||err),true); }
+});
+$('un-logo2-rm').onclick=()=>{ logo2Novo=null; mostrarLogo2(null); };
+$('un-save').onclick=async()=>{
+  const g=id=>$(id).value.trim();
+  const rec={nome:g('un-nome'), cnes:g('un-cnes').replace(/\D/g,'')||null, telefone:g('un-tel')||null, endereco:g('un-end')||null,
+    bairro:g('un-bairro')||null, municipio:g('un-mun')||null, uf:g('un-uf').toUpperCase()||null, cep:g('un-cep')||null, email:g('un-email')||null,
+    orgao:g('un-orgao')||null, secretaria:g('un-secr')||null, rodape:$('un-rodape').value.trim()||null};
+  if(!rec.nome){ toast('Informe o nome da unidade',true); return; }
+  // CNES tem 7 dígitos; documento impresso às vezes come o zero à esquerda
+  if(rec.cnes&&/^\d{6}$/.test(rec.cnes)){
+    if(!confirm('O CNES tem 7 dígitos e você digitou 6 ('+rec.cnes+').\n\nÉ comum o zero à esquerda sumir na impressão. Gravar como 0'+rec.cnes+'?\n\nNa dúvida, cancele e confira no cnes.datasus.gov.br.')) return;
+    rec.cnes='0'+rec.cnes; $('un-cnes').value=rec.cnes;
+  }
+  if(rec.cnes&&!/^\d{7}$/.test(rec.cnes)){ toast('O CNES tem 7 dígitos — confira o número',true); return; }
+  if(logoNovo!==undefined) rec.logo=logoNovo;
+  if(logo2Novo!==undefined) rec.logo2=logo2Novo;
+  const btn=$('un-save'); btn.disabled=true;
+  const editando=unidEditando;
+  const res=editando
+    ? await sb.from('pep_unidades').update(rec).eq('id',editando.id).select().single()
+    : await sb.from('pep_unidades').insert(Object.assign({ordem:unidades.length},rec)).select().single();
+  btn.disabled=false;
+  if(res.error){ toast('Erro ao salvar: '+res.error.message,true); return; }
+  const primeira=!editando&&!unidades.length;
+  await carregarUnidades();
+  if(primeira) await definirUnidadeAtiva(res.data.id);      // a primeira já vira a ativa
+  closeM('m-unid'); renderUnidadesModal(); toast(editando?'Unidade atualizada ✓':'Unidade cadastrada ✓');
+};
+$('pf-addunid').onclick=()=>{ if(!unidadesOK){ toast('Rode o documentos_schema.sql no Supabase primeiro',true); return; } abrirUnidade(null); };
+
+$('btn-prof').onclick=async()=>{ const d=dadosProf();
   $('pf-nome').value=d.nome||''; $('pf-crm').value=d.crm||''; $('pf-uf').value=d.uf_crm||'';
-  $('pf-esp').value=d.especialidade||''; $('pf-unidade').value=d.unidade||''; openM('m-prof'); };
+  $('pf-esp').value=d.especialidade||''; $('pf-rqe').value=d.rqe||''; $('pf-unidade').value=d.unidade||'';
+  await carregarUnidades(); renderUnidadesModal(); openM('m-prof'); };
 $('pf-save').onclick=async()=>{
   const d={nome:$('pf-nome').value.trim(),crm:$('pf-crm').value.trim(),uf_crm:$('pf-uf').value.trim().toUpperCase(),
-           especialidade:$('pf-esp').value.trim(),unidade:$('pf-unidade').value.trim()};
+           especialidade:$('pf-esp').value.trim(),unidade:(unidadeAtiva()||{}).nome||$('pf-unidade').value.trim()};
+  if(unidadesOK) d.rqe=$('pf-rqe').value.trim()||null;      // a coluna só existe depois do documentos_schema.sql
   if(!d.nome){ toast('Informe o nome do profissional',true); return; }
   const btn=$('pf-save'); btn.disabled=true;
   const u=(await sb.auth.getUser()).data.user;
@@ -1369,23 +1597,82 @@ $('pf-save').onclick=async()=>{
 
 // ---------- impressão (receita / solicitação de exames) ----------
 function dataBRsimples(iso){ if(!iso) return ''; const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso+'T12:00:00':iso); return d.toLocaleDateString('pt-BR'); }
-function montarDoc(titulo,itens,obs,quando){
+// ---------- documentos: dados comuns ----------
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function dataExtenso(iso){ const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso+'T12:00:00':iso);
+  return d.getDate()+' de '+MESES[d.getMonth()]+' de '+d.getFullYear(); }
+function dataHoraBR(iso){ const d=new Date(iso); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+function linhasUnidade(un){
+  if(!un) return [];
+  const l1=[un.cnes?'CNES '+un.cnes:'', un.telefone?'Tel. '+un.telefone:'', un.email||''].filter(Boolean).join('  ·  ');
+  const l2=[[un.endereco,un.bairro].filter(Boolean).join(' — '), [un.municipio,un.uf].filter(Boolean).join('/'),
+            un.cep?'CEP '+un.cep:''].filter(Boolean).join('  ·  ');
+  return [l1,l2].filter(Boolean);
+}
+const rodapeTexto=d=>{ const un=d.un||{}; return [un.nome,un.cnes?'CNES '+un.cnes:''].filter(Boolean).join(' · '); };
+// rodapé livre (endereço da Secretaria etc.), linha a linha; sem ele, vale o resumo da unidade
+const rodapeLinhas=d=>{ const r=(d.un&&d.un.rodape||'').split(/\n+/).map(x=>x.trim()).filter(Boolean); return r.length?r:[rodapeTexto(d)].filter(Boolean); };
+// as linhas do bloco central do cabeçalho: órgão, secretaria, unidade, CNES/telefone, endereço
+function blocoCabecalho(un){
+  if(!un) return [];
+  const out=[];
+  if(un.orgao) out.push({t:un.orgao.toUpperCase(),k:'org'});
+  if(un.secretaria) out.push({t:un.secretaria,k:'sec'});
+  out.push({t:un.nome,k:'un'});
+  linhasUnidade(un).forEach(l=>out.push({t:l,k:'det'}));
+  return out;
+}
+// unidadeId: a unidade onde o atendimento aconteceu. Sem ela, vale a ativa.
+function montarDoc(titulo,itens,obs,quando,unidadeId,extra){
   const pr=dadosProf(), p=pacienteSel||{};
   if(!pr.nome){ toast('Preencha os dados para impressão primeiro',true); $('btn-prof').click(); return null; }
-  return { titulo, itens, obs:obs||[], quando: quando||new Date().toISOString(), prof:pr,
-    ident:[['Paciente',p.nome],['Nascimento',p.data_nascimento?dataBRsimples(p.data_nascimento)+' ('+idade(p.data_nascimento)+')':''],
-           ['CPF',p.cpf],['CNS',p.cns]].filter(x=>x[1]),
-    assinatura:[pr.nome, pr.crm?('CRM '+[pr.uf_crm,pr.crm].filter(Boolean).join(' ')):'', pr.especialidade||''].filter(Boolean) };
+  const un=unidadePorId(unidadeId)||(pr.unidade?{nome:pr.unidade}:null);
+  const partes=String(titulo).split(' — ');
+  const q=quando||new Date().toISOString();
+  const nasc=p.data_nascimento?dataBRsimples(p.data_nascimento)+' · '+idade(p.data_nascimento):'';
+  // [rótulo, valor, colunas que ocupa numa grade de 3]
+  const pac=[['Paciente',p.nome,2],['Nascimento',nasc,1],['CPF',p.cpf,1],['CNS',p.cns,1],['Sexo',p.sexo,1],
+             ['Nome da mãe',p.nome_mae,3]].filter(x=>x[1]);
+  const crm=pr.crm?('CRM'+(pr.uf_crm?'-'+pr.uf_crm:'')+' '+pr.crm):'';
+  return Object.assign({
+    titulo, tituloPrinc:partes[0], subtitulo:partes[1]||'', un, prof:pr, pac,
+    itens:itens||[], grupos:[{titulo:'',itens:itens||[]}], paragrafos:null,
+    obs:obs||[], obsTitulo:'Observações', quando:q,
+    local:(un&&un.municipio?un.municipio+(un.uf?' – '+un.uf:'')+', ':'')+dataExtenso(q)+'.',
+    // como nos modelos das prefeituras: nome, registro, e "Médico – unidade"
+    carimbo:[pr.nome, [crm, pr.especialidade, pr.rqe?'RQE '+pr.rqe:''].filter(Boolean).join(' · '),
+             un&&un.nome?'Médico – '+un.nome:''].filter(Boolean),
+    emitido:new Date().toISOString()
+  }, extra||{});
 }
+
+// ---------- impressão (HTML) ----------
 function umaGuiaHTML(d){
-  return '<div class="pr-cab">'+(d.prof.unidade?'<div class="pr-un">'+esc(d.prof.unidade)+'</div>':'')+'<h1>'+esc(d.titulo)+'</h1></div>'+
-    '<div class="pr-pac">'+d.ident.map(x=>'<div><b>'+esc(x[0])+':</b> '+esc(x[1])+'</div>').join('')+'</div>'+
-    '<div class="pr-corpo">'+d.itens.map((it,i)=>'<div class="it"><div class="'+(d.semNumero?'p':'n')+'">'+
-        (d.semNumero?'':(i+1)+'. ')+esc(it.n)+'</div>'+
-        (it.d?'<div class="d">'+esc(it.d)+'</div>':'')+'</div>').join('')+'</div>'+
-    (d.obs.length?'<div class="pr-obs">'+d.obs.map(o=>'<b>'+esc(o[0])+':</b> '+esc(o[1])).join('<br>')+'</div>':'')+
-    '<div class="pr-ass"><div class="pr-linha"></div>'+d.assinatura.map(l=>'<div>'+esc(l)+'</div>').join('')+
-      '<div class="pr-data">'+esc(dataBRsimples(d.quando))+'</div></div>';
+  const un=d.un;
+  const cab=un?'<div class="pr-hd">'+
+      '<div class="pr-logo">'+(un.logo?'<img src="'+un.logo+'" alt="">':'')+'</div>'+
+      '<div class="pr-un">'+blocoCabecalho(un).map(x=>'<div class="pr-'+x.k+'">'+esc(x.t)+'</div>').join('')+'</div>'+
+      '<div class="pr-logo dir">'+(un.logo2?'<img src="'+un.logo2+'" alt="">':'')+'</div></div>'
+    :'<div class="pr-hd vazio"></div>';
+  const pac='<div class="pr-pac">'+d.pac.map(x=>'<div class="c s'+(x[2]||1)+'"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')+'</div>';
+  let corpo='';
+  if(d.secoes) corpo=d.secoes.map(sc=>'<div class="pr-sec">'+(sc.t?'<div class="pr-gt">'+esc(sc.t)+'</div>':'')+
+      String(sc.txt).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(t=>'<p class="pr-par">'+esc(t)+'</p>').join('')+'</div>').join('');
+  else if(d.paragrafos) corpo=d.paragrafos.map(t=>'<p class="pr-par">'+esc(t)+'</p>').join('');
+  else { let n=0;
+    corpo=d.grupos.map(g=>(g.titulo?'<div class="pr-gt">'+esc(g.titulo)+'</div>':'')+g.itens.map(it=>{ n++;
+      const dir=it.q||it.cod||'';
+      return '<div class="pr-it"><div class="pr-l1"><span class="pr-num">'+n+'.</span><span class="pr-nm">'+esc(it.n)+'</span>'+
+        (dir?'<span class="pr-dots"></span><span class="'+(it.cod?'pr-cod':'pr-q')+'">'+esc(dir)+'</span>':'')+'</div>'+
+        (it.d?'<div class="pr-pos">'+esc(it.d)+'</div>':'')+'</div>'; }).join('')).join(''); }
+  const obs=d.obs.length?'<div class="pr-obs"><div class="pr-obs-t">'+esc(d.obsTitulo)+'</div>'+
+    d.obs.map(o=>'<div><b>'+esc(o[0])+':</b> '+esc(o[1])+'</div>').join('')+'</div>':'';
+  const ass='<div class="pr-ass"><div class="pr-local">'+esc(d.local)+'</div><div class="pr-linha"></div>'+
+    d.carimbo.map((l,i)=>'<div class="'+(i?'pr-ci':'pr-cn')+'">'+esc(l)+'</div>').join('')+'</div>';
+  const ft='<div class="pr-ft">'+rodapeLinhas(d).map(l=>'<div>'+esc(l)+'</div>').join('')+
+    '<div class="pr-emit">Emitido em '+esc(dataHoraBR(d.emitido))+'</div></div>';
+  return cab+'<div class="pr-tit"><h1>'+esc(d.tituloPrinc)+'</h1>'+(d.subtitulo?'<div class="pr-sub">'+esc(d.subtitulo)+'</div>':'')+'</div>'+
+    pac+'<div class="pr-corpo">'+corpo+'</div>'+obs+'<div class="pr-fim">'+(d.fecho?'<p class="pr-par pr-fecho">'+esc(d.fecho)+'</p>':'')+ass+ft+'</div>';
 }
 // Aceita uma guia ou uma lista delas; cada guia sai numa folha.
 function imprimirDoc(d){
@@ -1396,61 +1683,206 @@ function imprimirDoc(d){
     '<div class="pr-folha"'+(i<docs.length-1?' style="page-break-after:always"':'')+'>'+umaGuiaHTML(x)+'</div>').join('');
   window.print();
 }
-// ---------- PDF (arquivo de verdade; é o que será assinado digitalmente) ----------
+// ---------- PDF (arquivo de verdade; é o que pode ser assinado digitalmente) ----------
 const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:'?');};
 const limpar=t=>String(t==null?'':t).split('').map(WIN).join('');
 async function gerarPDF(entrada){
   if(!entrada) return null;
   const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
   if(!docs.length) return null;
-  if(!window.PDFLib) { toast('Biblioteca de PDF não carregou; recarregue a página',true); return null; }
+  if(!window.PDFLib){ toast('Biblioteca de PDF não carregou; recarregue a página',true); return null; }
   const {PDFDocument,StandardFonts,rgb}=PDFLib;
-  const doc=await PDFDocument.create();
-  doc.setTitle(limpar(docs[0].titulo)); doc.setCreator('PEP Clínico'); doc.setProducer('PEP Clínico');
-  const normal=await doc.embedFont(StandardFonts.Helvetica), negrito=await doc.embedFont(StandardFonts.HelveticaBold);
-  const L=40, R=555.28, TOPO=801.89, BASE=60;
-  let pg=doc.addPage([595.28,841.89]), y=TOPO;
-  const novaPagina=()=>{ pg=doc.addPage([595.28,841.89]); y=TOPO; };
-  const espaco=h=>{ if(y-h<BASE) novaPagina(); };
-  const quebrar=(txt,f,t,larg)=>{ const out=[]; let linha='';
-    for(const w of limpar(txt).split(/\s+/)){ const tent=linha?linha+' '+w:w;
-      if(f.widthOfTextAtSize(tent,t)>larg && linha){ out.push(linha); linha=w; } else linha=tent; }
-    if(linha) out.push(linha); return out; };
-  const escrever=(txt,{f=normal,t=11,x=L,gap=14,centro=false,larg=R-L}={})=>{
-    for(const ln of quebrar(txt,f,t,larg)){ espaco(gap);
-      const px=centro?(L+(larg-f.widthOfTextAtSize(ln,t))/2):x;
-      pg.drawText(ln,{x:px,y:y-t,size:t,font:f,color:rgb(0,0,0)}); y-=gap; } };
-  const linhaH=(x1,x2,g=10)=>{ espaco(g); pg.drawLine({start:{x:x1,y:y-4},end:{x:x2,y:y-4},thickness:1,color:rgb(0,0,0)}); y-=g; };
+  const pdf=await PDFDocument.create();
+  pdf.setTitle(limpar(docs[0].titulo)); pdf.setCreator('PEP Clínico'); pdf.setProducer('PEP Clínico');
+  const F=await pdf.embedFont(StandardFonts.Helvetica), FB=await pdf.embedFont(StandardFonts.HelveticaBold),
+        FI=await pdf.embedFont(StandardFonts.HelveticaOblique);
+  const W=595.28,H=841.89,L=48,R=W-48,TOPO=H-42,BASE=66;
+  const AZUL=rgb(0.039,0.435,0.741), TINTA=rgb(0.075,0.161,0.247), CINZA=rgb(0.369,0.455,0.565),
+        LINHA=rgb(0.82,0.86,0.91), FUNDO=rgb(0.957,0.969,0.984);
+  const cacheLogo={};
+  async function logoDe(src){
+    if(!src) return null;
+    if(cacheLogo[src]!==undefined) return cacheLogo[src];
+    try{ cacheLogo[src]=/^data:image\/jpe?g/i.test(src)?await pdf.embedJpg(src):await pdf.embedPng(src); }
+    catch(e){ cacheLogo[src]=null; }
+    return cacheLogo[src];
+  }
+  const quebrar=(txt,f,s,lw)=>{ const out=[]; let ln='';
+    for(const w of limpar(txt).split(/\s+/).filter(Boolean)){ const t=ln?ln+' '+w:w;
+      if(f.widthOfTextAtSize(t,s)>lw&&ln){ out.push(ln); ln=w; } else ln=t; }
+    if(ln) out.push(ln); return out; };
+  const centro=(pg,t,y,f,s,cor)=>{ const x=limpar(t); pg.drawText(x,{x:(W-f.widthOfTextAtSize(x,s))/2,y,size:s,font:f,color:cor}); };
+  const paginas=[];   // {pg,d} — para numerar no fim
 
-  docs.forEach((d,iDoc)=>{
-  if(iDoc>0) novaPagina();           // cada guia começa numa folha nova
-  if(d.prof.unidade) escrever(d.prof.unidade,{t:11,centro:true,gap:15});
-  escrever(d.titulo.toUpperCase(),{f:negrito,t:14,centro:true,gap:20});
-  linhaH(L,R,14);
-  for(const [k,v] of d.ident){ espaco(14);
-    pg.drawText(limpar(k+':'),{x:L,y:y-10,size:10,font:negrito});
-    pg.drawText(limpar(v),{x:L+negrito.widthOfTextAtSize(limpar(k+':'),10)+4,y:y-10,size:10,font:normal}); y-=14; }
-  y-=10;
-  d.itens.forEach((it,i)=>{ espaco(30);
-    if(d.semNumero) escrever(it.n,{t:11,gap:17});
-    else escrever((i+1)+'. '+it.n,{f:negrito,t:11,gap:15});
-    if(it.d) escrever(it.d,{t:10,x:L+16,gap:13,larg:R-L-16});
-    y-=d.semNumero?10:6; });
-  if(d.obs.length){ y-=8; linhaH(L,R,12);
-    for(const [k,v] of d.obs) escrever(k+': '+v,{t:10,gap:13}); }
+  // estilos do bloco central do cabeçalho (mesmo padrão da impressão em HTML)
+  const ESTILO={org:{f:FB,s:10.5,c:TINTA,h:13.5}, sec:{f:F,s:10,c:TINTA,h:13}, un:{f:FB,s:11.5,c:AZUL,h:15}, det:{f:F,s:8.3,c:CINZA,h:11}};
+  for(const d of docs){
+    let pg,y;
+    // rodapé livre: até 4 linhas; a área útil termina acima dele
+    const rod=rodapeLinhas(d).slice(0,4);
+    const EMIT_Y=24, ROD_Y0=EMIT_Y+12+(rod.length-1)*10, REGUA_Y=rod.length?ROD_Y0+12:EMIT_Y+12;
+    const BASE=REGUA_Y+16;
+    async function cabecalho(primeira){
+      const un=d.un;
+      if(un){
+        const yTopo=y, MAXH=60, MAXW=92;
+        const pos=async (src,esq)=>{ const img=await logoDe(src); if(!img) return 0;
+          const k=Math.min(MAXH/img.height,MAXW/img.width), iw=img.width*k, ih=img.height*k;
+          pg.drawImage(img,{x:esq?L:R-iw,y:yTopo-(MAXH+ih)/2,width:iw,height:ih}); return iw; };
+        const w1=await pos(un.logo,true), w2=await pos(un.logo2,false);
+        // bloco centralizado na página; as margens laterais reservam o espaço do maior logotipo
+        const reserva=Math.max(w1,w2)?Math.max(w1,w2)+12:0, lw=R-L-2*reserva;
+        const linhas=[];
+        for(const b of blocoCabecalho(un)){ const e=ESTILO[b.k];
+          let tam=e.s; while(tam>e.s*0.8&&e.f.widthOfTextAtSize(limpar(b.t),tam)>lw) tam-=0.25;
+          quebrar(b.t,e.f,tam,lw).forEach(t=>linhas.push({t,e,tam})); }
+        const altTxt=linhas.reduce((a,l)=>a+l.e.h,0);
+        // texto centrado verticalmente na faixa dos logotipos, se couber
+        let yy=yTopo-Math.max(0,((reserva?MAXH:0)-altTxt)/2);
+        for(const l of linhas){ yy-=l.e.h; centro(pg,l.t,yy+(l.e.h-l.tam)*0.45,l.e.f,l.tam,l.e.c); }
+        y=Math.min(yTopo-(reserva?MAXH:0),yy)-8;
+      }
+      pg.drawRectangle({x:L,y:y-2,width:R-L,height:1.6,color:AZUL});
+      y-=18;
+      if(!primeira){ pg.drawText(limpar(d.tituloPrinc+' — continuação'),{x:L,y:y-8,size:9,font:FI,color:CINZA}); y-=22; }
+    }
+    async function nova(primeira){ pg=pdf.addPage([W,H]); paginas.push({pg,d}); y=TOPO; await cabecalho(primeira); }
+    const espaco=async h=>{ if(y-h<BASE+10) await nova(false); };
+    d._rod=rod; d._ry={EMIT_Y,ROD_Y0,REGUA_Y};
+    await nova(true);
 
-  // assinatura no rodapé da última página
-  const alturaAss=22+d.assinatura.length*13+20;
-  if(y-alturaAss<BASE) novaPagina();
-  y=Math.max(BASE+alturaAss, 170);
-  pg.drawLine({start:{x:197,y:y},end:{x:398,y:y},thickness:1,color:rgb(0,0,0)}); y-=16;
-  for(const ln of d.assinatura){ const w=normal.widthOfTextAtSize(limpar(ln),10);
-    pg.drawText(limpar(ln),{x:(595.28-w)/2,y:y,size:10,font:normal}); y-=13; }
-  const dt=dataBRsimples(d.quando), wd=normal.widthOfTextAtSize(limpar(dt),10);
-  pg.drawText(limpar(dt),{x:(595.28-wd)/2,y:y-8,size:10,font:normal});
+    // título
+    centro(pg,d.tituloPrinc.toUpperCase(),y-14,FB,15,TINTA); y-=22;
+    if(d.subtitulo){ centro(pg,d.subtitulo,y-10,F,10.5,AZUL); y-=18; }
+    y-=6;
+
+    // quadro do paciente: grade de 3 colunas, rótulo pequeno sobre o valor
+    const colW=(R-L-20)/3, linhas=[]; let atual=[], ocup=0;
+    for(const c of d.pac){ const sp=Math.min(3,c[2]||1); if(ocup+sp>3){ linhas.push(atual); atual=[]; ocup=0; } atual.push(c); ocup+=sp; }
+    if(atual.length) linhas.push(atual);
+    if(linhas.length){
+      const alt=10+linhas.length*27;
+      pg.drawRectangle({x:L,y:y-alt,width:R-L,height:alt,color:FUNDO,borderColor:LINHA,borderWidth:0.8});
+      let yb=y-10;
+      for(const lin of linhas){ let x=L+10;
+        for(const c of lin){ const sp=Math.min(3,c[2]||1), cw=colW*sp;
+          pg.drawText(limpar(String(c[0]).toUpperCase()),{x,y:yb-7,size:6.8,font:FB,color:CINZA});
+          let v=limpar(c[1]); const fv=c[0]==='Paciente'?FB:F;
+          while(v.length>4&&fv.widthOfTextAtSize(v,10.5)>cw-8) v=v.slice(0,-4)+'...';
+          pg.drawText(v,{x,y:yb-19,size:10.5,font:fv,color:TINTA});
+          x+=cw; }
+        yb-=27; }
+      y-=alt+20;
+    }
+
+    // corpo
+    // uma linha justificada (menos a última de cada parágrafo, como no papel)
+    const escrever=async(par,tam,alt)=>{
+      const ls=quebrar(par,F,tam,R-L);
+      for(let i=0;i<ls.length;i++){
+        await espaco(alt);
+        const pal=ls[i].split(' ');
+        if(i<ls.length-1&&pal.length>1){
+          const ocupado=pal.reduce((a,w)=>a+F.widthOfTextAtSize(w,tam),0), gap=(R-L-ocupado)/(pal.length-1);
+          let x=L; for(const w of pal){ pg.drawText(w,{x,y:y-tam,size:tam,font:F,color:TINTA}); x+=F.widthOfTextAtSize(w,tam)+gap; }
+        } else pg.drawText(ls[i],{x:L,y:y-tam,size:tam,font:F,color:TINTA});
+        y-=alt;
+      }
+    };
+    if(d.secoes){
+      const altSec=sc=>(sc.t?24:0)+String(sc.txt).split(/\n+/).map(x=>x.trim()).filter(Boolean)
+        .reduce((a,par)=>a+quebrar(par,F,11,R-L).length*16.5+3,0)+11;
+      for(const [i,sc] of d.secoes.entries()){
+        // a última seção desce junto com o fecho e a assinatura, se não couberem nesta folha
+        if(i===d.secoes.length-1){
+          const resto=altSec(sc)+(d.fecho?quebrar(d.fecho,F,11,R-L).length*16.5+14:0)+24+16+42+d.carimbo.length*13;
+          if(resto<TOPO-BASE-160) await espaco(resto);
+        }
+        if(sc.t){ await espaco(48); y-=2;
+          const gt=limpar(sc.t.toUpperCase()); pg.drawText(gt,{x:L,y:y-10,size:9.5,font:FB,color:AZUL});
+          pg.drawRectangle({x:L,y:y-14,width:FB.widthOfTextAtSize(gt,9.5),height:0.8,color:AZUL}); y-=22; }
+        const pars=String(sc.txt).split(/\n+/).map(x=>x.trim()).filter(Boolean);
+        for(const par of pars){ await escrever(par,11,16.5); y-=3; }
+        y-=11;
+      }
+    } else if(d.paragrafos){
+      for(const par of d.paragrafos){
+        const ls=quebrar(par,F,11.5,R-L);
+        for(let i=0;i<ls.length;i++){
+          await espaco(20);
+          const pal=ls[i].split(' ');
+          if(i<ls.length-1&&pal.length>1){                  // texto justificado, como num atestado de papel
+            const ocupado=pal.reduce((a,w)=>a+F.widthOfTextAtSize(w,11.5),0), gap=(R-L-ocupado)/(pal.length-1);
+            let x=L; for(const w of pal){ pg.drawText(w,{x,y:y-12,size:11.5,font:F,color:TINTA}); x+=F.widthOfTextAtSize(w,11.5)+gap; }
+          } else pg.drawText(ls[i],{x:L,y:y-12,size:11.5,font:F,color:TINTA});
+          y-=20;
+        }
+        y-=10;
+      }
+    } else {
+      let n=0;
+      for(const g of d.grupos){
+        if(g.titulo){ await espaco(40); y-=2;
+          const gt=limpar(g.titulo); pg.drawText(gt,{x:L,y:y-10,size:9.5,font:FB,color:AZUL});
+          pg.drawRectangle({x:L,y:y-14,width:FB.widthOfTextAtSize(gt,9.5),height:0.8,color:AZUL}); y-=24; }
+        for(const it of g.itens){ n++;
+          const dir=limpar(it.q||it.cod||''), fd=it.cod?F:FB, sd=it.cod?8.5:10.5, cd=it.cod?CINZA:TINTA;
+          const wd=dir?fd.widthOfTextAtSize(dir,sd):0;
+          const nl=quebrar(it.n,FB,11,R-(L+18)-(dir?wd+28:0));
+          const pos=it.d?quebrar(it.d,F,10,R-(L+18)):[];
+          await espaco(14+nl.length*14+pos.length*13+10);
+          pg.drawText(n+'.',{x:L,y:y-11,size:11,font:FB,color:TINTA});
+          nl.forEach((t,i)=>pg.drawText(t,{x:L+18,y:y-11-i*14,size:11,font:FB,color:TINTA}));
+          if(dir){
+            const x0=L+18+FB.widthOfTextAtSize(nl[0],11)+6, x1=R-wd-6;
+            if(x1>x0) pg.drawLine({start:{x:x0,y:y-11},end:{x:x1,y:y-11},thickness:0.7,color:LINHA,dashArray:[1,2.6]});
+            pg.drawText(dir,{x:R-wd,y:y-11,size:sd,font:fd,color:cd});
+          }
+          y-=11+(nl.length-1)*14+7;
+          pos.forEach(t=>{ pg.drawText(t,{x:L+18,y:y-9,size:10,font:F,color:CINZA}); y-=13; });
+          y-=10;
+        }
+      }
+    }
+
+    // observações / indicação clínica
+    if(d.obs.length){
+      const lo=d.obs.flatMap(o=>quebrar(o[0]+': '+o[1],F,9.8,R-L-20));
+      const alt=24+lo.length*13;
+      await espaco(alt+12); y-=4;
+      pg.drawRectangle({x:L,y:y-alt,width:R-L,height:alt,borderColor:LINHA,borderWidth:0.8});
+      pg.drawText(limpar(d.obsTitulo.toUpperCase()),{x:L+10,y:y-13,size:6.8,font:FB,color:CINZA});
+      let yo=y-26; lo.forEach(t=>{ pg.drawText(t,{x:L+10,y:yo,size:9.8,font:F,color:TINTA}); yo-=13; });
+      y-=alt+8;
+    }
+
+    // local, data e carimbo — mais para baixo da folha quando há espaço
+    // a frase de fecho vai junto com a assinatura: nunca fica uma folha só com o carimbo
+    const altAss=16+42+d.carimbo.length*13;
+    const fl=d.fecho?quebrar(d.fecho,F,11,R-L):[], altF=fl.length?fl.length*16.5+14:0;
+    y-=24; let virou=false;
+    if(y-altF-altAss<BASE){ await nova(false); virou=true; }
+    if(fl.length){ await escrever(d.fecho,11,16.5); y-=14; }
+    let ya=virou?y-4:Math.min(y,BASE+altAss+34);
+    centro(pg,d.local,ya-11,F,10.5,TINTA); ya-=16+42;
+    pg.drawLine({start:{x:W/2-110,y:ya+10},end:{x:W/2+110,y:ya+10},thickness:0.9,color:TINTA});
+    d.carimbo.forEach((l,i)=>{ centro(pg,l,ya-2-i*13,i?F:FB,i?9.5:10.5,i?CINZA:TINTA); });
+  }
+
+  // rodapé em todas as páginas, numerado por documento
+  const porDoc=new Map(); paginas.forEach(x=>{ if(!porDoc.has(x.d)) porDoc.set(x.d,[]); porDoc.get(x.d).push(x.pg); });
+  const CLARO=rgb(0.557,0.651,0.753);
+  for(const [d,pgs] of porDoc) pgs.forEach((pg,i)=>{
+    const {EMIT_Y,ROD_Y0,REGUA_Y}=d._ry;
+    pg.drawRectangle({x:L,y:REGUA_Y,width:R-L,height:0.6,color:LINHA});
+    d._rod.forEach((l,k)=>{ let t=limpar(l), tam=8;
+      while(tam>6.5&&F.widthOfTextAtSize(t,tam)>R-L) tam-=0.25;
+      centro(pg,t,ROD_Y0-k*10,F,tam,TINTA); });
+    centro(pg,'Emitido em '+dataHoraBR(d.emitido)+'  ·  Página '+(i+1)+' de '+pgs.length,EMIT_Y-(d._rod.length?0:0),F,6.8,CLARO);
   });
-  return doc.save();
+  return pdf.save();
 }
+
 const sluga=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();
 function nomeArquivo(entrada){
   const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
@@ -1467,13 +1899,55 @@ async function baixarPDF(d){
   setTimeout(()=>URL.revokeObjectURL(url),4000);
   toast(Array.isArray(d)&&d.length>1 ? 'PDF com '+d.length+' guias gerado ✓' : 'PDF gerado ✓');
 }
-function docReceita(meds,quando){
-  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
-  return montarDoc('Receituário', meds.map(m=>({
-    n: m.medicamento+(m.quantidade?' - '+m.quantidade:'')+(m.uso_continuo?' (uso contínuo)':''),
-    d: [m.dose,m.via,m.frequencia,m.duracao].filter(Boolean).join(', ') })), [], quando);
+// "Via oral" vira o cabeçalho "USO ORAL", com a concordância certa
+function viaGrupo(v){
+  const t=semAc(v||'').replace(/^via\s+/,'').trim(); if(!t) return '';
+  const M={oral:'USO ORAL',sublingual:'USO SUBLINGUAL',intramuscular:'USO INTRAMUSCULAR',endovenosa:'USO ENDOVENOSO',
+    endovenoso:'USO ENDOVENOSO',intravenosa:'USO ENDOVENOSO',topica:'USO TÓPICO',topico:'USO TÓPICO',
+    inalatoria:'USO INALATÓRIO',inalatorio:'USO INALATÓRIO',subcutanea:'USO SUBCUTÂNEO',subcutaneo:'USO SUBCUTÂNEO',
+    oftalmica:'USO OFTÁLMICO',nasal:'USO NASAL',retal:'USO RETAL',vaginal:'USO VAGINAL',otologica:'USO OTOLÓGICO',cutanea:'USO CUTÂNEO'};
+  return M[t]||('USO '+String(v).replace(/^via\s+/i,'').toUpperCase());
 }
-function docAtestado(at,quando){
+function docReceita(meds,quando,unidadeId){
+  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
+  const itens=meds.map(m=>({ n:m.medicamento, q:m.quantidade||'', via:viaGrupo(m.via),
+    d:[m.dose,m.frequencia,m.duracao].filter(Boolean).join(', ')+(m.uso_continuo?((m.dose||m.frequencia||m.duracao)?' — ':'')+'uso contínuo':'') }));
+  const grupos=[]; itens.forEach(it=>{ let g=grupos.find(x=>x.titulo===it.via); if(!g){ g={titulo:it.via,itens:[]}; grupos.push(g); } g.itens.push(it); });
+  return montarDoc('Receituário', itens, [], quando, unidadeId, {grupos});
+}
+
+const EXTENSO=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze',
+  'dezesseis','dezessete','dezoito','dezenove','vinte','vinte e um','vinte e dois','vinte e três','vinte e quatro','vinte e cinco',
+  'vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta','trinta e um'];
+const diasExtenso=n=>EXTENSO[n]?n+' ('+EXTENSO[n]+') '+(n==1?'dia':'dias'):n+(n==1?' dia':' dias');
+const TIPOS_REL={medico:'Relatório médico',inss:'Relatório para perícia (INSS)'};
+function docRelatorio(r,quando,unidadeId){
+  if(!r||!r.tipo) return null;
+  const t=v=>v&&String(v).trim()?String(v).trim():'';
+  const secoes=[];
+  let titulo;
+  if(r.tipo==='inss'){
+    titulo='Relatório médico — Para fins de perícia médica';
+    secoes.push({t:'',txt:(t(r.destinatario)?t(r.destinatario)+'\n':'')+
+      'Declaro, para fins de avaliação pela Perícia Médica, que o(a) paciente acima identificado(a) encontra-se em acompanhamento médico nesta unidade, com o quadro descrito a seguir.'});
+    [['Diagnóstico(s)',r.diagnosticos],['História clínica',r.historia],['Exames complementares',r.exames],
+     ['Tratamento em curso',r.tratamento],['Limitações funcionais',r.limitacoes],['Prognóstico',r.prognostico]]
+      .forEach(([k,v])=>{ if(t(v)) secoes.push({t:k,txt:t(v)}); });
+    if(r.afastamento_dias) secoes.push({t:'Afastamento',txt:'Do ponto de vista clínico, sugiro afastamento das atividades laborais por '+
+      diasExtenso(Number(r.afastamento_dias))+', a contar desta data, a critério da avaliação pericial.'});
+    if(t(r.texto)) secoes.push({t:'Considerações',txt:t(r.texto)});
+  } else {
+    titulo='Relatório médico'+(t(r.finalidade)?' — '+t(r.finalidade):'');
+    if(t(r.destinatario)) secoes.push({t:'',txt:t(r.destinatario)});
+    if(t(r.diagnosticos)) secoes.push({t:'Diagnóstico(s)',txt:t(r.diagnosticos)});
+    if(t(r.texto)) secoes.push({t:t(r.diagnosticos)?'Relato':'',txt:t(r.texto)});
+  }
+  if(!secoes.length){ toast('O relatório está vazio',true); return null; }
+  return montarDoc(titulo, [], [], quando, unidadeId, {secoes, semNumero:true,
+    fecho:'Coloco-me à disposição para esclarecimentos adicionais.'});
+}
+
+function docAtestado(at,quando,unidadeId){
   if(!at) return null;
   const p=pacienteSel||{};
   const rot={afastamento:'Atestado médico',comparecimento:'Declaração de comparecimento',
@@ -1492,12 +1966,9 @@ function docAtestado(at,quando){
     corpo='Declaro, para os devidos fins, que o(a) acima identificado(a) acompanhou paciente a esta consulta médica nesta data.';
   else
     corpo='Atesto, para os devidos fins, que o(a) paciente acima foi avaliado(a) e encontra-se apto(a) para a prática de atividade física.';
-  const itens=[{n:corpo,d:''}];
-  if(at.texto) itens.push({n:at.texto,d:''});
+  const pars=[corpo]; if(at.texto) pars.push(at.texto);
   const obs=at.cid10?[['CID-10',at.cid10]]:[];
-  const d=montarDoc(rot[at.tipo]||'Atestado', itens, obs, quando);
-  if(d) d.semNumero=true;
-  return d;
+  return montarDoc(rot[at.tipo]||'Atestado', [], obs, quando, unidadeId, {paragrafos:pars, semNumero:true});
 }
 // Os dois primeiros dígitos do código SIGTAP são o grupo e os dois seguintes o
 // subgrupo. É o subgrupo que diz a que serviço o exame pertence — e por isso
@@ -1536,7 +2007,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-11.5 · offline';
+const VERSAO='2026-11-13.1 · relatórios';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -1565,15 +2036,17 @@ function agruparExames(exames){
 }
 // Devolve UMA GUIA POR GRUPO. Se só houver um grupo, sai uma guia só, com o
 // título de sempre.
-function docsExames(exames,cab,quando){
+function docsExames(exames,cab,quando,unidadeId){
   if(!exames||!exames.length){ toast('Não há exames nesta solicitação',true); return null; }
   const obs=[]; if(cab&&cab.cid10) obs.push(['CID-10',cab.cid10]); if(cab&&cab.justificativa) obs.push(['Justificativa',cab.justificativa]);
   const grupos=agruparExames(exames);
   const docs=grupos.map(g=>montarDoc(
     grupos.length>1 ? 'Solicitação de exames — '+g.rotulo : 'Solicitação de exames',
-    g.itens.map(e=>({n:e.no_procedimento, d:'Código '+rotuloTabela(e.co_procedimento)+' '+e.co_procedimento})), obs, quando));
+    g.itens.map(e=>({n:e.no_procedimento, cod:rotuloTabela(e.co_procedimento)+' '+e.co_procedimento})),
+    obs, quando, unidadeId, {obsTitulo:'Indicação clínica'}));
   return docs.some(d=>!d) ? null : docs;
 }
+
 
 // ---------- ver um atendimento já salvo (somente leitura) ----------
 async function renderAtendimentoSalvo(c){
@@ -1596,6 +2069,9 @@ async function renderAtendimentoSalvo(c){
   let atest=null;
   const {data:ats2}=await sb.from('pep_atestados').select('*').eq('atendimento_id',a.id);
   if(ats2&&ats2.length) atest=ats2[0];
+  let rel=null;   // sem a tabela (SQL ainda não rodado) a consulta só volta vazia
+  const {data:rels}=await sb.from('pep_relatorios').select('*').eq('atendimento_id',a.id);
+  if(rels&&rels.length) rel=rels[0];
   const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',a.id);
   if(recs&&recs.length){
     const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(x=>x.id)).order('ordem',{ascending:true});
@@ -1631,6 +2107,9 @@ async function renderAtendimentoSalvo(c){
       (atest?'<h3 style="font-size:14px;margin:18px 0 8px">Atestado</h3><div class="ro">'+
         esc({afastamento:'Afastamento',comparecimento:'Comparecimento',acompanhante:'Acompanhante',aptidao:'Aptidão física'}[atest.tipo]||atest.tipo)+
         (atest.dias?' — '+esc(atest.dias)+' dia(s)':'')+(atest.cid10?' · CID-10 '+esc(atest.cid10):'')+'</div>':'')+
+      (rel?'<h3 style="font-size:14px;margin:18px 0 8px">Relatório</h3><div class="ro">'+esc(TIPOS_REL[rel.tipo]||rel.tipo)+
+        ([rel.destinatario,rel.finalidade].filter(Boolean).length?' — '+esc([rel.destinatario,rel.finalidade].filter(Boolean).join(' · ')):'')+
+        (rel.afastamento_dias?' · afastamento sugerido: '+esc(rel.afastamento_dias)+' dia(s)':'')+'</div>':'')+
     '</div></div>';
 
   box.querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>abrirResultado(
@@ -1641,15 +2120,18 @@ async function renderAtendimentoSalvo(c){
   if(exames.length){
     const ng=agruparExames(exames).length;
     const b1=el('button','btn ghost',ng>1?'Imprimir exames ('+ng+' guias)':'Imprimir exames');
-    b1.onclick=()=>imprimirDoc(docsExames(exames,cab,a.data_atendimento)); acoes.appendChild(b1);
+    b1.onclick=()=>imprimirDoc(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b1);
     const b2=el('button','btn ghost',ng>1?'PDF dos exames ('+ng+' guias)':'PDF dos exames');
-    b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento)); acoes.appendChild(b2); }
+    b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b2); }
   if(meds.length){
-    const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento)); acoes.appendChild(b3);
-    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento)); acoes.appendChild(b4); }
+    const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b3);
+    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4); }
   if(atest){
-    const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento)); acoes.appendChild(b5);
-    const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento)); acoes.appendChild(b6); }
+    const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b5);
+    const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6); }
+  if(rel){
+    const b7=el('button','btn ghost','Imprimir relatório'); b7.onclick=()=>imprimirDoc(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b7);
+    const b8=el('button','btn ghost','PDF do relatório'); b8.onclick=()=>baixarPDF(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b8); }
   const bEd=el('button','btn ghost','Editar atendimento');
   bEd.onclick=()=>{
     examItens.length=0; prescItens.length=0; probSel=new Set();
@@ -1658,6 +2140,7 @@ async function renderAtendimentoSalvo(c){
       duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo}));
     exameCab=cab?{cid10:cab.cid10||'',justificativa:cab.justificativa||''}:null;
     atestado=atest?{tipo:atest.tipo,dias:atest.dias,cid10:atest.cid10,texto:atest.texto}:null;
+    relatorio=rel?Object.assign({},rel):null;
     atendAtual={id:a.id,editando:true,dados:a}; renderMain();
   };
   acoes.insertBefore(bEd,acoes.firstChild);
@@ -1665,8 +2148,8 @@ async function renderAtendimentoSalvo(c){
 }
 
 // ---------- atendimento (SOAP) ----------
-let atestado=null, probSel=new Set();
-function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; atestado=null; probSel=new Set(); exameCab=null; renderMain(); }
+let atestado=null, relatorio=null, probSel=new Set();
+function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; atestado=null; relatorio=null; probSel=new Set(); exameCab=null; renderMain(); }
 let exameCab=null;
 
 async function repetirUltima(){
@@ -1746,6 +2229,7 @@ function renderAtendimento(c){
         <button class="ptab active" data-pt="ex">Exames</button>
         <button class="ptab" data-pt="rx">Prescrição</button>
         <button class="ptab" data-pt="at">Atestado</button>
+        <button class="ptab" data-pt="rl">Relatório</button>
       </div>
       <div data-panel="ex">
         <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
@@ -1774,6 +2258,29 @@ function renderAtendimento(c){
         <div class="field" style="margin:0"><label>Observação</label><textarea id="at-obs" class="f" placeholder="Texto adicional do atestado (opcional)"></textarea></div>
         <div class="muted" style="margin-top:8px">O CID só deve constar com autorização do paciente.</div>
       </div>
+      <div data-panel="rl" class="hidden">
+        <div class="grid">
+          <div class="field"><label>Tipo</label><select id="rl-tipo" class="f">
+            <option value="">Não emitir relatório</option>
+            <option value="medico">Relatório médico</option>
+            <option value="inss">Relatório para perícia (INSS)</option></select></div>
+          <div class="field rl-c"><label>Destinatário (opcional)</label><input id="rl-dest" class="f" placeholder="Ao Serviço de Ortopedia / À Perícia Médica Federal"></div>
+          <div class="field rl-c rl-m"><label>Finalidade (opcional)</label><input id="rl-fin" class="f" placeholder="Para fins de encaminhamento"></div>
+          <div class="field rl-c rl-i"><label>Afastamento sugerido (dias)</label><input id="rl-dias" class="f" type="number" min="1" placeholder="Ex.: 30"></div>
+        </div>
+        <div class="rl-c" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px">
+          <button class="btn ghost sm" id="rl-puxar" type="button">Puxar do prontuário</button>
+          <span class="muted">Preenche só os campos vazios: problemas marcados (ou ativos), medicamentos e últimos resultados.</span>
+        </div>
+        <div class="field rl-c"><label>Diagnóstico(s) — um por linha</label><textarea id="rl-diag" class="f" style="min-height:64px" placeholder="Hipertensão arterial sistêmica (CID-10 I10)"></textarea></div>
+        <div class="field rl-c rl-i"><label>História clínica</label><textarea id="rl-hist" class="f" placeholder="Início, evolução, intercorrências, internações…"></textarea></div>
+        <div class="field rl-c rl-i"><label>Exames complementares</label><textarea id="rl-exam" class="f" placeholder="Exame: resultado (data)"></textarea></div>
+        <div class="field rl-c rl-i"><label>Tratamento em curso</label><textarea id="rl-trat" class="f" placeholder="Medicamentos, terapias, seguimento com especialistas…"></textarea></div>
+        <div class="field rl-c rl-i"><label>Limitações funcionais</label><textarea id="rl-lim" class="f" placeholder="O que o paciente não consegue fazer hoje e por quê (ex.: não sustenta carga acima de 5 kg; não permanece em pé por mais de 20 min)"></textarea></div>
+        <div class="field rl-c rl-i"><label>Prognóstico</label><textarea id="rl-prog" class="f" style="min-height:52px" placeholder="Expectativa de evolução e de recuperação"></textarea></div>
+        <div class="field rl-c" style="margin:0"><label id="rl-texto-lb">Texto do relatório</label><textarea id="rl-texto" class="f" style="min-height:110px"></textarea></div>
+        <div class="muted rl-c" style="margin-top:8px">O CID só deve constar com autorização do paciente. <span class="rl-i">Descreva limitações objetivas; a conclusão sobre incapacidade e benefício cabe à Perícia Médica Federal.</span></div>
+      </div>
     </div></div>
 
     <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:30px">
@@ -1797,6 +2304,9 @@ function renderAtendimento(c){
   });
   if(exameCab){ $('ex-cid').value=exameCab.cid10||''; $('ex-just').value=exameCab.justificativa||''; }
   if(atestado){ $('at-tipo').value=atestado.tipo||''; $('at-dias').value=atestado.dias||''; $('at-cid').value=atestado.cid10||''; $('at-obs').value=atestado.texto||''; }
+  if(relatorio) Object.entries(REL_CAMPOS).forEach(([id,k])=>{ if(relatorio[k]!=null) $(id).value=relatorio[k]; });
+  $('rl-tipo').onchange=rlVisivel; rlVisivel();
+  $('rl-puxar').onclick=puxarRelatorio;
   if(atendAtual&&atendAtual.dados){ const d=atendAtual.dados;
     $('f-tipo').value=d.tipo_atendimento||'no_dia'; $('f-s').value=d.subjetivo||''; $('f-o').value=d.objetivo||'';
     $('f-a').value=d.avaliacao||''; $('f-p').value=d.plano||'';
@@ -1974,17 +2484,81 @@ $('pr-add').onclick=()=>{
   renderRxTable(); closeM('m-presc');
 };
 
+// ---------- relatório médico ----------
+const REL_CAMPOS={'rl-tipo':'tipo','rl-dest':'destinatario','rl-fin':'finalidade','rl-dias':'afastamento_dias','rl-diag':'diagnosticos',
+  'rl-hist':'historia','rl-exam':'exames','rl-trat':'tratamento','rl-lim':'limitacoes','rl-prog':'prognostico','rl-texto':'texto'};
+function rlVisivel(){
+  const t=$('rl-tipo').value, pn=document.querySelector('[data-panel="rl"]'); if(!pn) return;
+  pn.querySelectorAll('.rl-c').forEach(e=>e.classList.toggle('hidden',!t));
+  pn.querySelectorAll('.rl-m').forEach(e=>{ if(t) e.classList.toggle('hidden',t!=='medico'); });
+  pn.querySelectorAll('.rl-i').forEach(e=>{ if(t) e.classList.toggle('hidden',t!=='inss'); });
+  $('rl-texto-lb').textContent=t==='inss'?'Considerações finais (opcional)':'Texto do relatório';
+  $('rl-texto').placeholder=t==='inss'?'':'Descreva o quadro, a conduta e o motivo do relatório…';
+}
+function lerRelatorio(){
+  const tipo=$('rl-tipo')?$('rl-tipo').value:''; if(!tipo) return null;
+  const r={}; Object.entries(REL_CAMPOS).forEach(([id,k])=>{ const v=$(id).value.trim(); r[k]=v===''?null:v; });
+  r.afastamento_dias=r.afastamento_dias==null?null:Number(r.afastamento_dias);
+  if(r.tipo!=='inss'){ ['historia','exames','tratamento','limitacoes','prognostico','afastamento_dias'].forEach(k=>r[k]=null); }
+  else r.finalidade=null;
+  return r;
+}
+const numBR=v=>String(v).replace('.',',');
+async function medsContinuos(){
+  if(prescItens.length) return prescItens;
+  const {data:ats}=await sb.from('pep_atendimentos').select('id').eq('paciente_id',pacienteSel.id)
+    .order('data_atendimento',{ascending:false}).limit(5);
+  const vistos=new Set(), out=[];
+  for(const a of ats||[]){
+    const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',a.id);
+    if(!recs||!recs.length) continue;
+    const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(r=>r.id)).order('ordem',{ascending:true});
+    (mi||[]).filter(m=>m.uso_continuo&&!vistos.has(semAc(m.medicamento))).forEach(m=>{ vistos.add(semAc(m.medicamento)); out.push(m); });
+  }
+  return out;
+}
+async function puxarRelatorio(){
+  const btn=$('rl-puxar'); btn.disabled=true; let n=0;
+  const por=(id,v)=>{ const e=$(id); if(e&&!e.value.trim()&&v&&v.trim()){ e.value=v.trim(); n++; } };
+  try{
+    const probs=problemas.filter(x=>probSel.size?probSel.has(x.id):x.situacao==='ativo');
+    por('rl-diag',probs.map(x=>x.descricao+(x.cid10?' (CID-10 '+x.cid10+')':'')).join('\n'));
+    if($('rl-tipo').value==='inss'){
+      por('rl-hist',[$('f-s').value,$('f-a').value].map(x=>x.trim()).filter(Boolean).join('\n'));
+      const meds=await medsContinuos();
+      por('rl-trat',meds.map(m=>m.medicamento+([m.dose,m.frequencia].filter(Boolean).length?' — '+[m.dose,m.frequencia].filter(Boolean).join(', '):'')+
+        (m.uso_continuo?' (uso contínuo)':'')).join('\n'));
+      if(!resultados.length) await carregarResultados();
+      const ult=new Map();   // o resultado mais recente de cada exame
+      [...resultados].sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta))).forEach(x=>{
+        const k=x.analito||semAc(x.exame); if(!ult.has(k)) ult.set(k,x); });
+      por('rl-exam',[...ult.values()].slice(0,12).map(x=>x.exame+': '+
+        (x.valor!=null?numBR(x.valor)+(x.unidade?' '+x.unidade:''):(x.valor_texto||''))+' ('+dataBRsimples(x.data_coleta)+')').join('\n'));
+    }
+    toast(n?'Preenchi '+n+' campo(s) — revise antes de salvar':'Nada novo para puxar (os campos já estavam preenchidos ou não há dados)');
+  }catch(err){ toast('Não consegui puxar os dados: '+(err.message||err),true); }
+  finally{ btn.disabled=false; }
+}
+
 // ---------- finalizar: grava tudo no Supabase ----------
 async function finalizar(){
   const mk=OFF.marca();
   const btn=$('btn-finalizar'); const edit=!!(atendAtual&&atendAtual.editando);
   btn.disabled=true; btn.textContent='Salvando…';
   const num=id=>{ const v=$(id).value.trim(); return v===''?null:Number(v); };
+  const rel=lerRelatorio();
   try{
+    // sem a tabela, o atendimento seria salvo pela metade: confere antes
+    if(rel){
+      const {error:eR}=await sb.from('pep_relatorios').select('id').limit(1);
+      if(eR&&/does not exist|schema cache|PGRST205|42P01/i.test((eR.message||'')+' '+(eR.code||'')))
+        throw new Error('a tabela de relatórios não existe — rode o relatorios_schema.sql no Supabase');
+    }
     const campos={ tipo_atendimento:$('f-tipo').value,
       subjetivo:$('f-s').value||null, objetivo:$('f-o').value||null, avaliacao:$('f-a').value||null, plano:$('f-p').value||null,
       pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'),
       altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'), creatinina:num('f-creat'), status:'finalizado' };
+    if(!edit&&unidadesOK&&unidadeAtiva()) campos.unidade_id=unidadeAtiva().id;
     let at;
     if(edit){
       const {data,error}=await sb.from('pep_atendimentos').update(campos).eq('id',atendAtual.id).select().single();
@@ -1995,6 +2569,7 @@ async function finalizar(){
       const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',at.id);
       if(recs&&recs.length) await sb.from('pep_prescricoes').delete().eq('atendimento_id',at.id);
       await sb.from('pep_atestados').delete().eq('atendimento_id',at.id);
+      await sb.from('pep_relatorios').delete().eq('atendimento_id',at.id);   // sem a tabela, só devolve erro
       await sb.from('pep_atendimento_problemas').delete().eq('atendimento_id',at.id);
     } else {
       const {data,error}=await sb.from('pep_atendimentos').insert(Object.assign({paciente_id:pacienteSel.id},campos)).select().single();
@@ -2022,6 +2597,10 @@ async function finalizar(){
       const {error:e6}=await sb.from('pep_atestados').insert({atendimento_id:at.id,tipo:tipoAt,
         dias:dias===''?null:Number(dias), cid10:$('at-cid').value.trim()||null, texto:$('at-obs').value.trim()||null});
       if(e6) throw e6;
+    }
+    if(rel){
+      const {error:e8}=await sb.from('pep_relatorios').insert(Object.assign({atendimento_id:at.id},rel));
+      if(e8) throw e8;
     }
     if(probSel.size){
       const sel=problemas.filter(x=>probSel.has(x.id));
