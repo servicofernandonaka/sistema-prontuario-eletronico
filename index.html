@@ -338,7 +338,7 @@
       <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
       <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
       <input type="file" id="cid10-file" accept=".zip,.csv,.txt" class="hidden">
-      <button class="btn ghost" id="btn-med" title="Planilha salva como CSV, com colunas nome / apresentacao / via">Importar medicamentos (CSV)</button>
+      <button class="btn ghost" id="btn-med" title="Lista de preços da CMED/Anvisa (.xlsx), ou planilha com colunas nome / apresentacao / via">Importar medicamentos</button>
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
@@ -2181,7 +2181,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.2 · busca ativa';
+const VERSAO='2026-11-13.3 · catálogo CMED';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2656,8 +2656,12 @@ function renderRxTable(){
   const rn=$('rx-tipos'); if(rn) rn.innerHTML=nota.map(esc).join('<br>');
   renderClCr(); renderAvisosRx();
 }
+let tarjaEscolhida='';
+$('pr-med').addEventListener('input',()=>{ tarjaEscolhida=''; });
 function infoTipoReceita(){
   const m={medicamento:$('pr-med').value,tipo_receita:$('pr-treceita').value||undefined}, c=classeMed(m);
+  if(/preta/i.test(tarjaEscolhida)&&!BLOQ[c]&&!m.tipo_receita){
+    $('pr-tipo-info').textContent='⚠ Tarja preta na CMED e o nome não está na minha lista: confira se exige Notificação A ou B, ou escolha o tipo de receita ao lado.'; return; }
   $('pr-tipo-info').textContent=!m.medicamento.trim()?'':BLOQ[c]?'⚠ '+BLOQ[c]+': use o talonário oficial.'
     :{controle:'Sai na Receita de Controle Especial, em 2 vias.',antimicrobiano:'Sai em receita de antimicrobiano, 2 vias (validade 10 dias).',
       glp1:'Sai em receita de 2 vias com retenção (validade 90 dias).',comum:'Sai na receita comum.'}[c];
@@ -3087,8 +3091,10 @@ function taBind(input,list,fetcher,onPick){
 taBind($('pr-med'),$('pr-list'),async q=>{
   const {data,error}=await sb.rpc('buscar_medicamentos',{p_termo:q});
   if(error) return [];   // catálogo indisponível: segue como texto livre
-  return (data||[]).map(m=>({label:m.nome+' '+m.apresentacao,sub:m.via||'',value:m}));
-},opt=>{ const m=opt.value; $('pr-med').value=m.nome+' '+m.apresentacao; infoTipoReceita();
+  return (data||[]).map(m=>({label:m.nome+' '+m.apresentacao,
+    sub:[m.via||'', m.marcas?'marcas: '+m.marcas.split(', ').slice(0,4).join(', ')+(m.marcas.split(', ').length>4?'…':''):'',
+         /preta/i.test(m.tarja||'')?'tarja preta':'', m.fonte==='rename'?'RENAME':/^remume/.test(m.fonte||'')?'REMUME':''].filter(Boolean).join(' · '),value:m}));
+},opt=>{ const m=opt.value; $('pr-med').value=m.nome+' '+m.apresentacao; tarjaEscolhida=m.tarja||''; infoTipoReceita();
   if(m.via){ const sel=$('pr-via'); const o=[...sel.options].find(x=>x.text===m.via); if(o) sel.value=o.text; else { sel.add(new Option(m.via,m.via)); sel.value=m.via; } }
   $('pr-dose').focus(); });
 
@@ -3187,7 +3193,10 @@ function planilhaParaTabela(buf){
     const m=XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,blankrows:false,defval:''});
     // a primeira linha com pelo menos 2 células preenchidas é o cabeçalho —
     // as planilhas da ANS trazem título e linhas em branco antes dele
-    const iCab=m.findIndex(l=>l.filter(c=>String(c).trim()!=='').length>=2);
+    // a lista da CMED tem dezenas de linhas de notas antes do cabeçalho: procura a linha com SUBSTÂNCIA e APRESENTAÇÃO
+    const norm=c=>String(c).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+    let iCab=m.slice(0,150).findIndex(l=>l.some(c=>/^SUBSTANCIA/.test(norm(c).trim()))&&l.some(c=>/^APRESENTACAO/.test(norm(c).trim())));
+    if(iCab<0) iCab=m.findIndex(l=>l.filter(c=>String(c).trim()!=='').length>=2);
     if(iCab<0) continue;
     const cols=m[iCab].map(c=>String(c).trim().toUpperCase().replace(/[^A-Z0-9_]/g,''));
     const linhas=m.slice(iCab+1).map(l=>{ const o={}; cols.forEach((c,i)=>o[c]=String(l[i]===undefined?'':l[i]).trim()); return o; })
@@ -3468,6 +3477,112 @@ async function importarCid10(file){
 $('btn-cid10').onclick=()=>$('cid10-file').click();
 $('cid10-file').addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) importarCid10(f); });
 
+// ---------- lista de preços da CMED (Anvisa) → catálogo pela DCB ----------
+// Apresentação da CMED: "500 MG COM REV CT BL AL PLAS TRANS X 30"
+//   concentração ("500 MG") + forma ("COM REV") + embalagem ("CT BL ... X 30", descartada).
+const CMED_EMB=new Set(['CT','CX','CXA','FR','FA','FRA','BL','ENV','BG','BIS','STR','EMB','CJ','BD','CAR','PT','LT','LATA','DISPLAY','POTE','SACH','TB','EST','BOLS','KIT','AMP','SER','CARP','CAN','APLIC','GALAO','BALDE','FLAC','FLACONETE','X']);
+const CMED_UNI={MG:'mg',G:'g',MCG:'mcg',UG:'mcg','µG':'mcg',NG:'ng',KG:'kg',ML:'mL',L:'L',UI:'UI',U:'U',MEQ:'mEq',MMOL:'mmol',UFC:'UFC',DOSE:'dose',DOSES:'doses',ACT:'acionamento',CM2:'cm²',CM:'cm',GOTA:'gota',GOTAS:'gotas'};
+const CMED_FRASE=[   // da combinação mais longa para a mais curta
+  ['COM REV LIB PROL','comprimido revestido de liberação prolongada'],['COM REV LIB RETARD','comprimido revestido de liberação retardada'],
+  ['COM LIB PROL','comprimido de liberação prolongada'],['COM LIB RETARD','comprimido de liberação retardada'],['COM REV LIB MOD','comprimido revestido de liberação modificada'],
+  ['COM LIB MOD','comprimido de liberação modificada'],['COM REV','comprimido revestido'],['COM EFEV','comprimido efervescente'],['COM MAST','comprimido mastigável'],
+  ['COM DISP','comprimido dispersível'],['COM ORODISP','comprimido orodispersível'],['COM SUBL','comprimido sublingual'],['COM VAG','comprimido vaginal'],['COM','comprimido'],
+  ['CAP DURA LIB PROL','cápsula de liberação prolongada'],['CAP DURA LIB RETARD','cápsula de liberação retardada'],['CAP DURA LIB MOD','cápsula de liberação modificada'],
+  ['CAP MOLE','cápsula mole'],['CAP DURA','cápsula'],['CAP GEL DURA','cápsula'],['CAP','cápsula'],['DRG','drágea'],['PAS','pastilha'],
+  ['GRAN EFEV','granulado efervescente'],['GRAN','granulado'],['PO EFEV','pó efervescente'],
+  ['PO LIOF P/ SOL INJ','pó liofilizado para solução injetável'],['PO P/ SOL INJ','pó para solução injetável'],['PO P/ SUS INJ','pó para suspensão injetável'],
+  ['PO P/ SUS OR','pó para suspensão oral'],['PO P/ SOL OR','pó para solução oral'],['PO SOL OR','pó para solução oral'],['PO INAL','pó para inalação'],['PO','pó'],
+  ['SOL OR GOT','solução oral (gotas)'],['SOL OR','solução oral'],['SOL INJ','solução injetável'],['SOL OFT','solução oftálmica'],['SOL NAS','solução nasal'],
+  ['SOL OTO','solução otológica'],['SOL TOP','solução tópica'],['SOL DERM','solução dermatológica'],['SOL INAL','solução para inalação'],['SOL CAPILAR','solução capilar'],['SOL','solução'],
+  ['SUS OR','suspensão oral'],['SUS INJ','suspensão injetável'],['SUS OFT','suspensão oftálmica'],['SUS AER OR','aerossol oral (spray)'],['SUS SPR NAS','spray nasal'],['SUS NAS','suspensão nasal'],['SUS','suspensão'],
+  ['EMU OR','emulsão oral'],['EMU INJ','emulsão injetável'],['EMU DERM','emulsão dermatológica'],['EMU','emulsão'],['XPE','xarope'],['ELX','elixir'],
+  ['CREM DERM','creme'],['CREM VAG','creme vaginal'],['CREM','creme'],['POM DERM','pomada'],['POM OFT','pomada oftálmica'],['POM VAG','pomada vaginal'],['POM','pomada'],
+  ['GEL DERM','gel'],['GEL OFT','gel oftálmico'],['GEL VAG','gel vaginal'],['GEL OR','gel oral'],['GEL','gel'],['LOC','loção'],['XAMP','xampu'],
+  ['AER','aerossol'],['SPR NAS','spray nasal'],['SPR','spray'],['SUP RET','supositório'],['SUP','supositório'],['OVL','óvulo'],['ADES TRANSD','adesivo transdérmico'],['ADES','adesivo'],
+  ['ENEM','enema'],['ESM','esmalte'],['GOM MAST','goma de mascar'],['IMPL','implante'],['ANEL VAG','anel vaginal'],['DIU','sistema intrauterino'],['TINT','tintura']];
+function viaDaForma(f){
+  const t=semAc(f);
+  if(/sublingual/.test(t)) return 'Sublingual';
+  if(/injetavel/.test(t)) return 'Injetável';
+  if(/oftalm/.test(t)) return 'Oftálmica';
+  if(/nasal/.test(t)) return 'Nasal';
+  if(/otolog/.test(t)) return 'Otológica';
+  if(/vaginal|ovulo|intrauterino/.test(t)) return 'Vaginal';
+  if(/supositorio|enema/.test(t)) return 'Retal';
+  if(/inala|aerossol oral/.test(t)) return 'Inalatória';
+  if(/transderm/.test(t)) return 'Transdérmica';
+  if(/creme|pomada|gel$|locao|xampu|dermatolog|topica|capilar|esmalte|tintura/.test(t)) return 'Tópica';
+  if(/comprimido|capsula|drag|pastilha|granulado|oral|xarope|elixir|goma|^po( efervescente)?$/.test(t)) return 'Via oral';
+  return '';
+}
+function apresentacaoCMED(a){
+  const tk=String(a||'').toUpperCase().replace(/\s+/g,' ').trim().split(' ');
+  // embalagem: a partir do primeiro termo de embalagem depois da forma
+  let fim=tk.length;
+  for(let i=1;i<tk.length;i++) if(CMED_EMB.has(tk[i])&&!/^\d/.test(tk[i-1]||'')){ fim=i; break; }
+  const parte=tk.slice(0,fim);
+  // concentração: números, unidades, "+", "/" (ex.: 100 MG/ML, 40 MG + 12,5 MG, 1.000 UI/G, 0,5%)
+  const ehConc=t=>/^[\d.,]+%?$/.test(t)||t==='+'||t==='%'||/^[\d.,]*(MG|G|MCG|UG|µG|NG|KG|ML|L|UI|U|MEQ|MMOL|UFC|DOSE|DOSES|ACT|CM2|CM|GOTA|GOTAS|%)(\/(MG|G|ML|L|DOSE|ACT|GOTA|CM2|H|24H|KG|\d+\s*ML))?$/.test(t);
+  let k=0; while(k<parte.length&&ehConc(parte[k])) k++;
+  const conc=parte.slice(0,k).map(t=>t.replace(/[A-Zµ²]+/g,u=>CMED_UNI[u]||u.toLowerCase()).replace(/\/(\d+)\s*mL/i,'/$1 mL')).join(' ')
+    .replace(/(\d)\s+%/g,'$1%').replace(/(\d)\s+(mg|g|mcg|mL|UI|U|mEq|mmol)\b/g,'$1 $2');
+  let resto=parte.slice(k).join(' '), forma='';
+  for(const [ab,ext] of CMED_FRASE){ if(resto===ab||resto.startsWith(ab+' ')){ forma=ext; resto=resto.slice(ab.length).trim(); break; } }
+  if(!forma) forma=resto.toLowerCase(), resto='';
+  else if(resto) forma+=' '+resto.toLowerCase();
+  return {apresentacao:[conc,forma].filter(Boolean).join(' ').trim(), forma, conc};
+}
+// "GLIFAGE XR" → "Glifage XR"; siglas curtas sem vogal e termos com número ficam em maiúsculas
+const capitalizar=t=>String(t||'').toLowerCase().split(/(\s+|-|\/|\()/).map(w=>
+  /\d/.test(w)||/^[b-df-hj-np-tv-z]{2,4}$/.test(w)?w.toUpperCase():w.replace(/^[a-zà-ú]/,c=>c.toUpperCase())).join('');
+function itensCMED(cols,linhas){
+  const cSub=acharCol(cols,/^SUBST/), cApr=acharCol(cols,/^APRESENT/), cPro=acharCol(cols,/^PRODUTO$/,/^PRODUTO/),
+        cTip=acharCol(cols,/^TIPODEPRODUTO/,/^TIPO/), cHos=acharCol(cols,/RESTRI.*HOSP/), cCom=acharCol(cols,/^COMERCIALIZ/), cTar=acharCol(cols,/^TARJA/);
+  if(!cSub||!cApr) return null;
+  const mapa=new Map(); let lidas=0, semForma=0, foraComercio=0, hosp=0;
+  for(const r of linhas){
+    const sub=(r[cSub]||'').trim(), apr=(r[cApr]||'').trim(); if(!sub||!apr) continue;
+    lidas++;
+    if(cCom&&/^n(ao|ão)/i.test((r[cCom]||'').trim())){ foraComercio++; continue; }
+    if(cHos&&/^sim/i.test((r[cHos]||'').trim())){ hosp++; continue; }
+    const nome=sub.toLowerCase().split(/\s*;\s*/).filter(Boolean).join(' + ');
+    const a=apresentacaoCMED(apr); if(!a.forma) semForma++;
+    if(!a.apresentacao) continue;
+    const ch=nome+'|'+a.apresentacao;
+    let it=mapa.get(ch);
+    if(!it){ it={nome, apresentacao:a.apresentacao, via:viaDaForma(a.forma), marcas:new Set(), tarja:''}; mapa.set(ch,it); }
+    const prod=(cPro?r[cPro]:'').trim(), tipo=semAc(cTip?r[cTip]:'');
+    if(prod&&!/generico/.test(tipo)&&semAc(prod)!==semAc(sub)&&!semAc(sub).includes(semAc(prod))) it.marcas.add(capitalizar(prod));
+    const tj=(cTar?r[cTar]:'').trim(); if(tj&&!/^[-(*\s)]+$/.test(tj)&&(!it.tarja||/preta/i.test(tj))) it.tarja=tj;
+  }
+  const itens=[...mapa.values()].map(x=>({nome:x.nome,apresentacao:x.apresentacao,via:x.via,tarja:x.tarja,
+    marcas:[...x.marcas].sort((a,b)=>a.localeCompare(b)).slice(0,12).join(', ')}));
+  return {itens,lidas,semForma,foraComercio,hosp};
+}
+async function importarCMED(cols,linhas,file){
+  const st=$('sigtap-status');
+  const r=itensCMED(cols,linhas);
+  if(!r||!r.itens.length) throw new Error('Não reconheci a lista da CMED (faltam as colunas SUBSTÂNCIA e APRESENTAÇÃO). Nada foi gravado.');
+  // trava: se a maior parte das apresentações não tiver forma reconhecível, o layout mudou
+  if(r.semForma>r.lidas*0.25) throw new Error('Só reconheci a forma farmacêutica em '+Math.round(100*(1-r.semForma/r.lidas))+'% das linhas — o layout da planilha deve ter mudado. Nada foi gravado.');
+  const ex=r.itens.filter(x=>x.marcas).slice(0,4).map(x=>'• '+x.nome+' '+x.apresentacao+(x.marcas?' ('+x.marcas.split(', ').slice(0,2).join(', ')+')':'')).join('\n');
+  if(!confirm('Lista da CMED: '+r.lidas.toLocaleString('pt-BR')+' embalagens lidas'+
+      (r.foraComercio?', '+r.foraComercio.toLocaleString('pt-BR')+' fora de comercialização':'')+(r.hosp?', '+r.hosp.toLocaleString('pt-BR')+' de uso hospitalar':'')+
+      '.\nViram '+r.itens.length.toLocaleString('pt-BR')+' apresentações pela DCB, por exemplo:\n\n'+ex+
+      '\n\nGravar no catálogo? Itens da RENAME e da REMUME não perdem a origem; só ganham as marcas.')) { st.textContent='Importação cancelada.'; return; }
+  let n=0;
+  for(let i=0;i<r.itens.length;i+=500){
+    const {error}=await sb.rpc('importar_medicamentos_cmed',{p_itens:r.itens.slice(i,i+500)});
+    if(error){
+      if(/importar_medicamentos_cmed|schema cache|PGRST202/i.test(error.message+' '+(error.code||'')))
+        throw new Error('rode o medicamentos_cmed_schema.sql no Supabase antes de importar a CMED');
+      throw new Error(error.message); }
+    n=Math.min(i+500,r.itens.length); st.textContent='CMED '+n.toLocaleString('pt-BR')+'/'+r.itens.length.toLocaleString('pt-BR');
+  }
+  st.textContent='CMED importada: '+r.itens.length.toLocaleString('pt-BR')+' apresentações ('+file.name+').';
+  toast('Lista da CMED importada ✓');
+}
+
 // ---------- importar medicamentos de uma planilha salva em CSV ----------
 // Colunas aceitas (em qualquer ordem, acento e maiúscula indiferentes):
 //   nome | medicamento | principio_ativo      (obrigatória)
@@ -3478,6 +3593,8 @@ async function importarMedicamentos(file){
   try{
     st.textContent='Lendo a planilha…';
     const {cols,linhas}=await lerTabela(file);
+    // lista de preços da CMED: tem SUBSTÂNCIA + APRESENTAÇÃO + PRODUTO
+    if(acharCol(cols,/^SUBST/)&&acharCol(cols,/^APRESENT/)&&acharCol(cols,/^PRODUTO/)) return await importarCMED(cols,linhas,file);
     const cNome=acharCol(cols,'NOME','MEDICAMENTO','PRINCIPIOATIVO',/PRINCIPIO/,/MEDICAM/,/^NOME/);
     if(!cNome) throw new Error('Não achei a coluna do nome do medicamento. Colunas lidas: '+(cols.join(', ')||'(nenhuma)'));
     const cApr=acharCol(cols,'APRESENTACAO',/APRESENT/,/^FORMA/,/DOSAGEM/);
