@@ -1,62 +1,49 @@
-// PEP Clínico — service worker
-// Guarda só o APLICATIVO (a página e as bibliotecas), nunca dados de paciente:
-// os dados ficam a cargo do próprio app, no IndexedDB, e só se o uso offline
-// estiver ligado no aparelho.
-//   • página: rede primeiro — com internet, a versão nova chega na hora;
-//     sem internet, abre a última que foi guardada;
-//   • bibliotecas (versão fixa na URL) e ícones: guardados e servidos daqui;
-//   • Supabase: não passa por aqui.
-const VERSAO='2026-11-13.7';
-const CACHE='pep-'+VERSAO;
-const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
-const LIBS=[
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
-];
+-- =============================================================================
+-- PEP Clínico — retorno previsto e encaminhamentos (referência / contrarreferência)
+-- Supabase / PostgreSQL · idempotente · não apaga nada
+-- =============================================================================
+-- • pep_atendimentos.retorno_previsto / retorno_motivo: a data de retorno marcada
+--   ao finalizar a consulta. A agenda de retornos e a busca ativa usam isso.
+-- • pep_encaminhamentos: um registro por especialidade encaminhada, com o
+--   acompanhamento (aguardando → agendado → realizado) e a contrarreferência.
+-- A revisão de medicação e a folha de rosto não precisam de tabela.
+-- Depende de setup_supabase_completo.sql.
+-- =============================================================================
 
-self.addEventListener('install',e=>{
-  e.waitUntil((async()=>{
-    const c=await caches.open(CACHE);
-    await Promise.all(SHELL.map(u=>c.add(u).catch(()=>{})));
-    await Promise.all(LIBS.map(u=>fetch(u,{mode:'cors'}).then(r=>{ if(r.ok) return c.put(u,r); }).catch(()=>{})));
-    await self.skipWaiting();
-  })());
-});
+alter table public.pep_atendimentos add column if not exists retorno_previsto date;
+alter table public.pep_atendimentos add column if not exists retorno_motivo   text;
+create index if not exists idx_pep_atend_retorno on public.pep_atendimentos (retorno_previsto) where retorno_previsto is not null;
 
-self.addEventListener('activate',e=>{
-  e.waitUntil((async()=>{
-    for(const k of await caches.keys()) if(k.startsWith('pep-')&&k!==CACHE) await caches.delete(k);
-    await self.clients.claim();
-  })());
-});
+create table if not exists public.pep_encaminhamentos (
+  id                 uuid primary key default gen_random_uuid(),
+  atendimento_id     uuid not null references public.pep_atendimentos(id) on delete cascade,
+  paciente_id        uuid not null references public.pep_pacientes(id) on delete cascade,
+  especialidade      text not null,
+  prioridade         text not null default 'eletiva' check (prioridade in ('eletiva','prioritaria','urgente')),
+  cid10              text,
+  motivo             text,
+  historia           text,
+  exames             text,
+  tratamento         text,
+  pergunta           text,          -- o que se espera do especialista
+  status             text not null default 'aguardando'
+                       check (status in ('aguardando','agendado','realizado','cancelado')),
+  data_agendada      date,
+  contrarreferencia  text,
+  data_contrarref    date,
+  criado_em          timestamptz not null default now()
+);
+create index if not exists idx_pep_enc_paciente on public.pep_encaminhamentos (paciente_id);
+create index if not exists idx_pep_enc_atend    on public.pep_encaminhamentos (atendimento_id);
 
-self.addEventListener('fetch',e=>{
-  const req=e.request;
-  if(req.method!=='GET') return;
-  const url=new URL(req.url);
-  if(url.hostname.endsWith('supabase.co')) return;
-  const mesma=url.origin===self.location.origin;
-  const pagina=mesma&&(req.mode==='navigate'||url.pathname.endsWith('/')||url.pathname.endsWith('.html'));
-  if(pagina){
-    e.respondWith((async()=>{
-      try{
-        const r=await fetch(req);
-        if(r.ok){ const c=await caches.open(CACHE); await c.put('./index.html',r.clone()); }
-        return r;
-      }catch(err){
-        return (await caches.match('./index.html'))||(await caches.match('./'))||Response.error();
-      }
-    })());
-    return;
-  }
-  if(mesma||LIBS.includes(req.url)){
-    e.respondWith((async()=>{
-      const hit=await caches.match(req); if(hit) return hit;
-      const r=await fetch(req);
-      if(r.ok){ const c=await caches.open(CACHE); c.put(req,r.clone()); }
-      return r;
-    })());
-  }
-});
+alter table public.pep_encaminhamentos enable row level security;
+do $$
+begin
+  if not exists (select 1 from pg_policies where tablename='pep_encaminhamentos' and policyname='pep_encaminhamentos_dono') then
+    create policy pep_encaminhamentos_dono on public.pep_encaminhamentos for all to authenticated
+      using (exists (select 1 from public.pep_atendimentos a where a.id=atendimento_id and a.profissional_id=auth.uid()))
+      with check (exists (select 1 from public.pep_atendimentos a where a.id=atendimento_id and a.profissional_id=auth.uid()));
+  end if;
+end $$;
+
+notify pgrst, 'reload schema';
