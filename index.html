@@ -391,6 +391,19 @@
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="al-save">Salvar</button></div>
 </div></div>
 
+<div class="overlay" id="m-rxsel"><div class="modal">
+  <div class="mh"><span>Escolher itens da receita</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" style="margin-bottom:10px">Marque os medicamentos que vão sair agora. Cada tipo de receita continua em folha própria.</div>
+    <div id="rxs-lista"></div>
+    <div style="display:flex;gap:10px;margin:8px 0 2px"><button class="btn ghost sm" id="rxs-todos" type="button">Marcar todos</button><button class="btn ghost sm" id="rxs-nenhum" type="button">Desmarcar todos</button></div>
+    <label style="display:flex;align-items:flex-start;gap:8px;color:var(--fg);font-weight:500;margin-top:12px"><input type="checkbox" id="rxs-separar" style="width:auto;margin-top:3px">
+      <span>Uma Receita de Controle Especial para cada medicamento controlado<br><span class="muted" style="font-weight:400">Fica como padrão neste aparelho, inclusive nos botões "Imprimir receita" e "PDF da receita".</span></span></label>
+    <div class="muted" id="rxs-resumo" style="margin-top:10px"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn ghost" id="rxs-imp">Imprimir</button><button class="btn primary" id="rxs-pdf">Baixar PDF</button></div>
+</div></div>
+
 <div class="overlay" id="m-modelos"><div class="modal" style="max-width:760px">
   <div class="mh"><span>Modelos de texto</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -2050,15 +2063,18 @@ function itensReceita(meds,extenso){
   return {itens,grupos};
 }
 // Separa a prescrição pelos tipos de receita. Devolve uma lista de folhas (controle e retenção saem em 2 vias).
-function docReceita(meds,quando,unidadeId){
+// preferência deste aparelho: cada controlado em sua própria Receita de Controle Especial
+const prefSeparar=()=>{ try{ return localStorage.getItem('pep_rce_separada')==='1'; }catch(e){ return false; } };
+function docReceita(meds,quando,unidadeId,opc){
   if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
+  const separar=opc&&opc.separar!==undefined?opc.separar:prefSeparar();
   const por={}; meds.forEach(m=>{ const c=classeMed(m); (por[c]=por[c]||[]).push(m); });
   const fora=Object.keys(BLOQ).flatMap(k=>(por[k]||[]).map(m=>m.medicamento+' ('+BLOQ[k]+')'));
   if(fora.length) toast('Não saem nesta receita: '+fora.join('; '),true);
   const docs=[];
   if(por.comum){ const {itens,grupos}=itensReceita(por.comum,false); docs.push(montarDoc('Receituário', itens, [], quando, unidadeId, {grupos})); }
-  if(por.controle){
-    const {itens,grupos}=itensReceita(por.controle,true);
+  for(const lote of (por.controle?(separar?por.controle.map(m=>[m]):[por.controle]):[])){
+    const {itens,grupos}=itensReceita(lote,true);
     // Portaria 344/98, art. 85, com a redação da RDC 1.000/2025: emitente com conselho/UF, endereço do local de atendimento
     // (telefone opcional) e CNES no serviço público; paciente por nome completo e CPF (sem CPF: "não possui");
     // 2 vias — a 1ª fica na farmácia ou drogaria, a 2ª com o paciente. Comprador e dispensação: a farmácia preenche ou carimba.
@@ -2182,7 +2198,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.6 · receita controle especial';
+const VERSAO='2026-11-13.7 · escolher itens da receita';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2300,7 +2316,8 @@ async function renderAtendimentoSalvo(c){
     b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b2); }
   if(meds.length){
     const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b3);
-    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4); }
+    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4);
+    const b4b=el('button','btn ghost','Escolher itens da receita…'); b4b.onclick=()=>abrirSelecaoReceita(meds,a); acoes.appendChild(b4b); }
   if(atest){
     const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b5);
     const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6); }
@@ -2936,6 +2953,28 @@ $('mod-salvar').onclick=async()=>{
   if(error){ toast('Erro ao salvar: '+error.message,true); return; }
   modelosMeus.push(data||Object.assign({titulo},rec)); modelosMeus.sort((a,b)=>a.titulo.localeCompare(b.titulo)); desenharModelos(); toast('Modelo salvo ✓');
 };
+
+// ---------- escolher itens da receita ----------
+function abrirSelecaoReceita(meds,a){
+  $('rxs-lista').innerHTML=meds.map((m,i)=>'<label class="chkp" style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)">'+
+    '<input type="checkbox" data-i="'+i+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(m.medicamento)+'</b>'+chipReceita(m)+
+    '<div class="muted" style="font-size:12px">'+esc([m.dose,m.frequencia,m.duracao,m.quantidade?'qtd. '+m.quantidade:''].filter(Boolean).join(' · '))+'</div></span></label>').join('');
+  $('rxs-separar').checked=prefSeparar();
+  const escolhidos=()=>[...$('rxs-lista').querySelectorAll('input:checked')].map(x=>meds[+x.dataset.i]);
+  const resumo=()=>{ const sel=escolhidos(), n={}; sel.forEach(m=>{ const c=classeMed(m); n[c]=(n[c]||0)+1; });
+    const folhas=(n.comum?1:0)+(n.controle?($('rxs-separar').checked?n.controle:1)*2:0)+(n.antimicrobiano?2:0)+(n.glp1?2:0);
+    $('rxs-resumo').textContent=sel.length?sel.length+' medicamento(s) · '+folhas+' folha(s)'+
+      (Object.keys(BLOQ).some(k=>n[k])?' · itens de notificação não saem (talonário oficial)':''):'Nenhum medicamento marcado.'; };
+  $('rxs-lista').querySelectorAll('input').forEach(x=>x.onchange=resumo);
+  $('rxs-todos').onclick=()=>{ $('rxs-lista').querySelectorAll('input').forEach(x=>x.checked=true); resumo(); };
+  $('rxs-nenhum').onclick=()=>{ $('rxs-lista').querySelectorAll('input').forEach(x=>x.checked=false); resumo(); };
+  $('rxs-separar').onchange=()=>{ try{ localStorage.setItem('pep_rce_separada',$('rxs-separar').checked?'1':'0'); }catch(e){} resumo(); };
+  const gerar=()=>{ const sel=escolhidos(); if(!sel.length){ toast('Marque ao menos um medicamento',true); return null; }
+    return docReceita(sel,a.data_atendimento,a.unidade_id,{separar:$('rxs-separar').checked}); };
+  $('rxs-imp').onclick=()=>{ const d=gerar(); if(d){ closeM('m-rxsel'); imprimirDoc(d); } };
+  $('rxs-pdf').onclick=()=>{ const d=gerar(); if(d){ closeM('m-rxsel'); baixarPDF(d); } };
+  resumo(); openM('m-rxsel');
+}
 
 // ---------- relatório médico ----------
 const REL_CAMPOS={'rl-tipo':'tipo','rl-dest':'destinatario','rl-fin':'finalidade','rl-dias':'afastamento_dias','rl-diag':'diagnosticos',
