@@ -2181,7 +2181,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.3 · catálogo CMED';
+const VERSAO='2026-11-13.4 · catálogo CMED';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3574,9 +3574,10 @@ async function importarCMED(cols,linhas,file){
   for(let i=0;i<r.itens.length;i+=500){
     const {error}=await sb.rpc('importar_medicamentos_cmed',{p_itens:r.itens.slice(i,i+500)});
     if(error){
-      if(/importar_medicamentos_cmed|schema cache|PGRST202/i.test(error.message+' '+(error.code||'')))
-        throw new Error('rode o medicamentos_cmed_schema.sql no Supabase antes de importar a CMED');
-      throw new Error(error.message); }
+      const det=' [Supabase: '+(error.code?error.code+' — ':'')+(error.message||'')+']';
+      if(error.code==='PGRST202'||/could not find the function/i.test(error.message||''))
+        throw new Error('a função importar_medicamentos_cmed não existe no Supabase: o medicamentos_cmed_schema.sql não rodou até o fim (ou o Supabase ainda não recarregou — aguarde 1 minuto e tente de novo)'+det);
+      throw new Error((i?'parou depois de '+i+' apresentações gravadas — ':'')+'erro ao gravar'+det); }
     n=Math.min(i+500,r.itens.length); st.textContent='CMED '+n.toLocaleString('pt-BR')+'/'+r.itens.length.toLocaleString('pt-BR');
   }
   st.textContent='CMED importada: '+r.itens.length.toLocaleString('pt-BR')+' apresentações ('+file.name+').';
