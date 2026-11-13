@@ -1,6 +1,12 @@
 // PEP Clínico — service worker
-// Guarda só o APLICATIVO (a página e as bibliotecas), nunca dados de paciente.
-const VERSAO='2026-11-11.5';
+// Guarda só o APLICATIVO (a página e as bibliotecas), nunca dados de paciente:
+// os dados ficam a cargo do próprio app, no IndexedDB, e só se o uso offline
+// estiver ligado no aparelho.
+//   • página: rede primeiro — com internet, a versão nova chega na hora;
+//     sem internet, abre a última que foi guardada;
+//   • bibliotecas (versão fixa na URL) e ícones: guardados e servidos daqui;
+//   • Supabase: não passa por aqui.
+const VERSAO='2026-11-13.1';
 const CACHE='pep-'+VERSAO;
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 const LIBS=[
