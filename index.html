@@ -134,6 +134,11 @@
   .bk-box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
   .bk-box h3{font-size:15px;margin:0 0 6px}
   .rev-h{font-weight:600;font-size:13.5px;margin-bottom:6px}
+  .btn.btn-calcmed{display:inline-flex;align-items:center;gap:7px;background:#0E8F80;border:1px solid #0E8F80;color:#fff;font-weight:600}
+  .btn.btn-calcmed:hover{background:#0B776B;border-color:#0B776B}
+  .btn.btn-calcmed b{font-weight:800;color:#c9f2ec}
+  .btn.btn-calcmed svg{flex:0 0 auto;border-radius:5px}
+  .btn.btn-calcmed .cm-seta{font-size:11px;opacity:.85}
   .cm-menu{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(17,42,68,.16);padding:6px;min-width:220px}
   .cm-menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px;font-size:13.5px;color:var(--fg);cursor:pointer}
   .cm-menu button:hover{background:var(--brand-050)}
@@ -2223,7 +2228,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.9 · CalcMed';
+const VERSAO='2026-11-13.10 · CalcMed';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2406,7 +2411,13 @@ function renderAtendimento(c){
   const head=el('div','phead');
   head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">'+(edit?'Editando atendimento':'Novo atendimento')+' · '+
     [p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
-  const bCalc=el('button','btn ghost','CalcMed ▾'); bCalc.onclick=ev=>{ ev.stopPropagation(); menuCalcMed(bCalc); }; head.appendChild(bCalc);
+  // logotipo do CalcMed (mesmo desenho do site), na cor da marca
+  const bCalc=el('button','btn btn-calcmed','<svg viewBox="0 0 96 96" width="18" height="18" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#fff"/>'+
+    '<g fill="#0E8F80"><rect x="38" y="12" width="20" height="20" rx="6"/><rect x="12" y="38" width="20" height="20" rx="6"/><rect x="38" y="38" width="20" height="20" rx="6"/>'+
+    '<rect x="64" y="38" width="20" height="20" rx="6"/><rect x="38" y="64" width="20" height="20" rx="6"/></g><g fill="#0E8F80" opacity=".4"><rect x="12" y="12" width="20" height="20" rx="6"/>'+
+    '<rect x="64" y="12" width="20" height="20" rx="6"/><rect x="12" y="64" width="20" height="20" rx="6"/><rect x="64" y="64" width="20" height="20" rx="6"/></g></svg>'+
+    '<span>Calc<b>Med</b></span><span class="cm-seta">▾</span>');
+  bCalc.title='Abrir o CalcMed com os dados desta consulta'; bCalc.onclick=ev=>{ ev.stopPropagation(); menuCalcMed(bCalc); }; head.appendChild(bCalc);
   const bMod=el('button','btn ghost','Modelos de texto'); bMod.onclick=abrirModelos; head.appendChild(bMod);
   if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
   const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
