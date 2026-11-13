@@ -6,7 +6,7 @@
 //     sem internet, abre a última que foi guardada;
 //   • bibliotecas (versão fixa na URL) e ícones: guardados e servidos daqui;
 //   • Supabase: não passa por aqui.
-const VERSAO='2026-11-13.1';
+const VERSAO='2026-11-13.2';
 const CACHE='pep-'+VERSAO;
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 const LIBS=[
