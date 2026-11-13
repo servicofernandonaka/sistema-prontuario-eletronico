@@ -119,6 +119,20 @@
   .atd-row .dt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 150px}
   .atd-row .tp{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
   .chip{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line)}
+  .chip.chip-red{background:#fdecec;color:#c62828;border-color:#f3c0c0}
+  .chip.chip-ok{background:#e8f5e9;color:#2e7d32;border-color:#c8e6c9}
+  .ba-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+  .ba-kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+  .ba-kpi .n{font-size:24px;font-weight:700;color:var(--fg)} .ba-kpi .l{font-size:12px;color:var(--muted)}
+  .ba-kpi .n small{font-size:13px;font-weight:600;color:#c62828;margin-left:6px}
+  .ba-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .ba-filtros .f{width:auto}
+  .ba-pend{display:flex;flex-wrap:wrap;gap:4px}
+  .ba-nome{background:none;border:0;padding:0;color:var(--brand);font-weight:600;cursor:pointer;text-align:left;font-size:inherit}
+  .mod-it{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+  .mod-it .tx{flex:1;min-width:0} .mod-it .tt{font-weight:600} .mod-it .pv{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bk-box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
+  .bk-box h3{font-size:15px;margin:0 0 6px}
 
   /* SOAP editor */
   .soap{display:flex;flex-direction:column;gap:14px}
@@ -247,6 +261,12 @@
     #print-area .pr-pac .c b{font-weight:400;font-size:10.5pt}
     #print-area .pr-pac .c.s2{grid-column:span 2} #print-area .pr-pac .c.s3{grid-column:span 3}
     #print-area .pr-pac .c:first-child b{font-weight:700}
+    #print-area .pr-qt{font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#0a6fbd;margin:0 0 3px}
+    #print-area .pr-qt+.pr-pac{margin-bottom:10px}
+    #print-area .pr-branco{display:block;border-bottom:1px solid #b9c7d8;height:14px}
+    #print-area .pr-finais{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:6mm}
+    #print-area .pr-fq{border:1px solid #d1dbe7;border-radius:2mm;padding:6px 10px}
+    #print-area .pr-fl{font-size:8.4pt;color:#3f5570;border-bottom:1px solid #d1dbe7;padding:9px 0 1px;min-height:13px}
     /* corpo */
     #print-area .pr-corpo{flex:0 0 auto}
     #print-area .pr-gt{font-size:9.5pt;font-weight:700;color:#0a6fbd;letter-spacing:.04em;margin:6px 0 8px;
@@ -308,9 +328,12 @@
       <input id="pac-search" placeholder="Buscar paciente, CPF, CNS…" autocomplete="off">
     </div>
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
+    <button class="btn ghost block" id="btn-busca">Busca ativa</button>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
+      <button class="btn ghost" id="btn-backup">Backup dos dados</button>
+      <div class="muted" id="backup-status" style="padding:0 4px;font-size:11px"></div>
       <button class="btn ghost" id="btn-sigtap" title="TUSS 22 da ANS (.csv), o mapeamento TUSS x SIGTAP (.csv), ou o pacote da SIGTAP (.zip)">Importar tabela de exames</button>
       <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
       <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
@@ -349,6 +372,7 @@
       <div class="field"><label>Sexo</label><select id="np-sexo" class="f"><option value="">—</option><option>Feminino</option><option>Masculino</option></select></div>
       <div class="field"><label>Nome da mãe</label><input id="np-mae" class="f"></div>
       <div class="field"><label>Telefone</label><input id="np-tel" class="f" placeholder="(11) 90000-0000"></div>
+      <div class="field np-end" style="grid-column:1/-1"><label>Endereço (sai na receita de controle especial)</label><input id="np-end" class="f" placeholder="Rua, número, bairro, cidade"></div>
     </div>
   </div>
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="np-save">Salvar paciente</button></div>
@@ -365,6 +389,15 @@
     </div>
   </div>
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="al-save">Salvar</button></div>
+</div></div>
+
+<div class="overlay" id="m-modelos"><div class="modal" style="max-width:760px">
+  <div class="mh"><span>Modelos de texto</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" style="margin-bottom:10px">"Inserir" acrescenta o texto ao fim de cada campo do SOAP (não apaga o que já está escrito). Troque os ___ pelos dados da consulta.</div>
+    <div id="mod-lista"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
 </div></div>
 
 <div class="overlay" id="m-problema"><div class="modal">
@@ -432,7 +465,14 @@
       <div class="field"><label>Duração</label><input id="pr-dur" class="f" placeholder="30 dias"></div>
       <div class="field"><label>Quantidade</label><input id="pr-qtd" class="f" placeholder="60"></div>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:500"><input type="checkbox" id="pr-cont" style="width:auto"> Uso contínuo</label>
+    <div class="grid">
+      <label style="display:flex;align-items:center;gap:8px;color:var(--fg);font-weight:500"><input type="checkbox" id="pr-cont" style="width:auto"> Uso contínuo</label>
+      <div class="field" style="margin:0"><label>Tipo de receita</label><select id="pr-treceita" class="f">
+        <option value="">Automático (pelo nome)</option><option value="comum">Comum</option>
+        <option value="controle">Controle especial (2 vias)</option><option value="antimicrobiano">Antimicrobiano (2 vias)</option>
+        <option value="glp1">Agonista de GLP-1 (2 vias)</option></select></div>
+    </div>
+    <div class="muted" id="pr-tipo-info" style="margin-top:6px"></div>
   </div>
   <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="pr-add">Adicionar à prescrição</button></div>
 </div></div>
@@ -548,7 +588,7 @@ const examItens=[], prescItens=[];
 const OFF=(()=>{
   const nativo=window.fetch.bind(window);
   const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
-    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_atendimento_problemas',
+    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_modelos','pep_atendimento_problemas',
     'pep_problemas','pep_alergias','pep_resultados'];
   const REFERENCIA=['pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
     'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
@@ -1054,7 +1094,10 @@ async function enter(session){
   show('app');
   const v=$('versao'); if(v) v.textContent='versão '+VERSAO;
   carregarAnalitos();
-  setTimeout(()=>{ OFF.enviarFila(); OFF.preparar(); },1500); await carregarPacientes(); renderMain(); await carregarProf(); await carregarUnidades(); carregarAlertas();
+  setTimeout(()=>{ OFF.enviarFila(); OFF.preparar(); },1500); await sondarColunas(); await carregarPacientes(); renderMain(); await carregarProf(); await carregarUnidades(); carregarAlertas();
+  statusBackup();
+  { const u=ultimoBackup(), d=diasDesde(u);
+    if(pacientes.length&&(!u||d>7)) setTimeout(()=>toast(u?'Seu último backup foi '+haQuanto(d)+'. Faça um em "Backup dos dados".':'Você ainda não fez backup neste aparelho. Use "Backup dos dados".',true),2500); }
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
 }
@@ -1070,8 +1113,18 @@ $('btn-logout').onclick=async()=>{
 };
 
 // ---------- pacientes ----------
+// colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
+let enderecoOK=false, tipoReceitaOK=false;
+async function sondarColunas(){
+  // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; }catch(e){} return; }
+  const [a,b]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+                                 sb.from('pep_prescricao_itens').select('tipo_receita').limit(1)]);
+  enderecoOK=!a.error; tipoReceitaOK=!b.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK})); }catch(e){}
+}
 async function carregarPacientes(q){
-  let query = sb.from('pep_pacientes').select('id,nome,cpf,cns,data_nascimento,sexo,nome_mae,telefone').order('nome',{ascending:true}).limit(200);
+  let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
   if(q) query = query.ilike('nome','%'+q+'%');
   const {data,error}=await query;
   if(error){ toast('Erro ao carregar pacientes: '+error.message,true); pacientes=[]; } else pacientes=data||[];
@@ -1099,9 +1152,12 @@ function abrirModalPaciente(p){
   $('np-nome').value=p?(p.nome||''):''; $('np-cpf').value=p?(p.cpf||''):''; $('np-cns').value=p?(p.cns||''):'';
   $('np-nasc').value=p?(p.data_nascimento||''):''; $('np-sexo').value=p?(p.sexo||''):'';
   $('np-mae').value=p?(p.nome_mae||''):''; $('np-tel').value=p?(p.telefone||''):'';
+  $('np-end').value=p?(p.endereco||''):''; document.querySelector('.np-end').classList.toggle('hidden',!enderecoOK);
   openM('m-pac');
 }
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
+$('btn-busca').onclick=()=>abrirTela('busca');
+$('btn-backup').onclick=()=>abrirTela('backup');
 const salvoMsg=(mk,padrao)=>OFF.enfileirouDesde(mk)
   ? padrao.replace(' ✓','')+' neste aparelho — sobe quando a conexão voltar' : padrao;
 $('np-save').onclick=async()=>{
@@ -1110,6 +1166,7 @@ $('np-save').onclick=async()=>{
   const rec={ nome, cpf:$('np-cpf').value.trim()||null, cns:$('np-cns').value.trim()||null,
     data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null,
     nome_mae:$('np-mae').value.trim()||null, telefone:$('np-tel').value.trim()||null };
+  if(enderecoOK) rec.endereco=$('np-end').value.trim()||null;
   const btn=$('np-save'); btn.disabled=true;
   let res;
   if(pacEditando) res=await sb.from('pep_pacientes').update(rec).eq('id',pacEditando.id).select().single();
@@ -1320,8 +1377,12 @@ async function resolverProblema(pb){
 }
 
 // ---------- render principal ----------
+let tela=null;   // telas sem paciente: 'busca' | 'backup'
+function abrirTela(t){ tela=t; pacienteSel=null; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain(); }
 function renderMain(){
   const c=$('main-content'); c.innerHTML='';
+  if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
+  if(!pacienteSel&&tela==='backup') return renderBackup(c);
   if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
   if(atendAtual){ (atendAtual.id && !atendAtual.editando)?renderAtendimentoSalvo(c):renderAtendimento(c); return; }
   renderFichaPaciente(c);
@@ -1654,7 +1715,10 @@ function umaGuiaHTML(d){
       '<div class="pr-un">'+blocoCabecalho(un).map(x=>'<div class="pr-'+x.k+'">'+esc(x.t)+'</div>').join('')+'</div>'+
       '<div class="pr-logo dir">'+(un.logo2?'<img src="'+un.logo2+'" alt="">':'')+'</div></div>'
     :'<div class="pr-hd vazio"></div>';
-  const pac='<div class="pr-pac">'+d.pac.map(x=>'<div class="c s'+(x[2]||1)+'"><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')+'</div>';
+  const grade=c=>'<div class="pr-pac">'+c.map(x=>'<div class="c s'+(x[2]||1)+'"><span>'+esc(x[0])+'</span><b>'+(x[1]?esc(x[1]):'<i class="pr-branco"></i>')+'</b></div>').join('')+'</div>';
+  const pac=(d.quadros||[{t:'',c:d.pac}]).map(q=>(q.t?'<div class="pr-qt">'+esc(q.t)+'</div>':'')+grade(q.c)).join('');
+  const finais=d.finais?'<div class="pr-finais">'+d.finais.map(f=>'<div class="pr-fq"><div class="pr-obs-t">'+esc(f.t)+'</div>'+
+    f.l.map(l=>'<div class="pr-fl">'+esc(l)+'</div>').join('')+'</div>').join('')+'</div>':'';
   let corpo='';
   if(d.secoes) corpo=d.secoes.map(sc=>'<div class="pr-sec">'+(sc.t?'<div class="pr-gt">'+esc(sc.t)+'</div>':'')+
       String(sc.txt).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(t=>'<p class="pr-par">'+esc(t)+'</p>').join('')+'</div>').join('');
@@ -1668,7 +1732,7 @@ function umaGuiaHTML(d){
   const obs=d.obs.length?'<div class="pr-obs"><div class="pr-obs-t">'+esc(d.obsTitulo)+'</div>'+
     d.obs.map(o=>'<div><b>'+esc(o[0])+':</b> '+esc(o[1])+'</div>').join('')+'</div>':'';
   const ass='<div class="pr-ass"><div class="pr-local">'+esc(d.local)+'</div><div class="pr-linha"></div>'+
-    d.carimbo.map((l,i)=>'<div class="'+(i?'pr-ci':'pr-cn')+'">'+esc(l)+'</div>').join('')+'</div>';
+    d.carimbo.map((l,i)=>'<div class="'+(i?'pr-ci':'pr-cn')+'">'+esc(l)+'</div>').join('')+'</div>'+finais;
   const ft='<div class="pr-ft">'+rodapeLinhas(d).map(l=>'<div>'+esc(l)+'</div>').join('')+
     '<div class="pr-emit">Emitido em '+esc(dataHoraBR(d.emitido))+'</div></div>';
   return cab+'<div class="pr-tit"><h1>'+esc(d.tituloPrinc)+'</h1>'+(d.subtitulo?'<div class="pr-sub">'+esc(d.subtitulo)+'</div>':'')+'</div>'+
@@ -1756,23 +1820,28 @@ async function gerarPDF(entrada){
     if(d.subtitulo){ centro(pg,d.subtitulo,y-10,F,10.5,AZUL); y-=18; }
     y-=6;
 
-    // quadro do paciente: grade de 3 colunas, rótulo pequeno sobre o valor
-    const colW=(R-L-20)/3, linhas=[]; let atual=[], ocup=0;
-    for(const c of d.pac){ const sp=Math.min(3,c[2]||1); if(ocup+sp>3){ linhas.push(atual); atual=[]; ocup=0; } atual.push(c); ocup+=sp; }
-    if(atual.length) linhas.push(atual);
-    if(linhas.length){
+    // quadros (paciente; na receita de controle, também o emitente): grade de 3 colunas, rótulo pequeno sobre o valor
+    const quadros=d.quadros||[{t:'',c:d.pac}];
+    for(const [qi,qd] of quadros.entries()){
+      const colW=(R-L-20)/3, linhas=[]; let atual=[], ocup=0;
+      for(const c of qd.c){ const sp=Math.min(3,c[2]||1); if(ocup+sp>3){ linhas.push(atual); atual=[]; ocup=0; } atual.push(c); ocup+=sp; }
+      if(atual.length) linhas.push(atual);
+      if(!linhas.length) continue;
+      if(qd.t){ pg.drawText(limpar(qd.t.toUpperCase()),{x:L,y:y-7,size:6.8,font:FB,color:AZUL}); y-=11; }
       const alt=10+linhas.length*27;
       pg.drawRectangle({x:L,y:y-alt,width:R-L,height:alt,color:FUNDO,borderColor:LINHA,borderWidth:0.8});
       let yb=y-10;
       for(const lin of linhas){ let x=L+10;
         for(const c of lin){ const sp=Math.min(3,c[2]||1), cw=colW*sp;
           pg.drawText(limpar(String(c[0]).toUpperCase()),{x,y:yb-7,size:6.8,font:FB,color:CINZA});
-          let v=limpar(c[1]); const fv=c[0]==='Paciente'?FB:F;
-          while(v.length>4&&fv.widthOfTextAtSize(v,10.5)>cw-8) v=v.slice(0,-4)+'...';
-          pg.drawText(v,{x,y:yb-19,size:10.5,font:fv,color:TINTA});
+          if(c[1]){
+            let v=limpar(c[1]); const fv=c[0]==='Paciente'||c[0]==='Nome'?FB:F;
+            while(v.length>4&&fv.widthOfTextAtSize(v,10.5)>cw-8) v=v.slice(0,-4)+'...';
+            pg.drawText(v,{x,y:yb-19,size:10.5,font:fv,color:TINTA});
+          } else pg.drawLine({start:{x,y:yb-20},end:{x:x+cw-14,y:yb-20},thickness:0.6,color:LINHA});   // em branco: preencher à mão
           x+=cw; }
         yb-=27; }
-      y-=alt+20;
+      y-=alt+(qi<quadros.length-1?10:20);
     }
 
     // corpo
@@ -1858,7 +1927,8 @@ async function gerarPDF(entrada){
 
     // local, data e carimbo — mais para baixo da folha quando há espaço
     // a frase de fecho vai junto com a assinatura: nunca fica uma folha só com o carimbo
-    const altAss=16+42+d.carimbo.length*13;
+    const altFin=d.finais?22+Math.max(...d.finais.map(f=>f.l.length))*17+12:0;
+    const altAss=16+42+d.carimbo.length*13+altFin;
     const fl=d.fecho?quebrar(d.fecho,F,11,R-L):[], altF=fl.length?fl.length*16.5+14:0;
     y-=24; let virou=false;
     if(y-altF-altAss<BASE){ await nova(false); virou=true; }
@@ -1867,6 +1937,18 @@ async function gerarPDF(entrada){
     centro(pg,d.local,ya-11,F,10.5,TINTA); ya-=16+42;
     pg.drawLine({start:{x:W/2-110,y:ya+10},end:{x:W/2+110,y:ya+10},thickness:0.9,color:TINTA});
     d.carimbo.forEach((l,i)=>{ centro(pg,l,ya-2-i*13,i?F:FB,i?9.5:10.5,i?CINZA:TINTA); });
+    if(d.finais){
+      let yt=ya-2-(d.carimbo.length-1)*13-20;
+      const ws=[1.4,1], tot=R-L-10, n=Math.max(...d.finais.map(f=>f.l.length)), h=18+n*17;
+      let x=L;
+      d.finais.forEach((f,i)=>{ const w=tot*ws[i]/(ws[0]+ws[1]);
+        pg.drawRectangle({x,y:yt-h,width:w,height:h,borderColor:LINHA,borderWidth:0.8});
+        pg.drawText(limpar(f.t.toUpperCase()),{x:x+8,y:yt-11,size:6.8,font:FB,color:CINZA});
+        f.l.forEach((l,k)=>{ const yl=yt-18-(k+1)*17+4;
+          pg.drawLine({start:{x:x+8,y:yl-2},end:{x:x+w-8,y:yl-2},thickness:0.5,color:LINHA});
+          if(l) pg.drawText(limpar(l),{x:x+8,y:yl+1,size:7.6,font:F,color:CINZA}); });
+        x+=w+10; });
+    }
   }
 
   // rodapé em todas as páginas, numerado por documento
@@ -1908,12 +1990,104 @@ function viaGrupo(v){
     oftalmica:'USO OFTÁLMICO',nasal:'USO NASAL',retal:'USO RETAL',vaginal:'USO VAGINAL',otologica:'USO OTOLÓGICO',cutanea:'USO CUTÂNEO'};
   return M[t]||('USO '+String(v).replace(/^via\s+/i,'').toUpperCase());
 }
-function docReceita(meds,quando,unidadeId){
-  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
-  const itens=meds.map(m=>({ n:m.medicamento, q:m.quantidade||'', via:viaGrupo(m.via),
+// ---------- tipo de receita por medicamento ----------
+// Portaria SVS/MS 344/1998, listas atualizadas pela RDC 999/2025; RDC 471/2021 (antimicrobianos);
+// IN 360/2025 e RDC 973/2025 (agonistas de GLP-1). Lista de nomes de uso comum na APS — não é a lista oficial completa:
+// se um item sair no tipo errado, escolha o tipo à mão no cadastro do medicamento.
+const CTRL={
+  // lista C1 e adendos que mandam para a Receita de Controle Especial (fenobarbital, B1; tramadol e codeína até 100 mg/unidade, A2)
+  controle:['amitriptilina','nortriptilina','imipramina','clomipramina','fluoxetina','sertralina','paroxetina','citalopram','fluvoxamina',
+    'venlafaxina','desvenlafaxina','duloxetina','bupropiona','mirtazapina','trazodona','vortioxetina','agomelatina','tianeptina',
+    'carbamazepina','oxcarbazepina','valpro','fenitoina','lamotrigina','topiramato','gabapentina','pregabalina','levetiracetam',
+    'lacosamida','primidona','fenobarbital','haloperidol','clorpromazina','levomepromazina','risperidona','paliperidona','quetiapina',
+    'olanzapina','aripiprazol','ziprasidona','clozapina','periciazina','tioridazina','flufenazina','sulpirida','amissulprida',
+    'pimozida','lurasidona','litio','biperideno','triexifenidil','dissulfiram','naltrexona','tramadol','codeina'],
+  // notificação "A" (amarela), "B" (azul) e de retinoides: talonário oficial, o sistema não emite
+  A:['morfina','metadona','oxicodona','fentanil','petidina','metilfenidato','lisdexanfetamina','hidromorfona'],
+  B:['alprazolam','bromazepam','clonazepam','clobazam','clordiazepoxido','diazepam','flunitrazepam','flurazepam','lorazepam',
+     'midazolam','nitrazepam','cloxazolam','estazolam','zolpidem','zopiclona','eszopiclona','sibutramina','anfepramona','femproporex','mazindol'],
+  RET:['isotretinoina','acitretina'],
+  glp1:['semaglutida','liraglutida','dulaglutida','tirzepatida','lixisenatida'],
+  antimicrobiano:['amoxicilina','ampicilina','penicilina','oxacilina','cefalexina','cefadroxila','cefaclor','cefuroxima','cefixima',
+    'ceftriaxona','azitromicina','claritromicina','eritromicina','ciprofloxacino','levofloxacino','norfloxacino','ofloxacino',
+    'moxifloxacino','sulfametoxazol','trimetoprima','nitrofurantoina','fosfomicina','doxiciclina','tetraciclina','minociclina',
+    'metronidazol','secnidazol','tinidazol','clindamicina']
+};
+const BLOQ={A:'exige Notificação de Receita A (amarela)',B:'exige Notificação de Receita B (azul)',RET:'exige Notificação de Receita Especial (retinoides)'};
+function classeMed(m){
+  if(m&&m.tipo_receita) return m.tipo_receita;
+  const n=semAc(typeof m==='string'?m:m&&m.medicamento);
+  const tem=k=>CTRL[k].some(x=>n.includes(x));
+  for(const k of ['A','B','RET','controle','glp1','antimicrobiano']) if(tem(k)) return k;
+  return 'comum';
+}
+function chipReceita(m){
+  const c=classeMed(m), rot={controle:'controle especial',antimicrobiano:'antimicrobiano',glp1:'GLP-1',A:'notificação A',B:'notificação B',RET:'notificação retinoide'}[c];
+  return rot?' <span class="chip'+(BLOQ[c]?' chip-red':'')+'">'+rot+'</span>':'';
+}
+// quantidade por extenso (exigência usual em receita de controlado; evita adulteração)
+const UNI=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+const DEZ=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+const CEN=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+function porExtenso(n,fem){
+  n=Math.floor(n);
+  const u=k=>fem&&(k===1||k===2)?(k===1?'uma':'duas'):UNI[k];
+  const c=k=>fem&&k>1?CEN[k].replace(/os$/,'as'):CEN[k];
+  if(n<20) return u(n); if(n<100) return DEZ[Math.floor(n/10)]+(n%10?' e '+u(n%10):'');
+  if(n===100) return 'cem'; if(n<1000) return c(Math.floor(n/100))+(n%100?' e '+porExtenso(n%100,fem):'');
+  if(n<10000){ const m=Math.floor(n/1000), r=n%1000; return (m===1?'mil':u(m)+' mil')+(r?((r<100||r%100===0)?' e ':' ')+porExtenso(r,fem):''); }
+  return String(n);
+}
+// unidades femininas: "uma cápsula", "duas ampolas", "duzentas gotas"
+const FEMININOS=/^(capsula|caneta|ampola|gota|unidade|drageia|pastilha|bisnaga|seringa|caixa|cartela|bolsa|dose|lata|flaconete)/;
+const qtdExtenso=q=>{ const m=String(q||'').match(/^\s*(\d{1,4})\b\s*(.*)$/); if(!m||/\(/.test(q)) return q||'';
+  return m[1]+' ('+porExtenso(+m[1],FEMININOS.test(semAc(m[2])))+')'+(m[2]?' '+m[2]:''); };
+
+function itensReceita(meds,extenso){
+  const itens=meds.map(m=>({ n:m.medicamento, q:extenso?qtdExtenso(m.quantidade):(m.quantidade||''), via:viaGrupo(m.via),
     d:[m.dose,m.frequencia,m.duracao].filter(Boolean).join(', ')+(m.uso_continuo?((m.dose||m.frequencia||m.duracao)?' — ':'')+'uso contínuo':'') }));
   const grupos=[]; itens.forEach(it=>{ let g=grupos.find(x=>x.titulo===it.via); if(!g){ g={titulo:it.via,itens:[]}; grupos.push(g); } g.itens.push(it); });
-  return montarDoc('Receituário', itens, [], quando, unidadeId, {grupos});
+  return {itens,grupos};
+}
+// Separa a prescrição pelos tipos de receita. Devolve uma lista de folhas (controle e retenção saem em 2 vias).
+function docReceita(meds,quando,unidadeId){
+  if(!meds||!meds.length){ toast('Não há medicamentos nesta prescrição',true); return null; }
+  const por={}; meds.forEach(m=>{ const c=classeMed(m); (por[c]=por[c]||[]).push(m); });
+  const fora=Object.keys(BLOQ).flatMap(k=>(por[k]||[]).map(m=>m.medicamento+' ('+BLOQ[k]+')'));
+  if(fora.length) toast('Não saem nesta receita: '+fora.join('; '),true);
+  const docs=[];
+  if(por.comum){ const {itens,grupos}=itensReceita(por.comum,false); docs.push(montarDoc('Receituário', itens, [], quando, unidadeId, {grupos})); }
+  if(por.controle){
+    const {itens,grupos}=itensReceita(por.controle,true);
+    for(const via of ['1ª via — retenção da farmácia ou drogaria','2ª via — orientação ao paciente']){
+      const d=montarDoc('Receituário de controle especial — '+via.split(' — ')[0], itens,
+        [['Validade','30 dias a contar da emissão, em todo o território nacional']], quando, unidadeId, {grupos, controle:true});
+      if(!d) return null; d.subtitulo=via;
+      const pr=d.prof, un=d.un||{}, p=pacienteSel||{};
+      d.quadros=[
+        {t:'Identificação do emitente',c:[['Nome',pr.nome,2],['CRM / UF',[pr.crm,pr.uf_crm].filter(Boolean).join(' / '),1],
+          ['Endereço',[un.endereco,un.bairro].filter(Boolean).join(' — '),2],['Telefone',un.telefone||'',1],
+          ['Cidade',un.municipio||'',2],['UF',un.uf||'',1]]},
+        {t:'Paciente',c:[['Paciente',p.nome,2],['Nascimento',d.pac.find(x=>x[0]==='Nascimento')?d.pac.find(x=>x[0]==='Nascimento')[1]:'',1],
+          ['Endereço',p.endereco||'',3]]}];
+      d.finais=[{t:'Identificação do comprador',l:['Nome','Ident. nº                       Órg. emissor','Endereço','Cidade                                 UF','Telefone']},
+                {t:'Identificação do fornecedor',l:['','Assinatura do farmacêutico','','Data ____/____/________']}];
+      docs.push(d);
+    }
+  }
+  for(const [k,val,tit] of [['antimicrobiano','10 dias a contar da emissão','Receituário — Antimicrobiano'],
+                            ['glp1','90 dias a contar da emissão (uso prolongado: quantidade para cada 30 dias)','Receituário — Agonista de GLP-1']]){
+    if(!por[k]) continue;
+    const {itens,grupos}=itensReceita(por[k],false);
+    for(const via of ['1ª via — paciente','2ª via — retenção na farmácia']){
+      const d=montarDoc(tit+' · '+via.split(' — ')[0], itens, [['Validade',val]], quando, unidadeId, {grupos});
+      if(!d) return null;
+      d.tituloPrinc=tit.split(' — ')[0]; d.subtitulo=tit.split(' — ')[1]+' · '+via;
+      docs.push(d);
+    }
+  }
+  if(!docs.length){ toast('Nenhum item desta prescrição sai em receita do sistema',true); return null; }
+  return docs;
 }
 
 const EXTENSO=['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze',
@@ -2007,7 +2181,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.1 · relatórios';
+const VERSAO='2026-11-13.2 · busca ativa';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2136,8 +2310,8 @@ async function renderAtendimentoSalvo(c){
   bEd.onclick=()=>{
     examItens.length=0; prescItens.length=0; probSel=new Set();
     exames.forEach(e=>examItens.push({co_procedimento:e.co_procedimento,no_procedimento:e.no_procedimento}));
-    meds.forEach(m=>prescItens.push({medicamento:m.medicamento,via:m.via||'',dose:m.dose||'',frequencia:m.frequencia||'',
-      duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo}));
+    meds.forEach(m=>prescItens.push(Object.assign({medicamento:m.medicamento,via:m.via||'',dose:m.dose||'',frequencia:m.frequencia||'',
+      duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo},m.tipo_receita?{tipo_receita:m.tipo_receita}:{})));
     exameCab=cab?{cid10:cab.cid10||'',justificativa:cab.justificativa||''}:null;
     atestado=atest?{tipo:atest.tipo,dias:atest.dias,cid10:atest.cid10,texto:atest.texto}:null;
     relatorio=rel?Object.assign({},rel):null;
@@ -2160,8 +2334,8 @@ async function repetirUltima(){
   const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',id);
   if(recs&&recs.length){
     const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(r=>r.id)).order('ordem',{ascending:true});
-    (mi||[]).forEach(m=>prescItens.push({medicamento:m.medicamento,via:m.via||'',dose:m.dose||'',frequencia:m.frequencia||'',
-      duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo}));
+    (mi||[]).forEach(m=>prescItens.push(Object.assign({medicamento:m.medicamento,via:m.via||'',dose:m.dose||'',frequencia:m.frequencia||'',
+      duracao:m.duracao||'',quantidade:m.quantidade||'',uso_continuo:!!m.uso_continuo},m.tipo_receita?{tipo_receita:m.tipo_receita}:{})));
   }
   const {data:sols}=await sb.from('pep_solicitacoes_exames').select('id,cid10,justificativa').eq('atendimento_id',id);
   if(sols&&sols.length){
@@ -2180,6 +2354,7 @@ function renderAtendimento(c){
   const head=el('div','phead');
   head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">'+(edit?'Editando atendimento':'Novo atendimento')+' · '+
     [p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
+  const bMod=el('button','btn ghost','Modelos de texto'); bMod.onclick=abrirModelos; head.appendChild(bMod);
   if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
   const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
   c.appendChild(head);
@@ -2242,6 +2417,7 @@ function renderAtendimento(c){
         <div id="rx-clcr" class="muted" style="margin:8px 0"></div>
         <table style="margin-top:10px"><thead><tr><th>Medicamento</th><th>Posologia</th><th>Qtd.</th><th></th></tr></thead><tbody id="rx-tbody"></tbody></table>
         <div id="rx-empty" class="muted" style="margin-top:8px">Nenhum medicamento prescrito.</div>
+        <div id="rx-tipos" class="muted" style="margin-top:8px;line-height:1.5"></div>
         <div id="rx-avisos" style="margin-top:10px"></div>
       </div>
       <div data-panel="at" class="hidden">
@@ -2469,19 +2645,290 @@ function renderAvisosRx(){
 // ---------- prescrição ----------
 function renderRxTable(){
   const tb=$('rx-tbody'); if(!tb) return;
-  tb.innerHTML=prescItens.map((m,i)=>'<tr><td>'+esc(m.medicamento)+'</td><td class="muted">'+esc([m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
+  tb.innerHTML=prescItens.map((m,i)=>'<tr><td>'+esc(m.medicamento)+chipReceita(m)+'</td><td class="muted">'+esc([m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
   $('rx-empty').style.display=prescItens.length?'none':'block';
   tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ prescItens.splice(+b.dataset.i,1); renderRxTable(); });
+  const cls=new Set(prescItens.map(classeMed)), nota=[];
+  if(cls.has('controle')) nota.push('Controle especial: 2 vias, validade de 30 dias; quantidade para até 60 dias de tratamento (anticonvulsivantes e antiparkinsonianos: até 6 meses).');
+  if(cls.has('antimicrobiano')) nota.push('Antimicrobiano: 2 vias, a farmácia retém a 2ª; validade de 10 dias.');
+  if(cls.has('glp1')) nota.push('Agonista de GLP-1: 2 vias com retenção; validade de 90 dias; idade e sexo do paciente na receita.');
+  if([...cls].some(c=>BLOQ[c])) nota.push('Itens marcados em vermelho precisam do talonário oficial (notificação) e não saem na receita do sistema.');
+  const rn=$('rx-tipos'); if(rn) rn.innerHTML=nota.map(esc).join('<br>');
   renderClCr(); renderAvisosRx();
 }
+function infoTipoReceita(){
+  const m={medicamento:$('pr-med').value,tipo_receita:$('pr-treceita').value||undefined}, c=classeMed(m);
+  $('pr-tipo-info').textContent=!m.medicamento.trim()?'':BLOQ[c]?'⚠ '+BLOQ[c]+': use o talonário oficial.'
+    :{controle:'Sai na Receita de Controle Especial, em 2 vias.',antimicrobiano:'Sai em receita de antimicrobiano, 2 vias (validade 10 dias).',
+      glp1:'Sai em receita de 2 vias com retenção (validade 90 dias).',comum:'Sai na receita comum.'}[c];
+}
+$('pr-med').addEventListener('input',infoTipoReceita); $('pr-treceita').addEventListener('change',infoTipoReceita);
 $('pr-add').onclick=()=>{
   const med=$('pr-med').value.trim(); if(!med){ toast('Informe o medicamento',true); return; }
-  prescItens.push({medicamento:med,via:$('pr-via').value,dose:$('pr-dose').value,frequencia:$('pr-freq').value,duracao:$('pr-dur').value,quantidade:$('pr-qtd').value,uso_continuo:$('pr-cont').checked});
+  const tr=$('pr-treceita').value;
+  if(tr&&!tipoReceitaOK){ toast('Para escolher o tipo de receita à mão, rode o receitas_modelos_schema.sql no Supabase',true); return; }
+  const item={medicamento:med,via:$('pr-via').value,dose:$('pr-dose').value,frequencia:$('pr-freq').value,duracao:$('pr-dur').value,quantidade:$('pr-qtd').value,uso_continuo:$('pr-cont').checked};
+  if(tr) item.tipo_receita=tr;
+  prescItens.push(item);
+  const cl=classeMed(item);
+  if(BLOQ[cl]) toast(med+': '+BLOQ[cl]+' — não sai na receita do sistema',true);
   const av=avisosPara(med);
   if(av.some(a=>a.t==='alergia')) toast('Atenção: '+med+' bate com uma alergia registrada',true);
   else if(av.length) toast(av.length+' aviso(s) para '+med);
-  ['pr-med','pr-dose','pr-freq','pr-dur','pr-qtd'].forEach(i=>$(i).value=''); $('pr-cont').checked=false;
+  ['pr-med','pr-dose','pr-freq','pr-dur','pr-qtd'].forEach(i=>$(i).value=''); $('pr-cont').checked=false; $('pr-treceita').value=''; $('pr-tipo-info').textContent='';
   renderRxTable(); closeM('m-presc');
+};
+
+// ---------- leitura em lote (o Supabase devolve no máximo 1000 linhas por vez) ----------
+async function todos(tab,cols){
+  const out=[];
+  for(let i=0;;i+=1000){
+    const {data,error}=await sb.from(tab).select(cols||'*').range(i,i+999);
+    if(error) throw error;
+    out.push(...(data||[])); if(!data||data.length<1000) break;
+  }
+  return out;
+}
+const diasDesde=iso=>iso?Math.floor((Date.now()-new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso)?iso+'T12:00:00':iso))/864e5):null;
+const haQuanto=d=>d==null?'nunca':d<60?'há '+d+' dias':'há '+Math.round(d/30.44)+' meses';
+
+// ---------- busca ativa ----------
+// Critérios do painel (ajuste aqui se a sua equipe usa outros prazos)
+const BA={consulta_cronico:180, pa:180, hba1c:180, creatinina:365, microalb:365, consulta_idoso:365, idade_idoso:60};
+let baCache=null;
+async function dadosBusca(){
+  const [pacs,probs,ats]=await Promise.all([todos('pep_pacientes','*'),
+    todos('pep_problemas','paciente_id,descricao,cid10,situacao'),
+    todos('pep_atendimentos','paciente_id,data_atendimento,pa_sistolica,pa_diastolica')]);
+  let res=[]; try{ res=await todos('pep_resultados','paciente_id,analito,exame,data_coleta'); }catch(e){ res=[]; }
+  if(!analitos.length) await carregarAnalitos();
+  const idx=new Map(pacs.map(p=>[p.id,{p,has:false,dm:false,idoso:false,ultCons:null,ultPA:null,pa:null,ex:{}}]));
+  for(const pb of probs){ const r=idx.get(pb.paciente_id); if(!r||pb.situacao!=='ativo') continue;
+    const cid=String(pb.cid10||'').toUpperCase(), d=semAc(pb.descricao);
+    if(/^I1[0-5]/.test(cid)||/hipertens|\bhas\b/.test(d)) r.has=true;
+    if(/^E1[0-4]/.test(cid)||/diabet|\bdm ?[12]?\b/.test(d)) r.dm=true; }
+  for(const a of ats){ const r=idx.get(a.paciente_id); if(!r) continue;
+    if(!r.ultCons||a.data_atendimento>r.ultCons) r.ultCons=a.data_atendimento;
+    if(a.pa_sistolica&&(!r.ultPA||a.data_atendimento>r.ultPA)){ r.ultPA=a.data_atendimento; r.pa=[a.pa_sistolica,a.pa_diastolica]; } }
+  for(const x of res){ const r=idx.get(x.paciente_id); if(!r) continue;
+    const k=x.analito||analitoDe(x.exame||''); if(!k) continue;
+    if(!r.ex[k]||x.data_coleta>r.ex[k]) r.ex[k]=x.data_coleta; }
+  const linhas=[];
+  for(const r of idx.values()){
+    const anos=r.p.data_nascimento?Math.floor(diasDesde(r.p.data_nascimento)/365.25):null;
+    r.idoso=anos!=null&&anos>=BA.idade_idoso;
+    if(!r.has&&!r.dm&&!r.idoso) continue;
+    const pend=[], dc=diasDesde(r.ultCons);
+    const venc=(rot,d,lim)=>{ if(d==null||d>lim) pend.push({t:rot+' '+haQuanto(d),d:d==null?99999:d}); };
+    if(r.has||r.dm) venc('Consulta',dc,BA.consulta_cronico);
+    else venc('Consulta',dc,BA.consulta_idoso);
+    if(r.has){ venc('PA',diasDesde(r.ultPA),BA.pa);
+      if(r.pa&&(r.pa[0]>=140||r.pa[1]>=90)) pend.push({t:'Última PA '+r.pa[0]+'/'+r.pa[1],d:0}); }
+    if(r.dm){ venc('HbA1c',diasDesde(r.ex.hba1c),BA.hba1c); venc('Microalbuminúria',diasDesde(r.ex.microalb),BA.microalb); }
+    if(r.has||r.dm) venc('Creatinina',diasDesde(r.ex.creatinina),BA.creatinina);
+    linhas.push({p:r.p,anos,has:r.has,dm:r.dm,idoso:r.idoso,ultCons:r.ultCons,pend});
+  }
+  linhas.sort((a,b)=>b.pend.length-a.pend.length||(diasDesde(b.ultCons)??99999)-(diasDesde(a.ultCons)??99999));
+  return linhas;
+}
+async function renderBuscaAtiva(c){
+  c.innerHTML='<div class="phead"><div><div class="nm">Busca ativa</div><div class="mt">Hipertensos, diabéticos e pessoas com '+BA.idade_idoso+
+    ' anos ou mais com acompanhamento em atraso</div></div><div class="sp"></div>'+
+    '<button class="btn ghost" id="ba-csv">Exportar lista (CSV)</button><button class="btn ghost" id="ba-imp">Imprimir lista</button>'+
+    '<button class="btn ghost" id="ba-atual">Atualizar</button></div><div id="ba-corpo"><div class="muted">Carregando…</div></div>';
+  $('ba-atual').onclick=()=>{ baCache=null; renderMain(); };
+  let linhas;
+  try{ linhas=baCache||(baCache=await dadosBusca()); }
+  catch(err){ $('ba-corpo').innerHTML='<div class="empty">Não consegui montar o painel: '+esc(err.message||err)+'</div>'; return; }
+  if(tela!=='busca'||pacienteSel) return;
+  const f=JSON.parse((()=>{ try{ return localStorage.getItem('pep_ba_filtro')||'{}'; }catch(e){ return '{}'; } })());
+  const corpo=$('ba-corpo');
+  const kp=(rot,l)=>'<div class="ba-kpi"><div class="n">'+l.length+(l.filter(x=>x.pend.length).length?' <small>'+l.filter(x=>x.pend.length).length+' em atraso</small>':'')+'</div><div class="l">'+rot+'</div></div>';
+  corpo.innerHTML='<div class="ba-kpis">'+kp('Hipertensos',linhas.filter(x=>x.has))+kp('Diabéticos',linhas.filter(x=>x.dm))+
+    kp(BA.idade_idoso+' anos ou mais',linhas.filter(x=>x.idoso))+'</div>'+
+    '<div class="ba-filtros"><select id="ba-grupo" class="f"><option value="">Todos os grupos</option><option value="has">Hipertensos</option>'+
+    '<option value="dm">Diabéticos</option><option value="idoso">'+BA.idade_idoso+' anos ou mais</option></select>'+
+    '<label style="display:flex;gap:6px;align-items:center;font-weight:500"><input type="checkbox" id="ba-so" style="width:auto"> Só com pendência</label>'+
+    '<span class="muted" id="ba-n"></span></div>'+
+    '<div class="card"><table><thead><tr><th>Paciente</th><th>Grupos</th><th>Pendências</th><th>Última consulta</th></tr></thead><tbody id="ba-tb"></tbody></table></div>'+
+    '<div class="muted" style="margin-top:10px;line-height:1.5">Critérios: consulta a cada '+Math.round(BA.consulta_cronico/30)+' meses (HAS/DM) ou '+
+    Math.round(BA.consulta_idoso/30)+' meses (só idade); PA a cada '+Math.round(BA.pa/30)+' meses e última PA ≥ 140/90 (HAS); HbA1c a cada '+Math.round(BA.hba1c/30)+
+    ' meses e microalbuminúria anual (DM); creatinina anual (HAS/DM). Grupos vêm da lista de problemas ativos (CID I10–I15 / E10–E14 ou descrição); exames, dos resultados lançados. '+
+    'Ajuste os prazos às metas da sua equipe e do município.</div>';
+  $('ba-grupo').value=f.g||''; $('ba-so').checked=f.so!==false;
+  const filtrar=()=>{ const g=$('ba-grupo').value, so=$('ba-so').checked;
+    try{ localStorage.setItem('pep_ba_filtro',JSON.stringify({g,so})); }catch(e){}
+    return linhas.filter(x=>(!g||x[g])&&(!so||x.pend.length)); };
+  const desenhar=()=>{ const l=filtrar(); $('ba-n').textContent=l.length+' paciente(s)';
+    $('ba-tb').innerHTML=l.length?l.map((x,i)=>'<tr><td><button class="ba-nome" data-i="'+linhas.indexOf(x)+'">'+esc(x.p.nome)+'</button>'+
+      '<div class="muted" style="font-size:12px">'+[x.anos!=null?x.anos+' anos':'',x.p.telefone||''].filter(Boolean).map(esc).join(' · ')+'</div></td>'+
+      '<td>'+[x.has?'HAS':'',x.dm?'DM':'',x.idoso?'≥'+BA.idade_idoso:''].filter(Boolean).map(t=>'<span class="chip">'+t+'</span>').join(' ')+'</td>'+
+      '<td><div class="ba-pend">'+(x.pend.length?x.pend.map(pp=>'<span class="chip chip-red">'+esc(pp.t)+'</span>').join(''):'<span class="chip chip-ok">em dia</span>')+'</div></td>'+
+      '<td>'+(x.ultCons?esc(dataBRsimples(x.ultCons)):'<span class="muted">nunca</span>')+'</td></tr>').join('')
+      :'<tr><td colspan="4" class="muted" style="padding:18px">Ninguém neste filtro.</td></tr>';
+    $('ba-tb').querySelectorAll('.ba-nome').forEach(b=>b.onclick=async()=>{ const x=linhas[+b.dataset.i];
+      tela=null; pacienteSel=x.p; atendAtual=null; renderSideList(); renderMain(); await carregarProblemasAlergias(); await carregarResultados(); renderMain(); }); };
+  $('ba-grupo').onchange=desenhar; $('ba-so').onchange=desenhar; desenhar();
+  const tabela=()=>filtrar().map(x=>[x.p.nome,x.anos??'',x.p.telefone||'',[x.has?'HAS':'',x.dm?'DM':'',x.idoso?'idoso':''].filter(Boolean).join(' '),
+    x.pend.map(pp=>pp.t).join('; ')||'em dia',x.ultCons?dataBRsimples(x.ultCons):'nunca']);
+  $('ba-csv').onclick=()=>baixarTexto(paraCSV([['Paciente','Idade','Telefone','Grupos','Pendências','Última consulta'],...tabela()]),
+    'busca-ativa-'+new Date().toISOString().slice(0,10)+'.csv','text/csv');
+  $('ba-imp').onclick=()=>{ const t=tabela();
+    $('print-area').innerHTML='<div style="font:10pt Inter,Arial,sans-serif;color:#13293f"><h2 style="margin:0 0 4px">Busca ativa</h2><div style="color:#5e7490;margin-bottom:10px">'+
+      esc(dataExtenso(new Date().toISOString()))+' · '+t.length+' paciente(s)</div><table style="width:100%;border-collapse:collapse;font-size:9pt">'+
+      '<tr>'+['Paciente','Idade','Telefone','Grupos','Pendências','Última consulta','Contato'].map(h=>'<th style="text-align:left;border-bottom:1.5px solid #0a6fbd;padding:4px">'+h+'</th>').join('')+'</tr>'+
+      t.map(r=>'<tr>'+r.map(v=>'<td style="border-bottom:1px solid #d1dbe7;padding:4px;vertical-align:top">'+esc(v)+'</td>').join('')+'<td style="border-bottom:1px solid #d1dbe7;width:22mm"></td></tr>').join('')+'</table></div>';
+    window.print(); };
+}
+
+// ---------- arquivos ----------
+function paraCSV(linhas){
+  const q=v=>{ const t=v==null?'':typeof v==='object'?JSON.stringify(v):String(v); return /[;"\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t; };
+  return '﻿'+linhas.map(l=>l.map(q).join(';')).join('\r\n');   // ; e BOM: abre certo no Excel em português
+}
+function baixarBlob(blob,nome){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=nome;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+const baixarTexto=(txt,nome,tipo)=>baixarBlob(new Blob([txt],{type:(tipo||'text/plain')+';charset=utf-8'}),nome);
+
+// ---------- backup ----------
+// ordem de restauração: quem é referenciado vem antes
+const TAB_BACKUP=['pep_unidades','pep_pacientes','pep_problemas','pep_alergias','pep_atendimentos','pep_atendimento_problemas',
+  'pep_solicitacoes_exames','pep_solicitacao_itens','pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios',
+  'pep_resultados','pep_modelos','pep_profissional'];
+const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); }catch(e){ return null; } };
+function statusBackup(){
+  const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
+  e.textContent=u?'Último backup '+(d===0?'hoje':haQuanto(d))+' neste aparelho':'Nenhum backup feito neste aparelho';
+  e.style.color=(!u||d>7)?'#c62828':'';
+}
+async function gerarBackup(){
+  const dados={}, faltou=[];
+  for(const t of TAB_BACKUP){ try{ dados[t]=await todos(t,'*'); }catch(e){ faltou.push(t); } }
+  const quando=new Date().toISOString();
+  const zip=new JSZip();
+  zip.file('backup.json',JSON.stringify({sistema:'PEP Clínico',versao:VERSAO,gerado_em:quando,tabelas:dados}));
+  for(const [t,rows] of Object.entries(dados)){ if(!rows.length) continue;
+    const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))].filter(k=>!(t==='pep_unidades'&&/^logo/.test(k)));
+    zip.file('planilhas/'+t.replace(/^pep_/,'')+'.csv',paraCSV([cols,...rows.map(r=>cols.map(k=>r[k]))])); }
+  zip.file('LEIA-ME.txt','Backup do PEP Clínico gerado em '+dataHoraBR(quando)+'.\r\n\r\n'+
+    'backup.json: todos os dados, para restaurar no sistema (Backup dos dados > Restaurar).\r\n'+
+    'planilhas/: uma planilha por tabela, para abrir no Excel.\r\n\r\n'+
+    'Contém dados de saúde identificados. Guarde em local protegido (pasta com senha ou criptografada) e não envie por e-mail ou WhatsApp.\r\n'+
+    'Catálogos (CID-10, TUSS, medicamentos) não entram: são reimportados dos arquivos oficiais.\r\n');
+  const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+  baixarBlob(blob,'pep-backup-'+quando.slice(0,10)+'.zip');
+  try{ localStorage.setItem('pep_ultimo_backup',quando); }catch(e){}
+  statusBackup();
+  return {dados,faltou};
+}
+async function lerBackup(file){
+  let txt;
+  if(/\.zip$/i.test(file.name)){ const z=await JSZip.loadAsync(file); const f=z.file('backup.json'); if(!f) throw new Error('o .zip não tem backup.json'); txt=await f.async('string'); }
+  else txt=await file.text();
+  const j=JSON.parse(txt); if(!j||!j.tabelas) throw new Error('arquivo não é um backup do PEP Clínico');
+  return j;
+}
+async function restaurarBackup(j){
+  const rel=[];
+  for(const t of TAB_BACKUP){ const rows=j.tabelas[t]; if(!rows||!rows.length) continue;
+    if(t==='pep_profissional'){ rel.push(t+': mantido o cadastro atual'); continue; }
+    const pk=t==='pep_profissional'?'user_id':'id'; let ok=0, erro='';
+    for(let i=0;i<rows.length;i+=500){
+      const {error}=await sb.from(t).upsert(rows.slice(i,i+500),{onConflict:pk,ignoreDuplicates:true});
+      if(error){ erro=error.message; break; } ok+=Math.min(500,rows.length-i); }
+    rel.push(t.replace(/^pep_/,'')+': '+(erro?'erro — '+erro:ok+' registro(s) conferido(s)'));
+  }
+  return rel;
+}
+function renderBackup(c){
+  const u=ultimoBackup();
+  c.innerHTML='<div class="phead"><div><div class="nm">Backup dos dados</div><div class="mt">'+
+    (u?'Último backup neste aparelho: '+esc(dataHoraBR(u)):'Nenhum backup feito neste aparelho')+'</div></div></div>'+
+    '<div class="bk-box"><h3>Baixar backup completo</h3><div class="muted" style="margin-bottom:10px;line-height:1.5">Um arquivo .zip com todos os pacientes, consultas, receitas, exames, resultados, atestados, relatórios, unidades e modelos: '+
+    'um <b>backup.json</b> para restaurar e uma planilha por tabela para consulta. O plano gratuito do Supabase não guarda cópias que você possa baixar e pausa o projeto após uma semana sem uso — faça ao menos uma vez por semana.</div>'+
+    '<button class="btn primary" id="bk-baixar">Baixar backup agora</button> <span class="muted" id="bk-msg"></span></div>'+
+    '<div class="bk-box"><h3>Restaurar</h3><div class="muted" style="margin-bottom:10px;line-height:1.5">Só <b>acrescenta</b> o que falta: registros que já existem não são alterados nem apagados. '+
+    'Use na mesma conta em que o backup foi feito (cada registro guarda o profissional dono).</div>'+
+    '<button class="btn ghost" id="bk-rest">Escolher arquivo (.zip ou .json)</button><input type="file" id="bk-file" accept=".zip,.json" class="hidden">'+
+    '<div class="muted" id="bk-rel" style="margin-top:10px;line-height:1.6"></div></div>'+
+    '<div class="bk-box"><h3>Onde guardar</h3><div class="muted" style="line-height:1.5">O arquivo tem dados de saúde identificados (LGPD, dado sensível). Guarde em pasta protegida — por exemplo, um pendrive criptografado ou uma pasta do Google Drive/OneDrive só sua — e apague cópias antigas que não precisar mais.</div></div>';
+  $('bk-baixar').onclick=async()=>{ const b=$('bk-baixar'); b.disabled=true; $('bk-msg').textContent='Gerando…';
+    try{ const r=await gerarBackup(); const n=Object.values(r.dados).reduce((a,x)=>a+x.length,0);
+      $('bk-msg').textContent=n+' registros salvos'+(r.faltou.length?' · tabelas ainda não criadas: '+r.faltou.map(t=>t.replace(/^pep_/,'')).join(', '):'');
+      toast('Backup baixado ✓'); }
+    catch(err){ $('bk-msg').textContent=''; toast('Erro no backup: '+(err.message||err),true); }
+    finally{ b.disabled=false; } };
+  $('bk-rest').onclick=()=>$('bk-file').click();
+  $('bk-file').addEventListener('change',async e=>{ const f=e.target.files[0]; e.target.value=''; if(!f) return;
+    try{ const j=await lerBackup(f);
+      const cont=Object.entries(j.tabelas).filter(([,r])=>r&&r.length).map(([t,r])=>t.replace(/^pep_/,'')+': '+r.length).join('\n');
+      if(!confirm('Backup de '+dataHoraBR(j.gerado_em)+'\n\n'+cont+'\n\nRestaurar? Só entra o que não existe.')) return;
+      $('bk-rel').textContent='Restaurando…';
+      const rel=await restaurarBackup(j); $('bk-rel').innerHTML=rel.map(esc).join('<br>'); toast('Restauração concluída');
+      carregarPacientes(); }
+    catch(err){ $('bk-rel').textContent=''; toast('Não consegui restaurar: '+(err.message||err),true); } });
+}
+
+// ---------- modelos de texto ----------
+const MODELOS_PADRAO=[
+  {titulo:'Consulta de hipertensão',
+   s:'Retorno para acompanhamento de HAS. Uso das medicações: ___. Queixas: ___. Dor torácica, dispneia, edema ou alteração visual: ___.',
+   o:'PA ___/___ mmHg (2ª medida ___/___). FC ___ bpm. Peso ___ kg. ACV: ___.',
+   a:'HAS ___ (controlada / não controlada). Risco cardiovascular: ___.',
+   p:'Anti-hipertensivo: manter / ajustar ___. Orientações: redução de sal, atividade física, cessar tabagismo. Exames de rotina: ___. Retorno em ___.'},
+  {titulo:'Consulta de diabetes',
+   s:'Retorno de DM2. Adesão à medicação e à dieta: ___. Hipoglicemias: ___. Poliúria/polidipsia: ___. Parestesias em pés: ___.',
+   o:'PA ___/___ mmHg. Peso ___ kg, IMC ___. Glicemia capilar ___ mg/dL. Pés: monofilamento ___, pulsos ___, lesões ___.',
+   a:'DM2 ___ (última HbA1c ___ % em ___).',
+   p:'Ajuste terapêutico: ___. Exames conforme periodicidade: HbA1c, creatinina, microalbuminúria, perfil lipídico. Fundo de olho se não feito no último ano. Retorno em ___.'},
+  {titulo:'Renovação de receita',
+   s:'Comparece para renovação de receita de uso contínuo. Refere uso regular, sem efeitos adversos. Sem queixas novas.',
+   o:'Bom estado geral. PA ___/___ mmHg.',
+   a:'Condições crônicas estáveis: ___.',
+   p:'Renovada a prescrição de uso contínuo. Retorno para consulta de seguimento em ___.'},
+  {titulo:'Infecção de vias aéreas superiores',
+   s:'Coriza, odinofagia e tosse há ___ dias. Febre: ___. Dispneia: nega.',
+   o:'BEG, eupneico. Tax ___ °C. Orofaringe: ___. Otoscopia: ___. AR: MV presente bilateralmente, sem ruídos adventícios.',
+   a:'Infecção de vias aéreas superiores, provavelmente viral.',
+   p:'Sintomáticos, hidratação, lavagem nasal com soro fisiológico. Orientados sinais de alarme (dispneia, febre por mais de 3 dias, piora do estado geral).'},
+  {titulo:'Lombalgia',
+   s:'Dor lombar há ___, de padrão ___ (mecânico / inflamatório). Irradiação: ___. Sinais de alerta (febre, perda de peso, trauma, déficit motor, alteração esfincteriana): nega.',
+   o:'Lasègue ___. Força e reflexos em MMII: ___. Palpação: ___.',
+   a:'Lombalgia ___ sem sinais de alerta.',
+   p:'Analgesia, manter atividades conforme tolerância, evitar repouso prolongado. Orientações posturais. Reavaliar em ___ semanas.'}];
+let modelosMeus=[];
+async function abrirModelos(){
+  openM('m-modelos'); $('mod-lista').innerHTML='<div class="muted">Carregando…</div>';
+  const {data,error}=await sb.from('pep_modelos').select('*').order('titulo');
+  modelosMeus=error?null:(data||[]);
+  desenharModelos();
+}
+function desenharModelos(){
+  const linha=(m,meu,i)=>'<div class="mod-it"><div class="tx"><div class="tt">'+esc(m.titulo)+(meu?'':' <span class="chip">padrão</span>')+'</div>'+
+    '<div class="pv">'+esc([m.s,m.o,m.a,m.p].filter(Boolean).join(' · '))+'</div></div>'+
+    '<button class="btn primary sm" data-ins="'+(meu?'m':'p')+i+'">Inserir</button>'+(meu?'<button class="btn ghost sm" data-del="'+i+'">Excluir</button>':'')+'</div>';
+  $('mod-lista').innerHTML=(modelosMeus===null?'<div class="muted" style="margin-bottom:8px">Para salvar seus próprios modelos, rode o receitas_modelos_schema.sql no Supabase.</div>':'')+
+    (modelosMeus&&modelosMeus.length?'<div class="muted" style="margin:0 0 6px;font-weight:600">Meus modelos</div>'+modelosMeus.map((m,i)=>linha(m,true,i)).join(''):'')+
+    '<div class="muted" style="margin:10px 0 6px;font-weight:600">Modelos prontos</div>'+MODELOS_PADRAO.map((m,i)=>linha(m,false,i)).join('');
+  $('mod-lista').querySelectorAll('[data-ins]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.ins, m=k[0]==='m'?modelosMeus[+k.slice(1)]:MODELOS_PADRAO[+k.slice(1)];
+    for(const [campo,id] of [['s','f-s'],['o','f-o'],['a','f-a'],['p','f-p']]){ const e=$(id), v=m[campo];
+      if(e&&v) e.value=e.value.trim()?e.value.replace(/\s+$/,'')+'\n'+v:v; }
+    closeM('m-modelos'); toast('Modelo "'+m.titulo+'" inserido'); });
+  $('mod-lista').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{ const m=modelosMeus[+b.dataset.del];
+    if(!confirm('Excluir o modelo "'+m.titulo+'"?')) return;
+    const {error}=await sb.from('pep_modelos').delete().eq('id',m.id);
+    if(error){ toast('Erro ao excluir: '+error.message,true); return; }
+    modelosMeus=modelosMeus.filter(x=>x!==m); desenharModelos(); });
+}
+$('mod-salvar').onclick=async()=>{
+  if(modelosMeus===null){ toast('Rode o receitas_modelos_schema.sql no Supabase para salvar modelos',true); return; }
+  const rec={s:$('f-s')?$('f-s').value.trim():'',o:$('f-o')?$('f-o').value.trim():'',a:$('f-a')?$('f-a').value.trim():'',p:$('f-p')?$('f-p').value.trim():''};
+  if(!rec.s&&!rec.o&&!rec.a&&!rec.p){ toast('O SOAP está vazio',true); return; }
+  const titulo=(prompt('Nome do modelo:')||'').trim(); if(!titulo) return;
+  const {data,error}=await sb.from('pep_modelos').insert(Object.assign({titulo},Object.fromEntries(Object.entries(rec).map(([k,v])=>[k,v||null])))).select().single();
+  if(error){ toast('Erro ao salvar: '+error.message,true); return; }
+  modelosMeus.push(data||Object.assign({titulo},rec)); modelosMeus.sort((a,b)=>a.titulo.localeCompare(b.titulo)); desenharModelos(); toast('Modelo salvo ✓');
 };
 
 // ---------- relatório médico ----------
@@ -2588,7 +3035,8 @@ async function finalizar(){
     if(prescItens.length){
       const {data:rec,error:e4}=await sb.from('pep_prescricoes').insert({atendimento_id:at.id,tipo_receita:'comum'}).select().single();
       if(e4) throw e4;
-      const {error:e5}=await sb.from('pep_prescricao_itens').insert(prescItens.map((m,i)=>({prescricao_id:rec.id,...m,ordem:i+1})));
+      const {error:e5}=await sb.from('pep_prescricao_itens').insert(prescItens.map((m,i)=>{
+        const r={prescricao_id:rec.id,...m,ordem:i+1}; if(!r.tipo_receita) delete r.tipo_receita; return r; }));
       if(e5) throw e5;
     }
     const tipoAt=$('at-tipo')?$('at-tipo').value:'';
@@ -2640,7 +3088,7 @@ taBind($('pr-med'),$('pr-list'),async q=>{
   const {data,error}=await sb.rpc('buscar_medicamentos',{p_termo:q});
   if(error) return [];   // catálogo indisponível: segue como texto livre
   return (data||[]).map(m=>({label:m.nome+' '+m.apresentacao,sub:m.via||'',value:m}));
-},opt=>{ const m=opt.value; $('pr-med').value=m.nome+' '+m.apresentacao;
+},opt=>{ const m=opt.value; $('pr-med').value=m.nome+' '+m.apresentacao; infoTipoReceita();
   if(m.via){ const sel=$('pr-via'); const o=[...sel.options].find(x=>x.text===m.via); if(o) sel.value=o.text; else { sel.add(new Option(m.via,m.via)); sel.value=m.via; } }
   $('pr-dose').focus(); });
 
