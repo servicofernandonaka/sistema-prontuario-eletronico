@@ -134,6 +134,10 @@
   .bk-box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
   .bk-box h3{font-size:15px;margin:0 0 6px}
   .rev-h{font-weight:600;font-size:13.5px;margin-bottom:6px}
+  .cm-menu{position:absolute;z-index:60;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(17,42,68,.16);padding:6px;min-width:220px}
+  .cm-menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px;font-size:13.5px;color:var(--fg);cursor:pointer}
+  .cm-menu button:hover{background:var(--brand-050)}
+  .cm-menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
   .ag-sec{font-weight:700;font-size:13px;margin:16px 0 6px;color:var(--fg)}
   .ag-sec.atraso{color:#c62828}
   .enc-st{width:auto;padding:4px 8px;font-size:12.5px}
@@ -2219,7 +2223,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.8 · plano de cuidado';
+const VERSAO='2026-11-13.9 · CalcMed';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2402,6 +2406,7 @@ function renderAtendimento(c){
   const head=el('div','phead');
   head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">'+(edit?'Editando atendimento':'Novo atendimento')+' · '+
     [p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
+  const bCalc=el('button','btn ghost','CalcMed ▾'); bCalc.onclick=ev=>{ ev.stopPropagation(); menuCalcMed(bCalc); }; head.appendChild(bCalc);
   const bMod=el('button','btn ghost','Modelos de texto'); bMod.onclick=abrirModelos; head.appendChild(bMod);
   if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
   const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
@@ -2581,6 +2586,7 @@ function renderAtendimento(c){
   $('rt-data').onchange=()=>{ $('rt-prazo').value=$('rt-data').value?'data':''; };
   if(atendAtual&&atendAtual.dados&&atendAtual.dados.retorno_previsto){ $('rt-prazo').value='data'; $('rt-data').value=atendAtual.dados.retorno_previsto; $('rt-motivo').value=atendAtual.dados.retorno_motivo||''; }
   carregarRegimeAnterior();
+  if(calcPendentes.length) setTimeout(inserirPendentesCalc,0);
   $('rl-puxar').onclick=puxarRelatorio;
   if(atendAtual&&atendAtual.dados){ const d=atendAtual.dados;
     $('f-tipo').value=d.tipo_atendimento||'no_dia'; $('f-s').value=d.subjetivo||''; $('f-o').value=d.objetivo||'';
@@ -3478,6 +3484,87 @@ async function docFolhaRosto(){
   if(pend.length) secoes.push({t:'Pendências',txt:pend.join('\n')});
   return montarDoc('Folha de rosto — Resumo clínico em '+br(new Date().toISOString()), [], [], null, null, {secoes, semAssinatura:true});
 }
+
+// ---------- integração com o CalcMed ----------
+// O PEP abre o CalcMed numa janela e, quando ela avisa que carregou, manda os dados clínicos da consulta por
+// postMessage — sem nome, CPF ou CNS, e nada no endereço. O CalcMed preenche os campos que reconhece e devolve
+// o resultado, que entra na Avaliação (ou no Plano, para o rastreamento) da consulta aberta.
+const CALCMED_PADRAO='https://servicofernandonaka.github.io/calculadorasmedicas/';
+const urlCalcMed=()=>{ try{ return localStorage.getItem('pep_calcmed_url')||CALCMED_PADRAO; }catch(e){ return CALCMED_PADRAO; } };
+const origemCalcMed=()=>{ try{ return new URL(urlCalcMed()).origin; }catch(e){ return ''; } };
+let calcJanela=null, calcPendentes=[];
+function menuCalcMed(btn){
+  document.querySelectorAll('.cm-menu').forEach(m=>m.remove());
+  const m=el('div','cm-menu');
+  [['clinica','Clínica (escores e risco)'],['geriatria','Geriatria'],['rastreio','Rastreamentos e vacinas'],['mental','Saúde mental'],
+   ['gineco','Gineco e obstetrícia'],['paliativos','Paliativos'],['labcore','LabCore (exames)']]
+    .forEach(([h,t])=>{ const b=el('button','',t); b.type='button'; b.onclick=()=>{ m.remove(); abrirCalcMed(h); }; m.appendChild(b); });
+  m.appendChild(el('hr'));
+  const cfg=el('button','','Endereço do CalcMed…'); cfg.type='button';
+  cfg.onclick=()=>{ m.remove(); const u=prompt('Endereço do CalcMed:',urlCalcMed()); if(u===null) return;
+    try{ const x=new URL(u.trim()); if(!/^https?:$/.test(x.protocol)) throw 0; localStorage.setItem('pep_calcmed_url',x.href); toast('Endereço do CalcMed salvo'); }
+    catch(e){ toast('Endereço inválido',true); } };
+  m.appendChild(cfg);
+  const r=btn.getBoundingClientRect(); m.style.top=(r.bottom+window.scrollY+4)+'px'; m.style.left=Math.max(8,r.right+window.scrollX-240)+'px';
+  document.body.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',function fora(e){ if(!m.contains(e.target)){ m.remove(); document.removeEventListener('click',fora); } }),0);
+}
+async function contextoCalcMed(){
+  const p=pacienteSel||{}, v=id=>{ const e=$(id); const x=e&&String(e.value).replace(',','.').trim(); return x!==''&&x!=null&&!isNaN(+x)?+x:null; };
+  const d={idade:anosPaciente(), sexo:/^f/i.test(p.sexo||'')?'F':/^m/i.test(p.sexo||'')?'M':null,
+    peso:v('f-peso'), altura:v('f-alt'), pas:v('f-pas'), pad:v('f-pad'), fc:v('f-fc'), glicemia:v('f-gli'), creatinina:v('f-creat')};
+  // o que não foi medido hoje vem da última consulta em que foi registrado
+  if([d.peso,d.altura,d.pas,d.pad,d.fc].some(x=>x==null)&&p.id){
+    const {data:ats}=await sb.from('pep_atendimentos').select('data_atendimento,peso_kg,altura_cm,pa_sistolica,pa_diastolica,fc').eq('paciente_id',p.id).order('data_atendimento',{ascending:false}).limit(15);
+    const ult=k=>((ats||[]).find(a=>a[k]!=null)||{})[k];
+    if(d.peso==null) d.peso=ult('peso_kg'); if(d.altura==null) d.altura=ult('altura_cm');
+    if(d.pas==null&&d.pad==null){ const a=(ats||[]).find(x=>x.pa_sistolica); if(a){ d.pas=a.pa_sistolica; d.pad=a.pa_diastolica; } }
+    if(d.fc==null) d.fc=ult('fc');
+  }
+  if(!resultados.length) await carregarResultados();
+  const ultimo=k=>{ const r=resultados.filter(x=>x.analito===k&&x.valor!=null).sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta)))[0]; return r?Number(r.valor):null; };
+  for(const [campo,chave] of [['creatinina','creatinina'],['hba1c','hba1c'],['glicemia','glicemia'],['colesterol','colesterol'],['ldl','ldl'],
+      ['hdl','hdl'],['triglicerides','triglicerides'],['potassio','potassio'],['sodio','sodio'],['ureia','ureia'],['tfg','tfg']])
+    if(d[campo]==null) d[campo]=ultimo(chave);
+  if(d.tfg==null&&d.creatinina&&d.idade&&d.sexo) d.tfg=ckdEpi2021(d.creatinina,d.idade,d.sexo==='F');
+  if(d.peso&&d.altura) d.imc=Math.round(d.peso/Math.pow(d.altura/100,2)*10)/10;
+  const c=condicoesAtivas(problemas); d.condicoes=Object.keys(c).filter(k=>c[k]);
+  Object.keys(d).forEach(k=>{ if(d[k]==null) delete d[k]; });
+  return d;
+}
+async function enviarContextoCalcMed(){
+  if(!calcJanela||calcJanela.closed||!pacienteSel) return;
+  const dados=await contextoCalcMed();
+  try{ calcJanela.postMessage({app:'pep',tipo:'contexto',dados},origemCalcMed()); }catch(e){}
+}
+function abrirCalcMed(aba){
+  const url=urlCalcMed().split('#')[0]+'#'+aba;
+  calcJanela=window.open(url,'calcmed');
+  if(!calcJanela){ toast('O navegador bloqueou a janela do CalcMed. Permita janelas pop-up para este site.',true); return; }
+  // janela já aberta (só troca de aba, não recarrega): manda os dados de novo
+  setTimeout(enviarContextoCalcMed,700);
+}
+function inserirResultadoCalc(r){
+  const campo=r.destino==='plano'?$('f-p'):$('f-a');
+  if(!campo) return false;
+  const txt='CalcMed — '+String(r.titulo||'').slice(0,200)+':\n'+String(r.texto||'').slice(0,3000);
+  campo.value=campo.value.trim()?campo.value.replace(/\s+$/,'')+'\n\n'+txt:txt;
+  return true;
+}
+function inserirPendentesCalc(){
+  const ok=calcPendentes.filter(inserirResultadoCalc);
+  if(ok.length){ toast(ok.length+' resultado(s) do CalcMed inseridos na consulta'); calcPendentes=calcPendentes.filter(r=>!ok.includes(r)); }
+}
+window.addEventListener('message',ev=>{
+  if(ev.origin!==origemCalcMed()) return;
+  const m=ev.data; if(!m||m.app!=='calcmed') return;
+  if(m.tipo==='pronto'){ if(ev.source&&calcJanela&&ev.source===calcJanela) enviarContextoCalcMed(); return; }
+  if(m.tipo==='resultado'){
+    const r={titulo:m.titulo,texto:m.texto,destino:m.destino==='plano'?'plano':'avaliacao'};
+    if(inserirResultadoCalc(r)) toast('Resultado do CalcMed inserido '+(r.destino==='plano'?'no Plano':'na Avaliação'));
+    else { calcPendentes.push(r); toast('Resultado do CalcMed guardado: abra ou continue uma consulta para inseri-lo'); }
+  }
+});
 
 // ---------- relatório médico ----------
 const REL_CAMPOS={'rl-tipo':'tipo','rl-dest':'destinatario','rl-fin':'finalidade','rl-dias':'afastamento_dias','rl-diag':'diagnosticos',
