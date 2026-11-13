@@ -133,6 +133,10 @@
   .mod-it .tx{flex:1;min-width:0} .mod-it .tt{font-weight:600} .mod-it .pv{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .bk-box{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
   .bk-box h3{font-size:15px;margin:0 0 6px}
+  .rev-h{font-weight:600;font-size:13.5px;margin-bottom:6px}
+  .ag-sec{font-weight:700;font-size:13px;margin:16px 0 6px;color:var(--fg)}
+  .ag-sec.atraso{color:#c62828}
+  .enc-st{width:auto;padding:4px 8px;font-size:12.5px}
 
   /* SOAP editor */
   .soap{display:flex;flex-direction:column;gap:14px}
@@ -265,6 +269,7 @@
     #print-area .pr-qt+.pr-pac{margin-bottom:10px}
     #print-area .pr-branco{display:block;border-bottom:1px solid #b9c7d8;height:14px}
     #print-area .pr-finais{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:6mm}
+    #print-area .pr-finais.um{grid-template-columns:1fr}
     #print-area .pr-fq{border:1px solid #d1dbe7;border-radius:2mm;padding:6px 10px}
     #print-area .pr-fl{font-size:8.4pt;color:#3f5570;border-bottom:1px solid #d1dbe7;padding:9px 0 1px;min-height:13px}
     /* corpo */
@@ -328,7 +333,7 @@
       <input id="pac-search" placeholder="Buscar paciente, CPF, CNS…" autocomplete="off">
     </div>
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
-    <button class="btn ghost block" id="btn-busca">Busca ativa</button>
+    <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
@@ -601,7 +606,7 @@ const examItens=[], prescItens=[];
 const OFF=(()=>{
   const nativo=window.fetch.bind(window);
   const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
-    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_modelos','pep_atendimento_problemas',
+    'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_modelos','pep_encaminhamentos','pep_atendimento_problemas',
     'pep_problemas','pep_alergias','pep_resultados'];
   const REFERENCIA=['pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
     'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
@@ -1127,14 +1132,16 @@ $('btn-logout').onclick=async()=>{
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
-let enderecoOK=false, tipoReceitaOK=false;
+let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false;
 async function sondarColunas(){
   // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
-  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; }catch(e){} return; }
-  const [a,b]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
-                                 sb.from('pep_prescricao_itens').select('tipo_receita').limit(1)]);
-  enderecoOK=!a.error; tipoReceitaOK=!b.error;
-  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK})); }catch(e){}
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; }catch(e){} return; }
+  const [a,b,r,n]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+                                 sb.from('pep_prescricao_itens').select('tipo_receita').limit(1),
+                                 sb.from('pep_atendimentos').select('retorno_previsto').limit(1),
+                                 sb.from('pep_encaminhamentos').select('id').limit(1)]);
+  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK})); }catch(e){}
 }
 async function carregarPacientes(q){
   let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
@@ -1170,6 +1177,7 @@ function abrirModalPaciente(p){
 }
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('btn-busca').onclick=()=>abrirTela('busca');
+$('btn-agenda').onclick=()=>abrirTela('agenda');
 $('btn-backup').onclick=()=>abrirTela('backup');
 const salvoMsg=(mk,padrao)=>OFF.enfileirouDesde(mk)
   ? padrao.replace(' ✓','')+' neste aparelho — sobe quando a conexão voltar' : padrao;
@@ -1395,6 +1403,7 @@ function abrirTela(t){ tela=t; pacienteSel=null; atendAtual=null; $('sidebar').c
 function renderMain(){
   const c=$('main-content'); c.innerHTML='';
   if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
+  if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
   if(!pacienteSel&&tela==='backup') return renderBackup(c);
   if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
   if(atendAtual){ (atendAtual.id && !atendAtual.editando)?renderAtendimentoSalvo(c):renderAtendimento(c); return; }
@@ -1442,6 +1451,16 @@ async function renderFichaPaciente(c){
   });
   cardP.appendChild(bodyP); cardA.appendChild(bodyA);
   res.appendChild(cardP); res.appendChild(cardA); c.appendChild(res);
+
+  // ---------- folha de rosto, revisão de medicação e encaminhamentos ----------
+  const cardF=el('div','card'); cardF.style.marginBottom='16px';
+  cardF.innerHTML='<div class="ch"><span>Medicamentos em uso e revisão</span><span style="display:flex;gap:6px"><button class="btn ghost sm" id="fr-imp">Folha de rosto</button><button class="btn ghost sm" id="fr-pdf">PDF</button></span></div>'+
+    '<div class="cb" id="fr-rev"><div class="muted">Carregando…</div></div>';
+  c.appendChild(cardF);
+  $('fr-imp').onclick=async()=>{ const d=await docFolhaRosto(); if(d) imprimirDoc(d); };
+  $('fr-pdf').onclick=async()=>{ const d=await docFolhaRosto(); if(d) baixarPDF(d); };
+  revisaoNaFicha();
+  if(encOK){ const cardE=el('div','card'); cardE.style.marginBottom='16px'; cardE.id='card-enc'; c.appendChild(cardE); renderEncFicha(cardE); }
 
   // ---------- resultados e evolução ----------
   const tit=el('div','sec-title','Resultados de exames');
@@ -1730,7 +1749,7 @@ function umaGuiaHTML(d){
     :'<div class="pr-hd vazio"></div>';
   const grade=c=>'<div class="pr-pac">'+c.map(x=>'<div class="c s'+(x[2]||1)+'"><span>'+esc(x[0])+'</span><b>'+(x[1]?esc(x[1]):'<i class="pr-branco"></i>')+'</b></div>').join('')+'</div>';
   const pac=(d.quadros||[{t:'',c:d.pac}]).map(q=>(q.t?'<div class="pr-qt">'+esc(q.t)+'</div>':'')+grade(q.c)).join('');
-  const finais=d.finais?'<div class="pr-finais">'+d.finais.map(f=>'<div class="pr-fq"><div class="pr-obs-t">'+esc(f.t)+'</div>'+
+  const finais=d.finais?'<div class="pr-finais'+(d.finais.length===1?' um':'')+'">'+d.finais.map(f=>'<div class="pr-fq"><div class="pr-obs-t">'+esc(f.t)+'</div>'+
     f.l.map(l=>'<div class="pr-fl">'+esc(l)+'</div>').join('')+'</div>').join('')+'</div>':'';
   let corpo='';
   if(d.secoes) corpo=d.secoes.map(sc=>'<div class="pr-sec">'+(sc.t?'<div class="pr-gt">'+esc(sc.t)+'</div>':'')+
@@ -1749,7 +1768,7 @@ function umaGuiaHTML(d){
   const ft='<div class="pr-ft">'+rodapeLinhas(d).map(l=>'<div>'+esc(l)+'</div>').join('')+
     '<div class="pr-emit">Emitido em '+esc(dataHoraBR(d.emitido))+'</div></div>';
   return cab+'<div class="pr-tit"><h1>'+esc(d.tituloPrinc)+'</h1>'+(d.subtitulo?'<div class="pr-sub">'+esc(d.subtitulo)+'</div>':'')+'</div>'+
-    pac+'<div class="pr-corpo">'+corpo+'</div>'+obs+'<div class="pr-fim">'+(d.fecho?'<p class="pr-par pr-fecho">'+esc(d.fecho)+'</p>':'')+ass+ft+'</div>';
+    pac+'<div class="pr-corpo">'+corpo+'</div>'+obs+'<div class="pr-fim">'+(d.semAssinatura?'':(d.fecho?'<p class="pr-par pr-fecho">'+esc(d.fecho)+'</p>':'')+ass)+ft+'</div>';
 }
 // Aceita uma guia ou uma lista delas; cada guia sai numa folha.
 function imprimirDoc(d){
@@ -1761,7 +1780,7 @@ function imprimirDoc(d){
   window.print();
 }
 // ---------- PDF (arquivo de verdade; é o que pode ser assinado digitalmente) ----------
-const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:'?');};
+const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...','≥':'>=','≤':'<=','₂':'2','→':'->','←':'<-','↑':'^','↓':'v','✓':'ok',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:'?');};
 const limpar=t=>String(t==null?'':t).split('').map(WIN).join('');
 async function gerarPDF(entrada){
   if(!entrada) return null;
@@ -1939,6 +1958,7 @@ async function gerarPDF(entrada){
     }
 
     // local, data e carimbo — mais para baixo da folha quando há espaço
+    if(!d.semAssinatura){
     // a frase de fecho vai junto com a assinatura: nunca fica uma folha só com o carimbo
     const altFin=d.finais?22+Math.max(...d.finais.map(f=>f.l.length))*17+12:0;
     const altAss=16+42+d.carimbo.length*13+altFin;
@@ -1952,15 +1972,16 @@ async function gerarPDF(entrada){
     d.carimbo.forEach((l,i)=>{ centro(pg,l,ya-2-i*13,i?F:FB,i?9.5:10.5,i?CINZA:TINTA); });
     if(d.finais){
       let yt=ya-2-(d.carimbo.length-1)*13-20;
-      const ws=[1.4,1], tot=R-L-10, n=Math.max(...d.finais.map(f=>f.l.length)), h=18+n*17;
+      const ws=d.finais.length===1?[1]:[1.4,1], tot=R-L-10*(d.finais.length-1), n=Math.max(...d.finais.map(f=>f.l.length)), h=18+n*17;
       let x=L;
-      d.finais.forEach((f,i)=>{ const w=tot*ws[i]/(ws[0]+ws[1]);
+      d.finais.forEach((f,i)=>{ const w=tot*ws[i]/ws.reduce((a,b)=>a+b,0);
         pg.drawRectangle({x,y:yt-h,width:w,height:h,borderColor:LINHA,borderWidth:0.8});
         pg.drawText(limpar(f.t.toUpperCase()),{x:x+8,y:yt-11,size:6.8,font:FB,color:CINZA});
         f.l.forEach((l,k)=>{ const yl=yt-18-(k+1)*17+4;
           pg.drawLine({start:{x:x+8,y:yl-2},end:{x:x+w-8,y:yl-2},thickness:0.5,color:LINHA});
           if(l) pg.drawText(limpar(l),{x:x+8,y:yl+1,size:7.6,font:F,color:CINZA}); });
         x+=w+10; });
+    }
     }
   }
 
@@ -2198,7 +2219,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.7 · escolher itens da receita';
+const VERSAO='2026-11-13.8 · plano de cuidado';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2260,6 +2281,8 @@ async function renderAtendimentoSalvo(c){
   let atest=null;
   const {data:ats2}=await sb.from('pep_atestados').select('*').eq('atendimento_id',a.id);
   if(ats2&&ats2.length) atest=ats2[0];
+  let encs=[];
+  if(encOK){ const {data:en}=await sb.from('pep_encaminhamentos').select('*').eq('atendimento_id',a.id).order('criado_em',{ascending:true}); encs=en||[]; }
   let rel=null;   // sem a tabela (SQL ainda não rodado) a consulta só volta vazia
   const {data:rels}=await sb.from('pep_relatorios').select('*').eq('atendimento_id',a.id);
   if(rels&&rels.length) rel=rels[0];
@@ -2298,6 +2321,9 @@ async function renderAtendimentoSalvo(c){
       (atest?'<h3 style="font-size:14px;margin:18px 0 8px">Atestado</h3><div class="ro">'+
         esc({afastamento:'Afastamento',comparecimento:'Comparecimento',acompanhante:'Acompanhante',aptidao:'Aptidão física'}[atest.tipo]||atest.tipo)+
         (atest.dias?' — '+esc(atest.dias)+' dia(s)':'')+(atest.cid10?' · CID-10 '+esc(atest.cid10):'')+'</div>':'')+
+      (encs.length?'<h3 style="font-size:14px;margin:18px 0 8px">Encaminhamentos</h3>'+encs.map(e=>'<div class="ro" style="margin-bottom:6px"><b>'+esc(e.especialidade)+'</b> · '+
+        esc(PRIOR_ENC[e.prioridade]||e.prioridade)+' · '+esc(STATUS_ENC[e.status]||e.status)+(e.motivo?'<div class="muted">'+esc(e.motivo)+'</div>':'')+'</div>').join(''):'')+
+      (a.retorno_previsto?'<h3 style="font-size:14px;margin:18px 0 8px">Retorno</h3><div class="ro">'+esc(dataBRsimples(a.retorno_previsto))+(a.retorno_motivo?' — '+esc(a.retorno_motivo):'')+'</div>':'')+
       (rel?'<h3 style="font-size:14px;margin:18px 0 8px">Relatório</h3><div class="ro">'+esc(TIPOS_REL[rel.tipo]||rel.tipo)+
         ([rel.destinatario,rel.finalidade].filter(Boolean).length?' — '+esc([rel.destinatario,rel.finalidade].filter(Boolean).join(' · ')):'')+
         (rel.afastamento_dias?' · afastamento sugerido: '+esc(rel.afastamento_dias)+' dia(s)':'')+'</div>':'')+
@@ -2321,6 +2347,9 @@ async function renderAtendimentoSalvo(c){
   if(atest){
     const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b5);
     const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6); }
+  if(encs.length){
+    const b9=el('button','btn ghost',encs.length>1?'Imprimir encaminhamentos ('+encs.length+')':'Imprimir encaminhamento'); b9.onclick=()=>imprimirDoc(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b9);
+    const b10=el('button','btn ghost',encs.length>1?'PDF dos encaminhamentos':'PDF do encaminhamento'); b10.onclick=()=>baixarPDF(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b10); }
   if(rel){
     const b7=el('button','btn ghost','Imprimir relatório'); b7.onclick=()=>imprimirDoc(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b7);
     const b8=el('button','btn ghost','PDF do relatório'); b8.onclick=()=>baixarPDF(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b8); }
@@ -2333,6 +2362,7 @@ async function renderAtendimentoSalvo(c){
     exameCab=cab?{cid10:cab.cid10||'',justificativa:cab.justificativa||''}:null;
     atestado=atest?{tipo:atest.tipo,dias:atest.dias,cid10:atest.cid10,texto:atest.texto}:null;
     relatorio=rel?Object.assign({},rel):null;
+    encItens=encs.map(e=>Object.assign({},e)); encRemovidos=[];
     atendAtual={id:a.id,editando:true,dados:a}; renderMain();
   };
   acoes.insertBefore(bEd,acoes.firstChild);
@@ -2340,8 +2370,8 @@ async function renderAtendimentoSalvo(c){
 }
 
 // ---------- atendimento (SOAP) ----------
-let atestado=null, relatorio=null, probSel=new Set();
-function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; atestado=null; relatorio=null; probSel=new Set(); exameCab=null; renderMain(); }
+let atestado=null, relatorio=null, probSel=new Set(), encItens=[], encRemovidos=[];
+function novoAtendimento(){ atendAtual={novo:true}; examItens.length=0; prescItens.length=0; atestado=null; relatorio=null; probSel=new Set(); exameCab=null; encItens=[]; encRemovidos=[]; renderMain(); }
 let exameCab=null;
 
 async function repetirUltima(){
@@ -2423,6 +2453,7 @@ function renderAtendimento(c){
         <button class="ptab" data-pt="rx">Prescrição</button>
         <button class="ptab" data-pt="at">Atestado</button>
         <button class="ptab" data-pt="rl">Relatório</button>
+        <button class="ptab" data-pt="en">Encaminhamento</button>
       </div>
       <div data-panel="ex">
         <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
@@ -2437,6 +2468,7 @@ function renderAtendimento(c){
         <div id="rx-empty" class="muted" style="margin-top:8px">Nenhum medicamento prescrito.</div>
         <div id="rx-tipos" class="muted" style="margin-top:8px;line-height:1.5"></div>
         <div id="rx-avisos" style="margin-top:10px"></div>
+        <div id="rx-revisao" style="margin-top:12px"></div>
       </div>
       <div data-panel="at" class="hidden">
         <div class="grid">
@@ -2451,6 +2483,32 @@ function renderAtendimento(c){
         </div>
         <div class="field" style="margin:0"><label>Observação</label><textarea id="at-obs" class="f" placeholder="Texto adicional do atestado (opcional)"></textarea></div>
         <div class="muted" style="margin-top:8px">O CID só deve constar com autorização do paciente.</div>
+      </div>
+      <div data-panel="en" class="hidden">
+        <div id="en-semtabela" class="avso outro hidden">Para salvar encaminhamentos, rode o plano_cuidado_schema.sql no Supabase.</div>
+        <div class="grid">
+          <div class="field"><label>Especialidade / serviço *</label><input id="en-esp" class="f" list="en-esp-lista" placeholder="Ex.: Cardiologia"></div>
+          <div class="field"><label>Prioridade</label><select id="en-pri" class="f"><option value="eletiva">Eletiva</option><option value="prioritaria">Prioritária</option><option value="urgente">Urgente</option></select></div>
+          <div class="field"><label>CID-10</label><input id="en-cid" class="f" placeholder="Ex.: I10"></div>
+        </div>
+        <datalist id="en-esp-lista">`+['Cardiologia','Endocrinologia','Nefrologia','Neurologia','Geriatria','Psiquiatria','Ortopedia','Reumatologia','Dermatologia',
+          'Oftalmologia','Otorrinolaringologia','Gastroenterologia','Urologia','Ginecologia','Pneumologia','Cirurgia geral','Cirurgia vascular','Angiologia',
+          'Hematologia','Oncologia','Infectologia','Mastologia','Proctologia','Fisioterapia','Nutrição','Psicologia','Fonoaudiologia','CAPS','Saúde bucal']
+          .map(x=>'<option value="'+x+'">').join('')+`</datalist>
+        <div class="field"><label>Motivo do encaminhamento *</label><textarea id="en-mot" class="f" style="min-height:58px" placeholder="Ex.: HAS resistente em uso de 4 classes, com PA 160/100"></textarea></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px">
+          <button class="btn ghost sm" id="en-puxar" type="button">Puxar do prontuário</button>
+          <span class="muted">Preenche só os campos vazios: SOAP de hoje, medicamentos em uso e últimos resultados.</span>
+        </div>
+        <div class="field"><label>História clínica</label><textarea id="en-hist" class="f"></textarea></div>
+        <div class="grid">
+          <div class="field"><label>Exames realizados</label><textarea id="en-exam" class="f"></textarea></div>
+          <div class="field"><label>Tratamento em curso</label><textarea id="en-trat" class="f"></textarea></div>
+        </div>
+        <div class="field"><label>O que se espera do especialista</label><textarea id="en-perg" class="f" style="min-height:52px" placeholder="Ex.: avaliar causa secundária e ajuste do esquema"></textarea></div>
+        <button class="btn primary sm" id="en-add" type="button">Adicionar encaminhamento</button>
+        <table style="margin-top:10px"><tbody id="en-tbody"></tbody></table>
+        <div class="muted" id="en-vazio" style="margin-top:6px">Nenhum encaminhamento nesta consulta. Cada especialidade sai numa folha própria.</div>
       </div>
       <div data-panel="rl" class="hidden">
         <div class="grid">
@@ -2477,6 +2535,18 @@ function renderAtendimento(c){
       </div>
     </div></div>
 
+    <div class="sbox" id="box-retorno"><div class="h">Retorno</div><div class="bd">
+      <div class="grid">
+        <div class="field" style="margin:0"><label>Retornar em</label><select id="rt-prazo" class="f">
+          <option value="">Sem retorno marcado</option><option value="7">7 dias</option><option value="15">15 dias</option><option value="30">1 mês</option>
+          <option value="60">2 meses</option><option value="90">3 meses</option><option value="120">4 meses</option><option value="180">6 meses</option>
+          <option value="365">1 ano</option><option value="data">Escolher a data</option></select></div>
+        <div class="field" style="margin:0"><label>Data prevista</label><input id="rt-data" class="f" type="date"></div>
+        <div class="field" style="margin:0"><label>Motivo (opcional)</label><input id="rt-motivo" class="f" placeholder="Ex.: trazer exames"></div>
+      </div>
+      <div class="muted hidden" id="rt-semcoluna" style="margin-top:8px">Para guardar o retorno, rode o plano_cuidado_schema.sql no Supabase.</div>
+    </div></div>
+
     <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:30px">
       <button class="btn ghost" id="btn-cancelar">Cancelar</button>
       <button class="btn primary" id="btn-finalizar">`+(edit?'Salvar alterações':'Finalizar e salvar atendimento')+`</button>
@@ -2500,6 +2570,17 @@ function renderAtendimento(c){
   if(atestado){ $('at-tipo').value=atestado.tipo||''; $('at-dias').value=atestado.dias||''; $('at-cid').value=atestado.cid10||''; $('at-obs').value=atestado.texto||''; }
   if(relatorio) Object.entries(REL_CAMPOS).forEach(([id,k])=>{ if(relatorio[k]!=null) $(id).value=relatorio[k]; });
   $('rl-tipo').onchange=rlVisivel; rlVisivel();
+  // encaminhamentos
+  if(!encOK) $('en-semtabela').classList.remove('hidden');
+  $('en-add').onclick=()=>{ if(adicionarEncaminhamento()) toast('Encaminhamento adicionado'); };
+  $('en-puxar').onclick=puxarEncaminhamento;
+  renderEncTable();
+  // retorno
+  if(!retornoOK){ $('rt-semcoluna').classList.remove('hidden'); ['rt-prazo','rt-data','rt-motivo'].forEach(i=>$(i).disabled=true); }
+  $('rt-prazo').onchange=()=>{ const v=$('rt-prazo').value; if(/^\d+$/.test(v)){ const d=new Date(); d.setDate(d.getDate()+(+v)); $('rt-data').value=d.toISOString().slice(0,10); } else if(!v) $('rt-data').value=''; };
+  $('rt-data').onchange=()=>{ $('rt-prazo').value=$('rt-data').value?'data':''; };
+  if(atendAtual&&atendAtual.dados&&atendAtual.dados.retorno_previsto){ $('rt-prazo').value='data'; $('rt-data').value=atendAtual.dados.retorno_previsto; $('rt-motivo').value=atendAtual.dados.retorno_motivo||''; }
+  carregarRegimeAnterior();
   $('rl-puxar').onclick=puxarRelatorio;
   if(atendAtual&&atendAtual.dados){ const d=atendAtual.dados;
     $('f-tipo').value=d.tipo_atendimento||'no_dia'; $('f-s').value=d.subjetivo||''; $('f-o').value=d.objetivo||'';
@@ -2509,7 +2590,7 @@ function renderAtendimento(c){
       .forEach(([el2,k])=>{ if(d[k]!=null && $(el2)) $(el2).value=d[k]; });
   }
   ['f-peso','f-creat'].forEach(id=>{ const e=$(id); if(e) e.addEventListener('input',()=>{
-    if(id==='f-creat') delete e.dataset.origem; renderClCr(); renderAvisosRx(); }); });
+    if(id==='f-creat') delete e.dataset.origem; renderClCr(); renderAvisosRx(); renderRevisao(); }); });
   c.querySelectorAll('#f-probs .chkp span').forEach(sp=>sp.onclick=()=>{
     const cx=sp.parentElement.querySelector('input'); cx.checked=!cx.checked; cx.dispatchEvent(new Event('change',{bubbles:true})); });
   c.querySelectorAll('#f-probs [data-rm]').forEach(b=>b.onclick=async ev=>{
@@ -2666,6 +2747,7 @@ function renderRxTable(){
   tb.innerHTML=prescItens.map((m,i)=>'<tr><td>'+esc(m.medicamento)+chipReceita(m)+'</td><td class="muted">'+esc([m.via,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.quantidade||'—')+'</td><td><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
   $('rx-empty').style.display=prescItens.length?'none':'block';
   tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ prescItens.splice(+b.dataset.i,1); renderRxTable(); });
+  renderRevisao();
   const cls=new Set(prescItens.map(classeMed)), nota=[];
   if(cls.has('controle')) nota.push('Receita de Controle Especial (modelo da RDC 1.000/2025): 2 vias (1ª fica na farmácia, 2ª com o paciente); o paciente é identificado pelo CPF — sem CPF, escreva "não possui". Quantidade para até 60 dias de tratamento (anticonvulsivantes e antiparkinsonianos: até 6 meses).');
   if(cls.has('controle')&&pacienteSel&&!pacienteSel.cpf) nota.push('⚠ Este paciente está sem CPF no cadastro: o campo sairá em branco.');
@@ -2722,7 +2804,7 @@ let baCache=null;
 async function dadosBusca(){
   const [pacs,probs,ats]=await Promise.all([todos('pep_pacientes','*'),
     todos('pep_problemas','paciente_id,descricao,cid10,situacao'),
-    todos('pep_atendimentos','paciente_id,data_atendimento,pa_sistolica,pa_diastolica')]);
+    todos('pep_atendimentos','paciente_id,data_atendimento,pa_sistolica,pa_diastolica'+(retornoOK?',retorno_previsto':''))]);
   let res=[]; try{ res=await todos('pep_resultados','paciente_id,analito,exame,data_coleta'); }catch(e){ res=[]; }
   if(!analitos.length) await carregarAnalitos();
   const idx=new Map(pacs.map(p=>[p.id,{p,has:false,dm:false,idoso:false,ultCons:null,ultPA:null,pa:null,ex:{}}]));
@@ -2731,7 +2813,7 @@ async function dadosBusca(){
     if(/^I1[0-5]/.test(cid)||/hipertens|\bhas\b/.test(d)) r.has=true;
     if(/^E1[0-4]/.test(cid)||/diabet|\bdm ?[12]?\b/.test(d)) r.dm=true; }
   for(const a of ats){ const r=idx.get(a.paciente_id); if(!r) continue;
-    if(!r.ultCons||a.data_atendimento>r.ultCons) r.ultCons=a.data_atendimento;
+    if(!r.ultCons||a.data_atendimento>r.ultCons){ r.ultCons=a.data_atendimento; r.retorno=a.retorno_previsto||null; }
     if(a.pa_sistolica&&(!r.ultPA||a.data_atendimento>r.ultPA)){ r.ultPA=a.data_atendimento; r.pa=[a.pa_sistolica,a.pa_diastolica]; } }
   for(const x of res){ const r=idx.get(x.paciente_id); if(!r) continue;
     const k=x.analito||analitoDe(x.exame||''); if(!k) continue;
@@ -2747,6 +2829,7 @@ async function dadosBusca(){
     else venc('Consulta',dc,BA.consulta_idoso);
     if(r.has){ venc('PA',diasDesde(r.ultPA),BA.pa);
       if(r.pa&&(r.pa[0]>=140||r.pa[1]>=90)) pend.push({t:'Última PA '+r.pa[0]+'/'+r.pa[1],d:0}); }
+    if(r.retorno&&r.retorno<new Date().toISOString().slice(0,10)) pend.push({t:'Retorno atrasado desde '+dataBRsimples(r.retorno),d:diasDesde(r.retorno)});
     if(r.dm){ venc('HbA1c',diasDesde(r.ex.hba1c),BA.hba1c); venc('Microalbuminúria',diasDesde(r.ex.microalb),BA.microalb); }
     if(r.has||r.dm) venc('Creatinina',diasDesde(r.ex.creatinina),BA.creatinina);
     linhas.push({p:r.p,anos,has:r.has,dm:r.dm,idoso:r.idoso,ultCons:r.ultCons,pend});
@@ -2817,7 +2900,7 @@ const baixarTexto=(txt,nome,tipo)=>baixarBlob(new Blob([txt],{type:(tipo||'text/
 // ordem de restauração: quem é referenciado vem antes
 const TAB_BACKUP=['pep_unidades','pep_pacientes','pep_problemas','pep_alergias','pep_atendimentos','pep_atendimento_problemas',
   'pep_solicitacoes_exames','pep_solicitacao_itens','pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios',
-  'pep_resultados','pep_modelos','pep_profissional'];
+  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_profissional'];
 const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); }catch(e){ return null; } };
 function statusBackup(){
   const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
@@ -2976,6 +3059,426 @@ function abrirSelecaoReceita(meds,a){
   resumo(); openM('m-rxsel');
 }
 
+// ---------- revisão da prescrição (interações, duplicidades, carga anticolinérgica, STOPP/START) ----------
+// Casamento por NOME do princípio ativo (sem acento, início de palavra). É lembrete clínico, não barreira:
+// listas parciais, escolhidas pelo que mais aparece na atenção primária.
+// Referências: STOPP/START v3 (O'Mahony et al., Eur Geriatr Med 2023); escala ACB — Anticholinergic Cognitive
+// Burden (Boustani 2008; atualização 2012); critérios de Beers AGS 2023; alertas de interação de bulas/FDA.
+const CL={
+  ieca:['captopril','enalapril','lisinopril','ramipril','perindopril','benazepril','fosinopril','quinapril','trandolapril'],
+  bra:['losartana','valsartana','candesartana','irbesartana','olmesartana','telmisartana','azilsartana'],
+  arni:['sacubitril'],
+  aldo:['espironolactona','eplerenona'],
+  poupk:['amilorida','triantereno'],
+  potassio:['cloreto de potassio','citrato de potassio','bicarbonato de potassio'],
+  tiazidico:['hidroclorotiazida','clortalidona','indapamida'],
+  alca:['furosemida','bumetanida'],
+  aine:['ibuprofeno','diclofenaco','naproxeno','cetoprofeno','nimesulida','meloxicam','piroxicam','tenoxicam','indometacina',
+        'celecoxibe','etoricoxibe','aceclofenaco','acido mefenamico','cetorolaco','loxoprofeno','etodolaco','dexcetoprofeno'],
+  aas:['acido acetilsalicilico','aas'],
+  p2y12:['clopidogrel','ticagrelor','prasugrel','ticlopidina'],
+  varfarina:['varfarina','femprocumona'],
+  doac:['rivaroxabana','apixabana','dabigatrana','edoxabana'],
+  heparina:['enoxaparina','heparina','dalteparina'],
+  isrs:['fluoxetina','sertralina','paroxetina','citalopram','escitalopram','fluvoxamina'],
+  irsn:['venlafaxina','desvenlafaxina','duloxetina'],
+  triciclico:['amitriptilina','nortriptilina','imipramina','clomipramina','doxepina'],
+  outrosAD:['bupropiona','mirtazapina','trazodona','vortioxetina','agomelatina'],
+  benzo:['alprazolam','bromazepam','clonazepam','clobazam','clordiazepoxido','diazepam','flunitrazepam','lorazepam','midazolam',
+         'nitrazepam','cloxazolam','estazolam','flurazepam'],
+  zdrug:['zolpidem','zopiclona','eszopiclona'],
+  opioide:['tramadol','codeina','morfina','oxicodona','metadona','fentanil','tapentadol','buprenorfina','hidromorfona','petidina'],
+  antipsic:['haloperidol','clorpromazina','levomepromazina','risperidona','paliperidona','quetiapina','olanzapina','aripiprazol',
+            'ziprasidona','clozapina','periciazina','tioridazina','flufenazina','sulpirida','amissulprida','pimozida','lurasidona'],
+  ibp:['omeprazol','esomeprazol','pantoprazol','lansoprazol','rabeprazol','dexlansoprazol'],
+  estatina:['sinvastatina','atorvastatina','rosuvastatina','pravastatina','lovastatina','fluvastatina','pitavastatina'],
+  sinvaLova:['sinvastatina','lovastatina'],
+  sulfonil:['glibenclamida','gliclazida','glimepirida','glipizida','clorpropamida'],
+  betabloq:['propranolol','atenolol','metoprolol','carvedilol','bisoprolol','nebivolol','nadolol','sotalol','pindolol'],
+  bbNaoSel:['propranolol','nadolol','carvedilol','sotalol','pindolol','timolol'],
+  ndhp:['verapamil','diltiazem'],
+  inibCYP3A:['claritromicina','eritromicina','itraconazol','cetoconazol','posaconazol','voriconazol'],
+  qt:['azitromicina','claritromicina','eritromicina','ciprofloxacino','levofloxacino','moxifloxacino','citalopram','escitalopram',
+      'haloperidol','clorpromazina','tioridazina','pimozida','ondansetrona','domperidona','amiodarona','sotalol','metadona',
+      'hidroxicloroquina','cloroquina','fluconazol','donepezila'],
+  digoxina:['digoxina'], amiodarona:['amiodarona'], litio:['litio'], alopurinol:['alopurinol'], azatioprina:['azatioprina'],
+  metotrexato:['metotrexato'], smxtmp:['sulfametoxazol','trimetoprima'], nitrato:['isossorbida','nitroglicerina','propatilnitrato'],
+  ipde5:['sildenafila','tadalafila','vardenafila'], levotiroxina:['levotiroxina'],
+  quelante:['carbonato de calcio','citrato de calcio','sulfato ferroso','ferro','hidroxido de aluminio','sucralfato'],
+  ibpClopi:['omeprazol','esomeprazol'], metronidazol:['metronidazol'], fluconazol:['fluconazol'],
+  serotoninaExtra:['trazodona','vortioxetina','linezolida','sumatriptana','rizatriptana','naratriptana','zolmitriptana'],
+  insulina:['insulina'], laxante:['lactulose','macrogol','polietilenoglicol','bisacodil','senosideos','sene','docusato','picossulfato','oleo mineral'],
+  inalatorio:['salbutamol','fenoterol','formoterol','salmeterol','budesonida','beclometasona','fluticasona','tiotropio','ipratropio',
+              'umeclidinio','vilanterol','glicopirronio','indacaterol','mometasona','ciclesonida'],
+  antiosteo:['alendronato','risedronato','ibandronato','zoledronico','denosumabe','raloxifeno','teriparatida'],
+  calcioVitD:['carbonato de calcio','citrato de calcio','colecalciferol','vitamina d','calcitriol'],
+  metformina:['metformina']
+};
+CL.anticoag=[...CL.varfarina,...CL.doac,...CL.heparina];
+CL.antiplaq=[...CL.aas,...CL.p2y12,'cilostazol','dipiridamol'];
+CL.antidep=[...CL.isrs,...CL.irsn,...CL.triciclico];
+CL.serot=[...CL.isrs,...CL.irsn,...CL.triciclico,...CL.serotoninaExtra];
+CL.sedativo=[...CL.benzo,...CL.zdrug];
+CL.raas=[...CL.ieca,...CL.bra,...CL.arni];
+CL.diuretico=[...CL.tiazidico,...CL.alca];
+// Escala ACB (lista parcial): 3 = anticolinérgico forte; 1–2 = efeito leve a moderado
+const ACB={3:['amitriptilina','nortriptilina','imipramina','clomipramina','doxepina','paroxetina','clorpromazina','tioridazina',
+    'olanzapina','quetiapina','clozapina','prometazina','hidroxizina','difenidramina','dexclorfeniramina','clorfeniramina',
+    'bronfeniramina','carbinoxamina','ciproeptadina','clemastina','dimenidrinato','meclizina','oxibutinina','tolterodina',
+    'solifenacina','darifenacina','trospio','escopolamina','biperideno','triexifenidil','orfenadrina','atropina','flavoxato','propantelina'],
+  2:['carbamazepina','oxcarbazepina','ciclobenzaprina','amantadina','petidina','pimozida'],
+  1:['alprazolam','diazepam','clordiazepoxido','atenolol','metoprolol','captopril','clortalidona','furosemida','digoxina','varfarina',
+    'prednisona','isossorbida','nifedipino','codeina','morfina','fentanil','loperamida','ranitidina','cimetidina','colchicina',
+    'dipiridamol','haloperidol','risperidona','trazodona','venlafaxina','bupropiona','fluvoxamina','mirtazapina','teofilina','hidralazina']};
+const reIni=p=>new RegExp('(^|[^a-z])'+p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+const casaMed=(nome,lista)=>{ const n=semAc(nome); return lista.some(p=>reIni(p).test(n)); };
+// condições pela lista de problemas ativos (CID-10 ou descrição)
+const COND={
+  dm:{cid:/^E1[0-4]/,txt:/diabet/}, has:{cid:/^I1[0-5]/,txt:/hipertens|\bhas\b/}, drc:{cid:/^N18/,txt:/renal cronica|drc\b/},
+  dac:{cid:/^I2[0-5]/,txt:/infarto|angina|coronar/}, avc:{cid:/^(I6[3-4]|I69|G45)/,txt:/\bavc\b|acidente vascular|ait\b/},
+  dap:{cid:/^(I70|I73)/,txt:/arterial periferica|claudicacao/}, fa:{cid:/^I48/,txt:/fibrilacao atrial|flutter/},
+  ic:{cid:/^I50/,txt:/insuficiencia cardiaca/}, osteo:{cid:/^M8[01]/,txt:/osteoporose/},
+  demencia:{cid:/^(F0[0-3]|G30|G31)/,txt:/demencia|alzheimer/}, asma:{cid:/^J45/,txt:/\basma\b/}, dpoc:{cid:/^J44/,txt:/dpoc|enfisema|bronquite cronica/},
+  gota:{cid:/^M10/,txt:/\bgota\b/}, ulcera:{cid:/^K2[5-8]/,txt:/ulcera (peptica|gastrica|duodenal)/},
+  quedas:{cid:/^(R29\.?6|W0\d|W1\d)/,txt:/queda/}, prostata:{cid:/^(N40|R33)/,txt:/hiperplasia prostatica|retencao urinaria/},
+  glaucoma:{cid:/^H40\.?2/,txt:/glaucoma de angulo fechado/}, parkinson:{cid:/^G20/,txt:/parkinson/}
+};
+function condicoesAtivas(probs){
+  const out={}; for(const [k,c] of Object.entries(COND))
+    out[k]=(probs||[]).some(p=>p.situacao!=='resolvido'&&(c.cid.test(String(p.cid10||'').toUpperCase().replace(/\s/g,''))||c.txt.test(semAc(p.descricao))));
+  return out;
+}
+// meds: [{medicamento, uso_continuo, origem:'hoje'|'anterior'}]; ctx: {anos, clcr, probs}
+function revisarPrescricao(meds,ctx){
+  const out=[], ja=new Set();
+  const add=(nivel,tipo,titulo,texto,envolvidos)=>{ const k=tipo+'|'+titulo; if(ja.has(k)) return; ja.add(k); out.push({nivel,tipo,titulo,texto,envolvidos:envolvidos||[]}); };
+  const dos=cl=>meds.filter(m=>casaMed(m.medicamento,CL[cl]));
+  const tem=cl=>dos(cl).length>0;
+  const nomes=l=>l.map(m=>m.medicamento.split(/\s+\d/)[0]);
+  const anos=ctx.anos, clcr=ctx.clcr, c=condicoesAtivas(ctx.probs), idoso=anos!=null&&anos>=65;
+
+  // ----- interações -----
+  const par=(a,b,nivel,titulo,texto)=>{ const A=dos(a), B=dos(b).filter(m=>!A.includes(m)); if(A.length&&B.length) add(nivel,'interacao',titulo,texto,nomes([...A,...B])); };
+  if(tem('raas')&&tem('diuretico')&&tem('aine'))
+    add('alto','interacao','IECA/BRA + diurético + AINE ("triple whammy")','Risco de lesão renal aguda, maior no idoso e na desidratação. Evite o AINE ou monitore creatinina e potássio.',nomes([...dos('raas'),...dos('diuretico'),...dos('aine')]));
+  if(tem('raas')&&(tem('aldo')||tem('poupk')||tem('potassio')||tem('smxtmp')))
+    add('alto','interacao','Hipercalemia: IECA/BRA + poupador de potássio, potássio ou trimetoprima','Monitore potássio e creatinina, principalmente com ClCr reduzida.',nomes([...dos('raas'),...dos('aldo'),...dos('poupk'),...dos('potassio'),...dos('smxtmp')]));
+  if(dos('ieca').length&&dos('bra').length)
+    add('alto','duplicidade','IECA + BRA juntos','Duplo bloqueio do SRAA: mais hipercalemia e lesão renal, sem benefício cardiovascular (ONTARGET).',nomes([...dos('ieca'),...dos('bra')]));
+  par('anticoag','aine','alto','Anticoagulante + AINE','Risco alto de sangramento, inclusive digestivo. Prefira paracetamol; se inevitável, use o menor tempo e associe IBP.');
+  par('anticoag','antiplaq','atencao','Anticoagulante + antiplaquetário','Sangramento aumentado. Confirme se a associação tem indicação e prazo definidos (ex.: pós-stent) e considere IBP.');
+  par('varfarina','metronidazol','alto','Varfarina + metronidazol','Potencializa a varfarina (INR sobe). Controle o INR em 3–5 dias ou troque o antimicrobiano.');
+  par('varfarina','smxtmp','alto','Varfarina + sulfametoxazol-trimetoprima','Potencializa a varfarina (INR sobe). Controle o INR ou troque o antimicrobiano.');
+  par('varfarina','fluconazol','alto','Varfarina + fluconazol','Potencializa a varfarina. Controle o INR.');
+  par('varfarina','amiodarona','alto','Varfarina + amiodarona','Potencializa a varfarina por semanas; costuma exigir redução de dose. Controle o INR.');
+  par('serot','aine','atencao','Antidepressivo serotoninérgico + AINE','Mais sangramento digestivo. Considere IBP, principalmente no idoso.');
+  par('serot','anticoag','atencao','Antidepressivo serotoninérgico + anticoagulante','Mais sangramento. Fique atento a sinais de sangramento.');
+  { const tr=dos('opioide').filter(m=>/tramadol|metadona|fentanil|petidina/.test(semAc(m.medicamento))), se=dos('serot').filter(m=>!tr.includes(m));
+    if(tr.length&&se.length) add('alto','interacao','Opioide serotoninérgico + antidepressivo','Risco de síndrome serotoninérgica (e convulsão, com tramadol).',nomes([...tr,...se])); }
+  par('opioide','sedativo','alto','Opioide + benzodiazepínico/hipnótico','Depressão respiratória e sedação (alerta da FDA). Evite associar; se inevitável, use doses mínimas.');
+  par('sinvaLova','inibCYP3A','alto','Sinvastatina/lovastatina + inibidor forte do CYP3A4','Risco de rabdomiólise. Suspenda a estatina durante o curso do antimicrobiano/antifúngico.');
+  par('sinvaLova','ndhp','atencao','Sinvastatina + diltiazem/verapamil','Mais miopatia. Limite a sinvastatina a 10 mg ou troque por outra estatina.');
+  par('sinvaLova','amiodarona','atencao','Sinvastatina + amiodarona','Mais miopatia. Limite a sinvastatina a 20 mg ou troque por outra estatina.');
+  par('p2y12','ibpClopi','atencao','Clopidogrel + omeprazol/esomeprazol','Reduz a ativação do clopidogrel. Se precisar de IBP, prefira pantoprazol.');
+  par('digoxina','amiodarona','alto','Digoxina + amiodarona','Eleva a digoxina (toxicidade). Reduza a digoxina e acompanhe nível sérico.');
+  par('digoxina','ndhp','atencao','Digoxina + verapamil/diltiazem','Eleva a digoxina e soma bradicardia.');
+  par('litio','raas','alto','Lítio + IECA/BRA','Eleva o lítio. Dose sérica de lítio após ajustes.');
+  par('litio','diuretico','alto','Lítio + diurético','Eleva o lítio (principalmente tiazídico). Dose sérica de lítio.');
+  par('litio','aine','alto','Lítio + AINE','Eleva o lítio. Evite ou dose o nível sérico.');
+  par('alopurinol','azatioprina','alto','Alopurinol + azatioprina','Mielotoxicidade grave. Reduza a azatioprina a 1/4 da dose ou evite.');
+  par('metotrexato','smxtmp','alto','Metotrexato + sulfametoxazol-trimetoprima','Mielotoxicidade. Evite a associação.');
+  par('nitrato','ipde5','alto','Nitrato + inibidor da PDE5 (sildenafila/tadalafila)','Hipotensão grave. Contraindicado.');
+  par('betabloq','ndhp','atencao','Betabloqueador + verapamil/diltiazem','Bradicardia e bloqueio AV. Evite ou monitore FC e ECG.');
+  par('levotiroxina','quelante','info','Levotiroxina + cálcio/ferro/antiácido','Reduz a absorção. Oriente intervalo de 4 horas entre eles.');
+  { const q=dos('qt'); if(q.length>=2) add('atencao','interacao','Dois ou mais medicamentos que prolongam o QT','Risco de torsades de pointes, maior com hipocalemia, bradicardia ou cardiopatia. Considere ECG.',nomes(q)); }
+
+  // ----- duplicidades -----
+  const dup=(cl,titulo,texto,nivel)=>{ const l=dos(cl); if(l.length>=2) add(nivel||'atencao','duplicidade',titulo,texto,nomes(l)); };
+  dup('sedativo','Dois benzodiazepínicos/hipnóticos','Soma sedação, quedas e dependência. Mantenha um só, se algum.','alto');
+  dup('antipsic','Dois antipsicóticos','Soma efeitos extrapiramidais, metabólicos e de QT. Confirme a indicação.');
+  dup('antidep','Dois antidepressivos (ISRS/IRSN/tricíclico)','Risco de síndrome serotoninérgica. Confirme se é troca em andamento.');
+  dup('aine','Dois AINEs','Sem ganho analgésico; soma toxicidade digestiva e renal.','alto');
+  dup('ibp','Dois IBPs','Duplicidade. Mantenha um.');
+  dup('estatina','Duas estatinas','Duplicidade. Mantenha uma.','alto');
+  dup('sulfonil','Duas sulfonilureias','Duplicidade; risco de hipoglicemia.','alto');
+  dup('opioide','Dois opioides','Soma depressão respiratória e constipação. Confirme o esquema (ex.: resgate).');
+  dup('betabloq','Dois betabloqueadores','Duplicidade.','alto');
+  dup('anticoag','Dois anticoagulantes','Duplicidade; risco alto de sangramento (exceto ponte heparina→varfarina).','alto');
+
+  // ----- carga anticolinérgica (ACB) -----
+  let acb=0; const acbMeds=[];
+  meds.forEach(m=>{ for(const s of [3,2,1]) if(casaMed(m.medicamento,ACB[s])){ acb+=s; acbMeds.push(m.medicamento.split(/\s+\d/)[0]+' ('+s+')'); break; } });
+  if(acb>=3) add(idoso?'alto':'atencao','acb','Carga anticolinérgica alta: escore ACB '+acb,
+    'Escore ≥ 3 associa-se a declínio cognitivo, delirium, quedas e maior mortalidade no idoso. Procure substituir os de pontuação 3.',acbMeds);
+
+  // ----- STOPP (situações a rever) -----
+  const ai=dos('aine');
+  if(ai.length&&(c.drc||(clcr!=null&&clcr<50))) add('alto','stopp','AINE com função renal reduzida','STOPP: evite AINE com ClCr < 50 mL/min ou DRC.'+(clcr!=null?' ClCr estimada: '+clcr+' mL/min.':''),nomes(ai));
+  if(ai.length&&c.ic) add('alto','stopp','AINE na insuficiência cardíaca','STOPP: retenção de sódio e descompensação da IC.',nomes(ai));
+  if(ai.length&&c.ulcera&&!tem('ibp')) add('alto','stopp','AINE com história de úlcera, sem IBP','STOPP: risco de sangramento digestivo.',nomes(ai));
+  const aas=dos('aas');
+  if(aas.length&&anos!=null&&anos>=70&&!c.dac&&!c.avc&&!c.dap)
+    add('atencao','stopp','AAS sem doença cardiovascular registrada, aos '+anos+' anos','Em prevenção primária após os 70 anos, o sangramento supera o benefício (ASPREE; USPSTF 2022). Confirme a indicação.',nomes(aas));
+  const gli=dos('sulfonil').filter(m=>/glibenclamida|clorpropamida/.test(semAc(m.medicamento)));
+  if(gli.length&&idoso) add('alto','stopp','Sulfonilureia de ação longa no idoso','STOPP/Beers: hipoglicemia prolongada. Prefira gliclazida ou outra classe.',nomes(gli));
+  if(acb>=2&&c.demencia) add('alto','stopp','Anticolinérgico em paciente com demência','STOPP: piora cognitiva e delirium.',acbMeds);
+  if(acb>=2&&c.prostata) add('atencao','stopp','Anticolinérgico com hiperplasia prostática/retenção urinária','STOPP: risco de retenção urinária.',acbMeds);
+  if(acb>=2&&c.glaucoma) add('alto','stopp','Anticolinérgico com glaucoma de ângulo fechado','STOPP: risco de crise de glaucoma.',acbMeds);
+  if(tem('antipsic')&&c.demencia) add('alto','stopp','Antipsicótico em paciente com demência','Beers/STOPP: aumenta AVC e mortalidade. Só para sintomas graves, na menor dose e por tempo limitado.',nomes(dos('antipsic')));
+  if(tem('sedativo')&&c.quedas) add('alto','stopp','Benzodiazepínico/hipnótico em paciente com quedas','STOPP: aumenta quedas e fraturas.',nomes(dos('sedativo')));
+  const bbn=dos('bbNaoSel'); if(bbn.length&&c.asma) add('alto','stopp','Betabloqueador não seletivo na asma','STOPP: risco de broncoespasmo.',nomes(bbn));
+  const tz=dos('tiazidico'); if(tz.length&&c.gota) add('atencao','stopp','Tiazídico em paciente com gota','STOPP: eleva o ácido úrico.',nomes(tz));
+  dos('ibp').filter(m=>m.uso_continuo).forEach(m=>add('info','stopp','IBP de uso contínuo','Revise a indicação: sem esôfago de Barrett, esofagite grave ou uso de AINE/antiplaquetário, considere reduzir ou suspender após 8 semanas.',nomes([m])));
+
+  // ----- START (omissões a considerar) — só faz sentido com o regime completo -----
+  if(ctx.regimeCompleto){
+    const ascvd=c.dac||c.avc||c.dap;
+    if(ascvd&&!tem('estatina')) add('atencao','start','Doença cardiovascular aterosclerótica sem estatina','START: estatina, salvo contraindicação ou fim de vida.');
+    if(ascvd&&!tem('antiplaq')&&!tem('anticoag')) add('atencao','start','Doença cardiovascular aterosclerótica sem antiplaquetário','START: AAS ou clopidogrel, salvo contraindicação.');
+    if(c.fa&&!tem('anticoag')) add('atencao','start','Fibrilação atrial sem anticoagulante','START: anticoagulação conforme CHA₂DS₂-VASc (≥ 2 em homens, ≥ 3 em mulheres), pesando o risco de sangramento.');
+    if(c.ic&&!tem('raas')) add('atencao','start','Insuficiência cardíaca sem IECA/BRA/sacubitril-valsartana','START: se fração de ejeção reduzida e sem contraindicação.');
+    if(c.ic&&!tem('betabloq')) add('info','start','Insuficiência cardíaca sem betabloqueador','START: carvedilol, bisoprolol ou metoprolol na fração de ejeção reduzida.');
+    if(c.dm&&(c.has||c.drc)&&!tem('raas')) add('atencao','start','Diabetes com hipertensão ou DRC sem IECA/BRA','START: nefroproteção, principalmente com albuminúria.');
+    if(c.dm&&anos!=null&&anos>=40&&anos<=75&&!tem('estatina')) add('atencao','start','Diabetes entre 40 e 75 anos sem estatina','Estatina de intensidade moderada, no mínimo, salvo contraindicação.');
+    if(c.osteo&&!tem('antiosteo')) add('atencao','start','Osteoporose sem tratamento específico','START: bisfosfonato (ou alternativa), com cálcio e vitamina D.');
+    if(c.osteo&&!tem('calcioVitD')) add('info','start','Osteoporose sem cálcio/vitamina D','Confira a ingestão de cálcio e o nível de vitamina D.');
+    if((c.asma||c.dpoc)&&!tem('inalatorio')) add('info','start','Asma/DPOC sem medicação inalatória registrada','Confira se usa broncodilatador ou corticoide inalatório.');
+  }
+  if(tem('opioide')&&!tem('laxante')&&dos('opioide').some(m=>m.uso_continuo)) add('info','start','Opioide de uso contínuo sem laxante','START: prescreva laxante junto do opioide regular.');
+  const ord={alto:0,atencao:1,info:2}; out.sort((a,b)=>ord[a.nivel]-ord[b.nivel]);
+  return {itens:out,acb,cond:c};
+}
+const NIVEL_REV={alto:{cls:'alergia',rot:'Alto'},atencao:{cls:'idoso',rot:'Atenção'},info:{cls:'outro',rot:'Rever'}};
+const TIPO_REV={interacao:'Interação',duplicidade:'Duplicidade',acb:'Anticolinérgico',stopp:'STOPP',start:'START'};
+function htmlRevisao(r){
+  if(!r.itens.length) return '<div class="muted">Nenhuma interação, duplicidade ou critério STOPP/START encontrado nas listas do sistema.</div>';
+  return r.itens.map(x=>'<div class="avso '+NIVEL_REV[x.nivel].cls+'"><b>'+esc(NIVEL_REV[x.nivel].rot)+' · '+esc(TIPO_REV[x.tipo])+':</b> '+esc(x.titulo)+
+    (x.envolvidos.length?' <span class="muted">('+esc([...new Set(x.envolvidos)].join(', '))+')</span>':'')+'<div class="muted" style="margin-top:2px">'+esc(x.texto)+'</div></div>').join('');
+}
+// medicamentos de uso contínuo das últimas consultas (exceto a que está sendo editada)
+async function continuosAnteriores(excluirId){
+  const {data:ats}=await sb.from('pep_atendimentos').select('id,data_atendimento').eq('paciente_id',pacienteSel.id)
+    .order('data_atendimento',{ascending:false}).limit(6);
+  const vistos=new Set(), out=[];
+  for(const a of (ats||[]).filter(x=>x.id!==excluirId).slice(0,5)){
+    const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',a.id);
+    if(!recs||!recs.length) continue;
+    const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(r=>r.id)).order('ordem',{ascending:true});
+    (mi||[]).filter(m=>m.uso_continuo&&!vistos.has(semAc(m.medicamento))).forEach(m=>{ vistos.add(semAc(m.medicamento)); out.push(Object.assign({},m,{origem:'anterior',data:a.data_atendimento})); });
+  }
+  return out;
+}
+let regimeAnterior={pac:null,meds:[]};
+async function carregarRegimeAnterior(){
+  if(!pacienteSel) return;
+  const id=pacienteSel.id, ex=atendAtual&&atendAtual.id;
+  try{ const meds=await continuosAnteriores(ex); if(pacienteSel&&pacienteSel.id===id) regimeAnterior={pac:id,meds}; }catch(e){ regimeAnterior={pac:id,meds:[]}; }
+  renderRevisao();
+}
+function anosPaciente(){ const p=pacienteSel||{}; return p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null; }
+function renderRevisao(){
+  const box=$('rx-revisao'); if(!box) return;
+  const hoje=prescItens.map(m=>Object.assign({},m,{origem:'hoje'}));
+  const ant=(regimeAnterior.pac===(pacienteSel&&pacienteSel.id)?regimeAnterior.meds:[]).filter(m=>!hoje.some(h=>semAc(h.medicamento).split(/\s+\d/)[0]===semAc(m.medicamento).split(/\s+\d/)[0]));
+  const regime=[...hoje,...ant];
+  if(!regime.length){ box.innerHTML=''; return; }
+  const c=calcClCr();
+  const r=revisarPrescricao(regime,{anos:anosPaciente(),clcr:c?c.valor:null,probs:problemas,regimeCompleto:true});
+  box.innerHTML='<div class="rev-h">Revisão da prescrição <span class="muted">— '+regime.length+' medicamento(s)'+
+    (ant.length?', dos quais '+ant.length+' de uso contínuo de consultas anteriores ('+esc(ant.map(m=>m.medicamento.split(/\s+\d/)[0]).join(', '))+')':'')+
+    (r.acb?' · escore anticolinérgico (ACB) '+r.acb:'')+'</span></div>'+htmlRevisao(r)+
+    '<div class="muted" style="font-size:11.5px;margin-top:4px">Listas parciais (STOPP/START v3, ACB, Beers 2023): lembrete clínico, não substitui o julgamento nem a bula.</div>';
+}
+
+// ---------- textos puxados do prontuário (encaminhamento, relatório) ----------
+async function textoTratamentoAtual(){
+  const hoje=prescItens.slice(), ant=regimeAnterior.pac===(pacienteSel&&pacienteSel.id)?regimeAnterior.meds:await continuosAnteriores(atendAtual&&atendAtual.id);
+  const l=[...hoje,...ant.filter(m=>!hoje.some(h=>semAc(h.medicamento)===semAc(m.medicamento)))];
+  return l.map(m=>m.medicamento+([m.dose,m.frequencia].filter(Boolean).length?' — '+[m.dose,m.frequencia].filter(Boolean).join(', '):'')+(m.uso_continuo?' (uso contínuo)':'')).join('\n');
+}
+async function ultimosResultados(){
+  if(!resultados.length) await carregarResultados();
+  const ult=new Map(), ant=new Map();
+  [...resultados].sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta))).forEach(x=>{
+    const k=x.analito||semAc(x.exame); if(!ult.has(k)) ult.set(k,x); else if(!ant.has(k)) ant.set(k,x); });
+  const val=x=>x.valor!=null?numBR(x.valor)+(x.unidade?' '+x.unidade:''):(x.valor_texto||'');
+  return [...ult.entries()].map(([k,x])=>({k,x,txt:x.exame+': '+val(x)+' ('+dataBRsimples(x.data_coleta)+')'+(ant.has(k)?' — anterior '+val(ant.get(k))+' ('+dataBRsimples(ant.get(k).data_coleta)+')':'')}));
+}
+
+// ---------- encaminhamentos ----------
+const PRIOR_ENC={eletiva:'Eletiva',prioritaria:'Prioritária',urgente:'Urgente'};
+const STATUS_ENC={aguardando:'Aguardando',agendado:'Agendado',realizado:'Realizado',cancelado:'Cancelado'};
+function adicionarEncaminhamento(silencioso){
+  const g=id=>$(id).value.trim();
+  const e={especialidade:g('en-esp'),prioridade:$('en-pri').value,cid10:g('en-cid').toUpperCase()||null,motivo:g('en-mot')||null,
+    historia:g('en-hist')||null,exames:g('en-exam')||null,tratamento:g('en-trat')||null,pergunta:g('en-perg')||null};
+  if(!e.especialidade||!e.motivo){ if(!silencioso) toast('Informe a especialidade e o motivo',true); return false; }
+  encItens.push(e);
+  ['en-esp','en-cid','en-mot','en-hist','en-exam','en-trat','en-perg'].forEach(i=>$(i).value=''); $('en-pri').value='eletiva';
+  renderEncTable(); return true;
+}
+function renderEncTable(){
+  const tb=$('en-tbody'); if(!tb) return;
+  tb.innerHTML=encItens.map((e,i)=>'<tr><td><b>'+esc(e.especialidade)+'</b> <span class="chip'+(e.prioridade==='urgente'?' chip-red':'')+'">'+esc(PRIOR_ENC[e.prioridade])+'</span>'+
+    (e.id?' <span class="chip">'+esc(STATUS_ENC[e.status]||'salvo')+'</span>':'')+'<div class="muted" style="font-size:12px">'+esc(e.motivo||'')+'</div></td>'+
+    '<td style="text-align:right"><button class="rm" data-i="'+i+'">✕</button></td></tr>').join('');
+  $('en-vazio').style.display=encItens.length?'none':'block';
+  tb.querySelectorAll('.rm').forEach(b=>b.onclick=()=>{ const e=encItens[+b.dataset.i];
+    if(e.id&&!confirm('Remover o encaminhamento para '+e.especialidade+'? O acompanhamento e a contrarreferência dele também somem ao salvar.')) return;
+    if(e.id) encRemovidos.push(e.id); encItens.splice(+b.dataset.i,1); renderEncTable(); });
+}
+async function puxarEncaminhamento(){
+  const btn=$('en-puxar'); btn.disabled=true; let n=0;
+  const por=(id,v)=>{ const e=$(id); if(e&&!e.value.trim()&&v&&v.trim()){ e.value=v.trim(); n++; } };
+  try{
+    por('en-hist',[$('f-s').value,$('f-o').value,$('f-a').value].map(x=>x.trim()).filter(Boolean).join('\n'));
+    por('en-trat',await textoTratamentoAtual());
+    por('en-exam',(await ultimosResultados()).slice(0,12).map(x=>x.txt).join('\n'));
+    const sel=problemas.filter(x=>probSel.has(x.id)&&x.cid10); if(sel.length) por('en-cid',sel[0].cid10);
+    toast(n?'Preenchi '+n+' campo(s) — revise antes de salvar':'Nada novo para puxar');
+  }catch(err){ toast('Não consegui puxar os dados: '+(err.message||err),true); }
+  finally{ btn.disabled=false; }
+}
+function docEncaminhamento(e,quando,unidadeId){
+  const t=v=>v&&String(v).trim()?String(v).trim():'';
+  const secoes=[{t:'',txt:'Ao serviço de '+e.especialidade+'.\nPrioridade: '+(PRIOR_ENC[e.prioridade]||e.prioridade)+'.'}];
+  if(t(e.motivo)) secoes.push({t:'Motivo do encaminhamento',txt:t(e.motivo)});
+  if(t(e.cid10)) secoes.push({t:'Hipótese diagnóstica',txt:'CID-10 '+t(e.cid10)});
+  if(t(e.historia)) secoes.push({t:'História clínica',txt:t(e.historia)});
+  if(t(e.exames)) secoes.push({t:'Exames realizados',txt:t(e.exames)});
+  if(t(e.tratamento)) secoes.push({t:'Tratamento em curso',txt:t(e.tratamento)});
+  if(t(e.pergunta)) secoes.push({t:'O que se espera do especialista',txt:t(e.pergunta)});
+  return montarDoc('Encaminhamento — '+e.especialidade, [], [], quando, unidadeId, {secoes, semNumero:true,
+    fecho:'Solicito a gentileza da contrarreferência para a continuidade do cuidado nesta unidade.',
+    finais:[{t:'Contrarreferência — preenchimento pelo especialista',l:['Diagnóstico','Conduta','','Seguimento / retorno à UBS','Data, assinatura e carimbo']}]});
+}
+async function renderEncFicha(card){
+  const {data,error}=await sb.from('pep_encaminhamentos').select('*').eq('paciente_id',pacienteSel.id).order('criado_em',{ascending:false});
+  const lista=error?[]:(data||[]);
+  card.innerHTML='<div class="ch"><span>Encaminhamentos</span></div><div class="cb" id="enc-f-lista"></div>';
+  const box=card.querySelector('#enc-f-lista');
+  if(error){ box.innerHTML='<div class="muted">Não consegui carregar: '+esc(error.message)+'</div>'; return; }
+  if(!lista.length){ box.innerHTML='<div class="muted">Nenhum encaminhamento. Use a aba “Encaminhamento” na consulta.</div>'; return; }
+  box.innerHTML='<table><tbody>'+lista.map(e=>'<tr><td><b>'+esc(e.especialidade)+'</b> <span class="chip'+(e.prioridade==='urgente'?' chip-red':'')+'">'+esc(PRIOR_ENC[e.prioridade])+'</span>'+
+    '<div class="muted" style="font-size:12px">'+esc(dataBRsimples(e.criado_em))+(e.motivo?' · '+esc(e.motivo):'')+
+    (e.data_agendada?' · agendado para '+esc(dataBRsimples(e.data_agendada)):'')+'</div>'+
+    (e.contrarreferencia?'<div style="font-size:12.5px;margin-top:3px"><b>Contrarreferência'+(e.data_contrarref?' ('+esc(dataBRsimples(e.data_contrarref))+')':'')+':</b> '+esc(e.contrarreferencia)+'</div>':'')+'</td>'+
+    '<td style="text-align:right;vertical-align:top"><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center"><select class="f enc-st" style="width:auto;min-width:0" data-st="'+e.id+'">'+Object.entries(STATUS_ENC).map(([k,v])=>'<option value="'+k+'"'+(k===e.status?' selected':'')+'>'+v+'</option>').join('')+'</select> '+
+    '<button class="btn ghost sm" data-cr="'+e.id+'">Contrarreferência</button> <button class="btn ghost sm" data-pe="'+e.id+'">PDF</button></div></td></tr>').join('')+'</tbody></table>';
+  const salvar=async(id,campos)=>{ const {data:x,error:er}=await sb.from('pep_encaminhamentos').update(campos).eq('id',id).select('id');
+    if(er||!x||!x.length){ toast('Não consegui salvar'+(er?': '+er.message:''),true); return false; } return true; };
+  box.querySelectorAll('[data-st]').forEach(s=>s.onchange=async()=>{
+    const campos={status:s.value};
+    if(s.value==='agendado'){ const d=prompt('Data agendada (dd/mm/aaaa), se souber:',''); const m=(d||'').match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m) campos.data_agendada=m[3]+'-'+m[2]+'-'+m[1]; }
+    if(await salvar(s.dataset.st,campos)){ toast('Situação atualizada'); renderEncFicha(card); } });
+  box.querySelectorAll('[data-cr]').forEach(b=>b.onclick=async()=>{ const e=lista.find(x=>x.id===b.dataset.cr);
+    const txt=prompt('Contrarreferência de '+e.especialidade+' (diagnóstico, conduta, seguimento):',e.contrarreferencia||''); if(txt===null) return;
+    if(await salvar(e.id,{contrarreferencia:txt.trim()||null,data_contrarref:txt.trim()?new Date().toISOString().slice(0,10):null,status:txt.trim()?'realizado':e.status})){ toast('Contrarreferência registrada'); renderEncFicha(card); } });
+  box.querySelectorAll('[data-pe]').forEach(b=>b.onclick=async()=>{ const e=lista.find(x=>x.id===b.dataset.pe);
+    const {data:a}=await sb.from('pep_atendimentos').select('data_atendimento,unidade_id').eq('id',e.atendimento_id).maybeSingle();
+    baixarPDF(docEncaminhamento(e,a&&a.data_atendimento,a&&a.unidade_id)); });
+}
+
+// ---------- agenda de retornos ----------
+async function dadosAgenda(){
+  const [pacs,ats]=await Promise.all([todos('pep_pacientes','*'),todos('pep_atendimentos','paciente_id,data_atendimento,retorno_previsto,retorno_motivo')]);
+  const ult=new Map();
+  ats.forEach(a=>{ const u=ult.get(a.paciente_id); if(!u||a.data_atendimento>u.data_atendimento) ult.set(a.paciente_id,a); });
+  const pm=new Map(pacs.map(p=>[p.id,p]));
+  // o retorno pendente é o marcado na consulta mais recente; uma consulta depois dele já o cumpre
+  return [...ult.values()].filter(a=>a.retorno_previsto&&pm.has(a.paciente_id)).map(a=>({p:pm.get(a.paciente_id),data:a.retorno_previsto,motivo:a.retorno_motivo,ult:a.data_atendimento}))
+    .sort((x,y)=>x.data.localeCompare(y.data));
+}
+async function renderAgenda(c){
+  c.innerHTML='<div class="phead"><div><div class="nm">Retornos</div><div class="mt">Retornos marcados ao finalizar a consulta e ainda não cumpridos</div></div><div class="sp"></div>'+
+    '<button class="btn ghost" id="ag-csv">Exportar (CSV)</button><button class="btn ghost" id="ag-imp">Imprimir</button></div><div id="ag-corpo"><div class="muted">Carregando…</div></div>';
+  if(!retornoOK){ $('ag-corpo').innerHTML='<div class="empty">Para usar a agenda de retornos, rode o plano_cuidado_schema.sql no Supabase.</div>'; return; }
+  let l; try{ l=await dadosAgenda(); }catch(err){ $('ag-corpo').innerHTML='<div class="empty">Não consegui carregar: '+esc(err.message||err)+'</div>'; return; }
+  if(tela!=='agenda'||pacienteSel) return;
+  const hoje=new Date().toISOString().slice(0,10), mais=n=>{ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  const grupos=[['Atrasados',x=>x.data<hoje,'atraso'],['Hoje',x=>x.data===hoje,''],['Próximos 7 dias',x=>x.data>hoje&&x.data<=mais(7),''],
+    ['Próximos 30 dias',x=>x.data>mais(7)&&x.data<=mais(30),''],['Depois',x=>x.data>mais(30),'']];
+  const linha=x=>'<tr><td><button class="ba-nome" data-id="'+x.p.id+'">'+esc(x.p.nome)+'</button><div class="muted" style="font-size:12px">'+
+    [idade(x.p.data_nascimento),x.p.telefone||''].filter(Boolean).map(esc).join(' · ')+'</div></td><td>'+esc(dataBRsimples(x.data))+
+    (x.data<hoje?' <span class="chip chip-red">'+esc(haQuanto(diasDesde(x.data)).replace('há ',''))+' de atraso</span>':'')+'</td><td>'+esc(x.motivo||'—')+'</td><td>'+esc(dataBRsimples(x.ult))+'</td></tr>';
+  $('ag-corpo').innerHTML=l.length?grupos.map(([t,f,cl])=>{ const g=l.filter(f); return g.length?'<div class="ag-sec '+cl+'">'+t+' · '+g.length+'</div><div class="card"><table><thead><tr><th>Paciente</th><th>Retorno previsto</th><th>Motivo</th><th>Última consulta</th></tr></thead><tbody>'+g.map(linha).join('')+'</tbody></table></div>':''; }).join('')
+    :'<div class="empty">Nenhum retorno pendente.</div>';
+  $('ag-corpo').querySelectorAll('.ba-nome').forEach(b=>b.onclick=async()=>{ const x=l.find(y=>y.p.id===b.dataset.id);
+    tela=null; pacienteSel=x.p; atendAtual=null; renderSideList(); renderMain(); await carregarProblemasAlergias(); await carregarResultados(); renderMain(); });
+  const tab=()=>l.map(x=>[x.p.nome,idade(x.p.data_nascimento),x.p.telefone||'',dataBRsimples(x.data),x.data<hoje?'atrasado':'',x.motivo||'',dataBRsimples(x.ult)]);
+  $('ag-csv').onclick=()=>baixarTexto(paraCSV([['Paciente','Idade','Telefone','Retorno previsto','Situação','Motivo','Última consulta'],...tab()]),'retornos-'+hoje+'.csv','text/csv');
+  $('ag-imp').onclick=()=>{ const t=tab();
+    $('print-area').innerHTML='<div style="font:10pt Inter,Arial,sans-serif;color:#13293f"><h2 style="margin:0 0 4px">Retornos</h2><div style="color:#5e7490;margin-bottom:10px">'+
+      esc(dataExtenso(new Date().toISOString()))+' · '+t.length+' paciente(s)</div><table style="width:100%;border-collapse:collapse;font-size:9pt"><tr>'+
+      ['Paciente','Idade','Telefone','Retorno','Situação','Motivo','Última consulta','Contato'].map(h=>'<th style="text-align:left;border-bottom:1.5px solid #0a6fbd;padding:4px">'+h+'</th>').join('')+'</tr>'+
+      t.map(r=>'<tr>'+r.map(v=>'<td style="border-bottom:1px solid #d1dbe7;padding:4px;vertical-align:top">'+esc(v)+'</td>').join('')+'<td style="border-bottom:1px solid #d1dbe7;width:22mm"></td></tr>').join('')+'</table></div>';
+    window.print(); };
+}
+
+// ---------- folha de rosto ----------
+// TFG pela CKD-EPI 2021 (sem raça): mL/min/1,73 m²
+function ckdEpi2021(cr,anos,fem){ const k=fem?0.7:0.9, a=fem?-0.241:-0.302, x=cr/k;
+  return Math.round(142*Math.pow(Math.min(x,1),a)*Math.pow(Math.max(x,1),-1.2)*Math.pow(0.9938,anos)*(fem?1.012:1)); }
+async function dadosFolha(){
+  const p=pacienteSel;
+  const {data:ats}=await sb.from('pep_atendimentos').select('*').eq('paciente_id',p.id).order('data_atendimento',{ascending:false}).limit(30);
+  const meds=await continuosAnteriores(null);
+  const res=await ultimosResultados();
+  let encs=[]; if(encOK){ const {data}=await sb.from('pep_encaminhamentos').select('especialidade,status,criado_em,data_agendada').eq('paciente_id',p.id); encs=(data||[]).filter(e=>e.status==='aguardando'||e.status==='agendado'); }
+  const anos=anosPaciente(), fem=/^f/i.test(p.sexo||'');
+  const peso=(ats||[]).find(a=>a.peso_kg), alt=(ats||[]).find(a=>a.altura_cm);
+  const crRes=[...resultados].filter(r=>r.analito==='creatinina'&&r.valor!=null).sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta)))[0];
+  const cr=crRes?{v:Number(crRes.valor),d:crRes.data_coleta}:((ats||[]).find(a=>a.creatinina)?{v:Number((ats||[]).find(a=>a.creatinina).creatinina),d:(ats||[]).find(a=>a.creatinina).data_atendimento}:null);
+  const clcr=cr&&peso&&anos?Math.round(((140-anos)*peso.peso_kg)/(72*cr.v)*(fem?0.85:1)):null;
+  const rev=revisarPrescricao(meds,{anos,clcr,probs:problemas,regimeCompleto:true});
+  return {ats:ats||[],meds,res,encs,anos,fem,peso,alt,cr,clcr,rev};
+}
+async function revisaoNaFicha(){
+  const box=$('fr-rev'); if(!box) return;
+  const id=pacienteSel.id;
+  try{
+    const meds=await continuosAnteriores(null);
+    if(!pacienteSel||pacienteSel.id!==id||!$('fr-rev')) return;
+    const {data:ats}=await sb.from('pep_atendimentos').select('peso_kg,creatinina,data_atendimento').eq('paciente_id',id).order('data_atendimento',{ascending:false}).limit(20);
+    const anos=anosPaciente(), fem=/^f/i.test(pacienteSel.sexo||''), peso=(ats||[]).find(a=>a.peso_kg);
+    const crR=[...resultados].filter(r=>r.analito==='creatinina'&&r.valor!=null).sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta)))[0];
+    const crv=crR?Number(crR.valor):((ats||[]).find(a=>a.creatinina)||{}).creatinina;
+    const clcr=crv&&peso&&anos?Math.round(((140-anos)*peso.peso_kg)/(72*crv)*(fem?0.85:1)):null;
+    const r=revisarPrescricao(meds,{anos,clcr,probs:problemas,regimeCompleto:true});
+    box.innerHTML=(meds.length?'<div style="margin-bottom:10px">'+meds.map(m=>'<span class="chip" style="margin:0 4px 4px 0">'+esc(m.medicamento)+'</span>').join('')+'</div>'
+      :'<div class="muted" style="margin-bottom:8px">Nenhum medicamento de uso contínuo nas últimas 5 consultas.</div>')+
+      (meds.length||problemas.length?htmlRevisao(r):'')+
+      (clcr?'<div class="muted" style="font-size:12px;margin-top:4px">ClCr usada: '+clcr+' mL/min (Cockcroft-Gault, última creatinina e último peso).</div>':'');
+  }catch(err){ box.innerHTML='<div class="muted">Não consegui montar a revisão: '+esc(err.message||err)+'</div>'; }
+}
+async function docFolhaRosto(){
+  let f; try{ f=await dadosFolha(); }catch(err){ toast('Não consegui montar a folha de rosto: '+(err.message||err),true); return null; }
+  const secoes=[], br=dataBRsimples;
+  const ativos=problemas.filter(x=>x.situacao!=='resolvido');
+  secoes.push({t:'Problemas ativos',txt:ativos.length?ativos.map(x=>x.descricao+(x.cid10?' (CID-10 '+x.cid10+')':'')).join('\n'):'Nenhum registrado.'});
+  secoes.push({t:'Alergias',txt:alergias.length?alergias.map(a=>a.substancia+(a.reacao?' — '+a.reacao:'')+(a.gravidade?' ('+a.gravidade+')':'')).join('\n'):'Nenhuma registrada.'});
+  secoes.push({t:'Medicamentos de uso contínuo',txt:f.meds.length?f.meds.map(m=>m.medicamento+([m.dose,m.frequencia].filter(Boolean).length?' — '+[m.dose,m.frequencia].filter(Boolean).join(', '):'')+' (prescrito em '+br(m.data)+')').join('\n'):'Nenhum nas últimas 5 consultas.'});
+  const pas=f.ats.filter(a=>a.pa_sistolica).slice(0,5);
+  const sv=[];
+  if(pas.length) sv.push('PA: '+pas.map(a=>a.pa_sistolica+'/'+a.pa_diastolica+' ('+br(a.data_atendimento)+')').join('; '));
+  if(f.peso) sv.push('Peso: '+numBR(f.peso.peso_kg)+' kg ('+br(f.peso.data_atendimento)+')'+(f.alt?' · IMC '+numBR((f.peso.peso_kg/Math.pow(f.alt.altura_cm/100,2)).toFixed(1)):''));
+  if(f.cr&&f.anos) sv.push('Função renal: creatinina '+numBR(f.cr.v)+' mg/dL ('+br(f.cr.d)+') · TFG '+ckdEpi2021(f.cr.v,f.anos,f.fem)+' mL/min/1,73 m² (CKD-EPI 2021)'+(f.clcr?' · ClCr '+f.clcr+' mL/min (Cockcroft-Gault)':''));
+  if(sv.length) secoes.push({t:'Medidas recentes',txt:sv.join('\n')});
+  if(f.res.length) secoes.push({t:'Últimos exames',txt:f.res.slice(0,16).map(x=>x.txt).join('\n')});
+  if(f.rev.itens.length) secoes.push({t:'Revisão de medicação',txt:f.rev.itens.map(x=>'['+NIVEL_REV[x.nivel].rot+' · '+TIPO_REV[x.tipo]+'] '+x.titulo+(x.envolvidos.length?' ('+[...new Set(x.envolvidos)].join(', ')+')':'')+' — '+x.texto).join('\n')});
+  const pend=[];
+  const ult=f.ats[0];
+  if(ult&&ult.retorno_previsto) pend.push('Retorno previsto para '+br(ult.retorno_previsto)+(ult.retorno_motivo?' — '+ult.retorno_motivo:'')+(ult.retorno_previsto<new Date().toISOString().slice(0,10)?' (atrasado)':''));
+  f.encs.forEach(e=>pend.push('Encaminhamento para '+e.especialidade+': '+(STATUS_ENC[e.status]||e.status).toLowerCase()+' desde '+br(e.criado_em)+(e.data_agendada?' (agendado para '+br(e.data_agendada)+')':'')));
+  const cond=f.rev.cond, ex=k=>{ const r=resultados.filter(x=>x.analito===k).sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta)))[0]; return r?diasDesde(r.data_coleta):null; };
+  const venc=(rot,d,lim)=>{ if(d==null||d>lim) pend.push(rot+': '+(d==null?'sem registro':'último '+haQuanto(d))); };
+  if(cond.dm){ venc('HbA1c',ex('hba1c'),BA.hba1c); venc('Microalbuminúria',ex('microalb'),BA.microalb); }
+  if(cond.dm||cond.has) venc('Creatinina',ex('creatinina'),BA.creatinina);
+  if(cond.has) venc('Aferição de PA',pas.length?diasDesde(pas[0].data_atendimento):null,BA.pa);
+  if(pend.length) secoes.push({t:'Pendências',txt:pend.join('\n')});
+  return montarDoc('Folha de rosto — Resumo clínico em '+br(new Date().toISOString()), [], [], null, null, {secoes, semAssinatura:true});
+}
+
 // ---------- relatório médico ----------
 const REL_CAMPOS={'rl-tipo':'tipo','rl-dest':'destinatario','rl-fin':'finalidade','rl-dias':'afastamento_dias','rl-diag':'diagnosticos',
   'rl-hist':'historia','rl-exam':'exames','rl-trat':'tratamento','rl-lim':'limitacoes','rl-prog':'prognostico','rl-texto':'texto'};
@@ -3039,7 +3542,10 @@ async function finalizar(){
   btn.disabled=true; btn.textContent='Salvando…';
   const num=id=>{ const v=$(id).value.trim(); return v===''?null:Number(v); };
   const rel=lerRelatorio();
+  // encaminhamento preenchido e não adicionado: entra assim mesmo
+  if($('en-esp')&&$('en-esp').value.trim()&&$('en-mot').value.trim()) adicionarEncaminhamento(true);
   try{
+    if(encItens.some(e=>!e.id)&&!encOK) throw new Error('a tabela de encaminhamentos não existe — rode o plano_cuidado_schema.sql no Supabase');
     // sem a tabela, o atendimento seria salvo pela metade: confere antes
     if(rel){
       const {error:eR}=await sb.from('pep_relatorios').select('id').limit(1);
@@ -3050,6 +3556,7 @@ async function finalizar(){
       subjetivo:$('f-s').value||null, objetivo:$('f-o').value||null, avaliacao:$('f-a').value||null, plano:$('f-p').value||null,
       pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'),
       altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'), creatinina:num('f-creat'), status:'finalizado' };
+    if(retornoOK){ campos.retorno_previsto=$('rt-data').value||null; campos.retorno_motivo=$('rt-data').value?($('rt-motivo').value.trim()||null):null; }
     if(!edit&&unidadesOK&&unidadeAtiva()) campos.unidade_id=unidadeAtiva().id;
     let at;
     if(edit){
@@ -3095,6 +3602,12 @@ async function finalizar(){
       const {error:e8}=await sb.from('pep_relatorios').insert(Object.assign({atendimento_id:at.id},rel));
       if(e8) throw e8;
     }
+    if(edit&&encRemovidos.length) await sb.from('pep_encaminhamentos').delete().in('id',encRemovidos);
+    const encNovos=encItens.filter(e=>!e.id);
+    if(encNovos.length){
+      const {error:e9}=await sb.from('pep_encaminhamentos').insert(encNovos.map(e=>Object.assign({atendimento_id:at.id,paciente_id:pacienteSel.id},e)));
+      if(e9) throw e9;
+    }
     if(probSel.size){
       const sel=problemas.filter(x=>probSel.has(x.id));
       const {error:e7}=await sb.from('pep_atendimento_problemas').insert(sel.map(x=>({atendimento_id:at.id,
@@ -3102,7 +3615,7 @@ async function finalizar(){
       if(e7) throw e7;
     }
     toast(salvoMsg(mk,edit?'Alterações salvas ✓':'Atendimento salvo ✓'));
-    atendAtual={id:at.id}; renderMain();
+    atendAtual={id:at.id}; encItens=[]; encRemovidos=[]; renderMain();
   }catch(err){ toast('Erro ao salvar: '+(err.message||err),true); }
   finally{ btn.disabled=false; btn.textContent=edit?'Salvar alterações':'Finalizar e salvar atendimento'; }
 }
