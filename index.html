@@ -2182,7 +2182,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.5 · PDFs assinados';
+const VERSAO='2026-11-13.6 · receita controle especial';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2320,7 +2320,6 @@ async function renderAtendimentoSalvo(c){
   };
   acoes.insertBefore(bEd,acoes.firstChild);
   if(acoes.children.length) box.appendChild(acoes);
-  const docsAss=el('div','bk-box'); box.insertBefore(docsAss,acoes); renderAssinados(docsAss,a,{exames,meds,atest,rel});
 }
 
 // ---------- atendimento (SOAP) ----------
@@ -2801,7 +2800,7 @@ const baixarTexto=(txt,nome,tipo)=>baixarBlob(new Blob([txt],{type:(tipo||'text/
 // ordem de restauração: quem é referenciado vem antes
 const TAB_BACKUP=['pep_unidades','pep_pacientes','pep_problemas','pep_alergias','pep_atendimentos','pep_atendimento_problemas',
   'pep_solicitacoes_exames','pep_solicitacao_itens','pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios',
-  'pep_resultados','pep_modelos','pep_documentos_assinados','pep_profissional'];
+  'pep_resultados','pep_modelos','pep_profissional'];
 const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); }catch(e){ return null; } };
 function statusBackup(){
   const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
@@ -2815,10 +2814,10 @@ async function gerarBackup(){
   const zip=new JSZip();
   zip.file('backup.json',JSON.stringify({sistema:'PEP Clínico',versao:VERSAO,gerado_em:quando,tabelas:dados}));
   for(const [t,rows] of Object.entries(dados)){ if(!rows.length) continue;
-    const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))].filter(k=>!(t==='pep_unidades'&&/^logo/.test(k))&&k!=='conteudo');
+    const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))].filter(k=>!(t==='pep_unidades'&&/^logo/.test(k)));
     zip.file('planilhas/'+t.replace(/^pep_/,'')+'.csv',paraCSV([cols,...rows.map(r=>cols.map(k=>r[k]))])); }
   zip.file('LEIA-ME.txt','Backup do PEP Clínico gerado em '+dataHoraBR(quando)+'.\r\n\r\n'+
-    'backup.json: todos os dados, inclusive os PDFs assinados, para restaurar no sistema (Backup dos dados > Restaurar).\r\n'+
+    'backup.json: todos os dados, para restaurar no sistema (Backup dos dados > Restaurar).\r\n'+
     'planilhas/: uma planilha por tabela, para abrir no Excel.\r\n\r\n'+
     'Contém dados de saúde identificados. Guarde em local protegido (pasta com senha ou criptografada) e não envie por e-mail ou WhatsApp.\r\n'+
     'Catálogos (CID-10, TUSS, medicamentos) não entram: são reimportados dos arquivos oficiais.\r\n');
@@ -2840,10 +2839,9 @@ async function restaurarBackup(j){
   for(const t of TAB_BACKUP){ const rows=j.tabelas[t]; if(!rows||!rows.length) continue;
     if(t==='pep_profissional'){ rel.push(t+': mantido o cadastro atual'); continue; }
     const pk=t==='pep_profissional'?'user_id':'id'; let ok=0, erro='';
-    const lote=t==='pep_documentos_assinados'?5:500;   // PDFs: poucos por vez, para não estourar o tamanho da requisição
-    for(let i=0;i<rows.length;i+=lote){
-      const {error}=await sb.from(t).upsert(rows.slice(i,i+lote),{onConflict:pk,ignoreDuplicates:true});
-      if(error){ erro=error.message; break; } ok+=Math.min(lote,rows.length-i); }
+    for(let i=0;i<rows.length;i+=500){
+      const {error}=await sb.from(t).upsert(rows.slice(i,i+500),{onConflict:pk,ignoreDuplicates:true});
+      if(error){ erro=error.message; break; } ok+=Math.min(500,rows.length-i); }
     rel.push(t.replace(/^pep_/,'')+': '+(erro?'erro — '+erro:ok+' registro(s) conferido(s)'));
   }
   return rel;
@@ -2938,73 +2936,6 @@ $('mod-salvar').onclick=async()=>{
   if(error){ toast('Erro ao salvar: '+error.message,true); return; }
   modelosMeus.push(data||Object.assign({titulo},rec)); modelosMeus.sort((a,b)=>a.titulo.localeCompare(b.titulo)); desenharModelos(); toast('Modelo salvo ✓');
 };
-
-// ---------- PDFs assinados digitalmente (anexados ao atendimento) ----------
-const TIPOS_ASS={receita:'Receita',controle:'Receita de controle especial',antimicrobiano:'Receita de antimicrobiano',
-  exames:'Pedido de exames',atestado:'Atestado',relatorio:'Relatório',outro:'Outro'};
-const LIMITE_PDF=5*1024*1024;
-// lê o campo de assinatura do PDF sem validar a criptografia (a validade se confere no ITI)
-function inspecionarPDF(bytes){
-  let txt=''; for(let i=0;i<bytes.length;i+=65536) txt+=String.fromCharCode.apply(null,bytes.subarray(i,i+65536));
-  const ehPDF=txt.slice(0,1024).includes('%PDF-');
-  txt=txt.replace(/\/Contents\s*<[0-9a-fA-F\s]*>/g,'/Contents <>');   // a assinatura em si (hex longo) atrapalha a leitura do dicionário
-  const tem=/\/ByteRange\s*\[/.test(txt)&&/\/Contents\s*<>/.test(txt)&&/\/(adbe\.pkcs7\.detached|ETSI\.CAdES\.detached|adbe\.pkcs7\.sha1)/.test(txt);
-  const lit=k=>{ const m=txt.match(new RegExp('\\/Type\\s*\\/Sig[\\s\\S]{0,4000}?\\/'+k+'\\s*\\(([^)]{1,200})\\)'))||txt.match(new RegExp('\\/'+k+'\\s*\\(([^)]{1,200})\\)[\\s\\S]{0,2000}?\\/ByteRange')); return m?m[1]:''; };
-  const dt=lit('M').match(/D:(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?/);
-  const nome=lit('Name').replace(/\\(\d{3})/g,(m,o)=>String.fromCharCode(parseInt(o,8))).replace(/^\xfe\xff/,'');
-  return {ehPDF,tem,signatario:/^[\x20-\x7e\xa0-\xff]+$/.test(nome)?nome.trim():'',
-    assinado_em:dt?dt[3]+'/'+dt[2]+'/'+dt[1]+(dt[4]?' '+dt[4]+':'+(dt[5]||'00'):''):''};
-}
-const bytesParaB64=b=>{ let s=''; for(let i=0;i<b.length;i+=32768) s+=String.fromCharCode.apply(null,b.subarray(i,i+32768)); return btoa(s); };
-const b64ParaBytes=t=>{ const s=atob(t), b=new Uint8Array(s.length); for(let i=0;i<s.length;i++) b[i]=s.charCodeAt(i); return b; };
-async function renderAssinados(box,a,ctx){
-  const sugestao=ctx.rel?'relatorio':ctx.atest?'atestado':ctx.meds.length?'receita':ctx.exames.length?'exames':'outro';
-  box.innerHTML='<h3>Documentos assinados digitalmente</h3><div class="muted" id="as-lista">Carregando…</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">'+
-    '<select id="as-tipo" class="f" style="width:auto">'+Object.entries(TIPOS_ASS).map(([k,v])=>'<option value="'+k+'"'+(k===sugestao?' selected':'')+'>'+v+'</option>').join('')+'</select>'+
-    '<button class="btn primary sm" id="as-anexar">Anexar PDF assinado</button><input type="file" id="as-file" accept="application/pdf,.pdf" class="hidden">'+
-    '<a class="btn ghost sm" href="https://validar.iti.gov.br/" target="_blank" rel="noopener">Validador do ITI ↗</a></div>'+
-    '<div class="muted" style="margin-top:8px;line-height:1.5">Baixe o PDF acima, assine com o seu certificado ICP-Brasil (VIDaaS) e anexe aqui a versão assinada. '+
-    'O sistema confere se o arquivo tem campo de assinatura digital; a validade jurídica se confere no validador do ITI.</div>';
-  const lista=box.querySelector('#as-lista');
-  const desenhar=async()=>{
-    const {data,error}=await sb.from('pep_documentos_assinados').select('id,tipo,nome_arquivo,tamanho,tem_assinatura,signatario,assinado_em,criado_em')
-      .eq('atendimento_id',a.id).order('criado_em',{ascending:true});
-    if(error){ lista.innerHTML=/schema cache|does not exist|PGRST205|42P01/i.test(error.message+' '+(error.code||''))
-      ?'Para anexar PDFs assinados, rode o assinados_schema.sql no Supabase.':'Não consegui listar: '+esc(error.message); box.querySelector('#as-anexar').disabled=true; return; }
-    if(!data.length){ lista.textContent='Nenhum PDF assinado anexado a este atendimento.'; return; }
-    lista.innerHTML='<table><tbody>'+data.map(d=>'<tr><td><b>'+esc(TIPOS_ASS[d.tipo]||d.tipo)+'</b><div class="muted" style="font-size:12px">'+esc(d.nome_arquivo)+
-      ' · '+Math.max(1,Math.round((d.tamanho||0)/1024))+' KB'+(d.criado_em?' · anexado em '+esc(dataHoraBR(d.criado_em)):'')+'</div></td><td>'+
-      (d.tem_assinatura?'<span class="chip chip-ok">assinatura digital'+(d.signatario?': '+esc(d.signatario):'')+(d.assinado_em?' · '+esc(d.assinado_em):'')+'</span>'
-        :'<span class="chip chip-red">sem assinatura digital</span>')+'</td>'+
-      '<td style="white-space:nowrap;text-align:right"><button class="btn ghost sm" data-bx="'+d.id+'">Baixar</button> <button class="btn ghost sm" data-rx="'+d.id+'">Excluir</button></td></tr>').join('')+'</tbody></table>';
-    lista.querySelectorAll('[data-bx]').forEach(b=>b.onclick=async()=>{ b.disabled=true;
-      const {data:x,error:e}=await sb.from('pep_documentos_assinados').select('nome_arquivo,conteudo').eq('id',b.dataset.bx).maybeSingle();
-      b.disabled=false; if(e||!x){ toast('Não consegui baixar: '+(e?e.message:'arquivo não encontrado'),true); return; }
-      baixarBlob(new Blob([b64ParaBytes(x.conteudo)],{type:'application/pdf'}),x.nome_arquivo); });
-    lista.querySelectorAll('[data-rx]').forEach(b=>b.onclick=async()=>{
-      const d=data.find(x=>x.id===b.dataset.rx);
-      if(!confirm('Excluir o PDF "'+d.nome_arquivo+'" deste atendimento?\n\nNão dá para desfazer (a não ser por um backup).')) return;
-      const {data:del,error:e}=await sb.from('pep_documentos_assinados').delete().eq('id',d.id).select('id');
-      if(e||!del||!del.length){ toast('Não consegui excluir'+(e?': '+e.message:''),true); return; }
-      toast('PDF excluído'); desenhar(); });
-  };
-  box.querySelector('#as-anexar').onclick=()=>box.querySelector('#as-file').click();
-  box.querySelector('#as-file').addEventListener('change',async e=>{
-    const f=e.target.files[0]; e.target.value=''; if(!f) return;
-    if(f.size>LIMITE_PDF){ toast('Arquivo grande demais ('+Math.round(f.size/1048576)+' MB). O limite é 5 MB.',true); return; }
-    const bytes=new Uint8Array(await f.arrayBuffer()), info=inspecionarPDF(bytes);
-    if(!info.ehPDF){ toast('Este arquivo não é um PDF',true); return; }
-    if(!info.tem&&!confirm('Não encontrei assinatura digital neste PDF.\n\nSe você assinou, confira se anexou a versão assinada (o assinador costuma salvar com outro nome).\n\nAnexar mesmo assim?')) return;
-    const btn=box.querySelector('#as-anexar'); btn.disabled=true; btn.textContent='Enviando…';
-    const {error:er}=await sb.from('pep_documentos_assinados').insert({atendimento_id:a.id,tipo:box.querySelector('#as-tipo').value,
-      nome_arquivo:f.name,tamanho:f.size,tem_assinatura:info.tem,signatario:info.signatario||null,assinado_em:info.assinado_em||null,conteudo:bytesParaB64(bytes)});
-    btn.disabled=false; btn.textContent='Anexar PDF assinado';
-    if(er){ toast('Não consegui anexar: '+er.message,true); return; }
-    toast(info.tem?'PDF assinado anexado ✓':'PDF anexado (sem assinatura digital)'); desenhar();
-  });
-  desenhar();
-}
 
 // ---------- relatório médico ----------
 const REL_CAMPOS={'rl-tipo':'tipo','rl-dest':'destinatario','rl-fin':'finalidade','rl-dias':'afastamento_dias','rl-diag':'diagnosticos',
