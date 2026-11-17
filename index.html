@@ -326,6 +326,10 @@
     .sidebar.open{transform:none}
     .menu-btn{display:inline-flex!important}
   }
+  .li-ou{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:12px}
+  .li-ou::before,.li-ou::after{content:"";flex:1;height:1px;background:var(--line)}
+  .btn-google{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f2937;border:1px solid #d8e3ef;font-weight:600}
+  .btn-google:hover{background:#f6f9fc}
   .menu-btn{display:none;border:1px solid var(--line);background:transparent;color:var(--fg);width:38px;height:38px;border-radius:9px;align-items:center;justify-content:center}
 </style>
 </head>
@@ -340,6 +344,11 @@
     <div class="field"><label>E-mail</label><input id="li-email" class="f" type="email" autocomplete="username"></div>
     <div class="field"><label>Senha</label><input id="li-pass" class="f" type="password" autocomplete="current-password"></div>
     <button id="li-btn" class="btn primary block">Entrar</button>
+    <div class="li-ou"><span>ou</span></div>
+    <button id="li-google" class="btn block btn-google" type="button">
+      <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.3 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.1 5.5c4.2-3.9 6.6-9.6 6.6-16z"/><path fill="#FBBC05" d="M10.5 28.4c-.5-1.4-.7-2.9-.7-4.4s.3-3 .7-4.4l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.6l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.3 0 11.6-2.1 15.5-5.7l-7.1-5.5c-2 1.3-4.5 2.1-8.4 2.1-6.3 0-11.7-3.8-13.5-9.1l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>
+      <span>Entrar com Google</span>
+    </button>
   </div>
 </div>
 
@@ -391,11 +400,12 @@
     <div class="lock-ico" aria-hidden="true">🔒</div>
     <h2>Sessão bloqueada</h2>
     <p class="muted" id="lock-sub">Ficou um tempo sem uso. Digite sua senha para continuar.</p>
-    <input id="lock-pass" class="f" type="password" autocomplete="current-password" placeholder="Senha" aria-label="Senha">
+    <div id="lock-senha-area"><input id="lock-pass" class="f" type="password" autocomplete="current-password" placeholder="Senha" aria-label="Senha"></div>
     <div id="lock-msg" class="lock-msg" hidden></div>
     <div class="lock-acts">
       <button class="btn ghost" id="lock-sair" type="button">Sair da conta</button>
       <button class="btn primary" id="lock-ok" type="button">Desbloquear</button>
+      <button class="btn primary btn-google" id="lock-google" type="button" hidden>Entrar de novo com Google</button>
     </div>
   </div>
 </div>
@@ -607,6 +617,10 @@
 const SUPABASE_URL = "https://joygodczajayygjxerno.supabase.co";
 // Publishable key (formato novo) — pública/segura no front-end; o RLS protege os dados.
 const SUPABASE_ANON_KEY = "sb_publishable_kk6ty_YczpR02xLJouj8EA_-oRjTsT6";
+// Contas autorizadas a entrar. Vazio = qualquer conta (o RLS isola os dados de cada uma).
+// Com o login por Google ligado, preencha com o seu e-mail para que só você entre:
+//   const EMAILS_AUTORIZADOS = ["servicofernandonaka@gmail.com"];
+const EMAILS_AUTORIZADOS = [];
 // ==================================================
 
 const $ = id => document.getElementById(id);
@@ -1129,11 +1143,38 @@ function boot(){
   // trava (deadlock) e nada mais responde. Por isso o tratamento é adiado com setTimeout.
   sb.auth.onAuthStateChange((_e,s)=> setTimeout(()=>aplicarSessao(s),0));
   sb.auth.getSession().then(({data})=> aplicarSessao(data.session));
+  checarRetornoOAuth();
 }
 let usuarioAtual=null;
+const emailAutorizado=e=>!EMAILS_AUTORIZADOS.length||EMAILS_AUTORIZADOS.map(x=>String(x).toLowerCase().trim()).includes(String(e||'').toLowerCase().trim());
 function aplicarSessao(s){
-  if(s){ if(usuarioAtual!==s.user.id){ usuarioAtual=s.user.id; enter(s); } }
+  if(s){
+    if(!emailAutorizado(s.user.email)){
+      // conta logada (inclusive via Google) que não está na lista de autorizados
+      usuarioAtual=null; show('login');
+      const cfg=$('cfg'); if(cfg){ cfg.classList.remove('hidden'); cfg.textContent='A conta '+(s.user.email||'')+' não está autorizada neste sistema.'; }
+      sb.auth.signOut().catch(()=>{}); return;
+    }
+    if(usuarioAtual!==s.user.id){ usuarioAtual=s.user.id; enter(s); }
+  }
   else { usuarioAtual=null; pacienteSel=null; atendAtual=null; show('login'); }
+}
+// URL para onde o Google volta após o login (precisa estar nas Redirect URLs do Supabase)
+const urlRetorno=()=> location.origin+location.pathname;
+async function entrarComGoogle(){
+  try{
+    const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:urlRetorno()}});
+    if(error) toast('Não consegui iniciar o login com Google: '+error.message,true);
+  }catch(e){ toast('Falha ao abrir o login do Google',true); }
+}
+// Ao voltar do Google com erro (ex.: provider não configurado), o Supabase traz ?error= ou #error=
+function checarRetornoOAuth(){
+  try{
+    const q=new URLSearchParams(location.search), h=new URLSearchParams((location.hash||'').replace(/^#/,''));
+    const err=q.get('error_description')||q.get('error')||h.get('error_description')||h.get('error');
+    if(err){ const cfg=$('cfg'); if(cfg){ cfg.classList.remove('hidden'); cfg.textContent='Login com Google não concluído: '+decodeURIComponent(err); }
+      if(/provider is not enabled|unsupported provider/i.test(err)) toast('O login com Google ainda não está ativado no Supabase.',true); }
+  }catch(e){}
 }
 let alertasMed=[], alertasErro=null;
 async function carregarAlertas(){
@@ -1143,10 +1184,11 @@ async function carregarAlertas(){
   else { alertasErro=null; alertasMed=data||[]; }
   renderAvisosRx();
 }
-let emailAtual=null;
+let emailAtual=null, authProvider='email';
 async function enter(session){
   show('app');
   emailAtual=session.user.email||null;
+  authProvider=(session.user.app_metadata&&session.user.app_metadata.provider)||'email';
   iniciarBloqueio();
   const v=$('versao'); if(v) v.textContent='versão '+VERSAO;
   carregarAnalitos();
@@ -1162,6 +1204,7 @@ $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({e
   if(error) toast(/fetch|network/i.test(error.message||'')||navigator.onLine===false
     ?'Sem conexão — entrar exige internet. Depois de entrar, o uso offline funciona.':error.message,true); };
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
+if($('li-google')) $('li-google').onclick=entrarComGoogle;
 $('btn-logout').onclick=async()=>{
   const n=OFF.pendentes();
   if(n&&!confirm('Há '+n+' registro(s) aguardando envio.\n\nSe você sair, eles continuam guardados neste aparelho, mas só sobem quando você entrar de novo AQUI. Sair mesmo assim?')) return;
@@ -2262,7 +2305,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-17.1 · segurança';
+const VERSAO='2026-11-17.2 · login Google';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3050,8 +3093,14 @@ function iniciarBloqueio(){
 function bloquear(){
   if(bloqueado||!emailAtual||$('view-app').classList.contains('hidden')) return;
   bloqueado=true; clearTimeout(bloqTimer);
-  $('lock-msg').hidden=true; $('lock-pass').value=''; $('lock-screen').classList.remove('hidden');
-  setTimeout(()=>{ try{ $('lock-pass').focus(); }catch(e){} },60);
+  $('lock-msg').hidden=true; $('lock-pass').value='';
+  const oauth=authProvider&&authProvider!=='email';
+  // conta Google não tem senha: o desbloqueio refaz o login pelo Google
+  $('lock-senha-area').classList.toggle('hidden',oauth);
+  $('lock-ok').hidden=oauth; $('lock-google').hidden=!oauth;
+  $('lock-sub').textContent=oauth?'Ficou um tempo sem uso. Entre de novo com o Google para continuar.':'Ficou um tempo sem uso. Digite sua senha para continuar.';
+  $('lock-screen').classList.remove('hidden');
+  if(!oauth) setTimeout(()=>{ try{ $('lock-pass').focus(); }catch(e){} },60);
 }
 async function desbloquear(){
   const senha=$('lock-pass').value; if(!senha) return;
@@ -3067,6 +3116,12 @@ if($('lock-ok')){
   $('lock-ok').onclick=desbloquear;
   $('lock-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') desbloquear(); });
   $('lock-sair').onclick=async()=>{ try{ await sb.auth.signOut(); }catch(e){} bloqueado=false; $('lock-screen').classList.add('hidden'); aplicarSessao(null); };
+  $('lock-google').onclick=async()=>{
+    // refaz o login pedindo a conta de novo — assim a tela protege mesmo numa máquina compartilhada
+    try{ const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:urlRetorno(),queryParams:{prompt:'select_account'}}});
+      if(error){ $('lock-msg').textContent=error.message; $('lock-msg').hidden=false; } }
+    catch(e){ $('lock-msg').textContent='Não consegui abrir o login do Google.'; $('lock-msg').hidden=false; }
+  };
 }
 
 const ACAO_ROT={login:'Entrou no sistema',prontuario:'Abriu prontuário',backup:'Exportou backup',documento:'Gerou documento'};
