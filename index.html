@@ -32,6 +32,16 @@
   button{font-family:inherit;cursor:pointer}
   input,select,textarea{font-family:inherit}
   .hidden{display:none!important}
+  /* tela de bloqueio */
+  .lock{position:fixed;inset:0;z-index:9000;background:rgba(13,41,63,.55);backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:18px}
+  .lock-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 60px rgba(13,41,63,.35);width:100%;max-width:360px;padding:26px 24px;text-align:center}
+  .lock-ico{font-size:34px;line-height:1}
+  .lock-card h2{font-size:19px;margin:10px 0 4px;color:var(--fg)}
+  .lock-card p{margin:0 0 14px;font-size:13.5px}
+  .lock-card input{text-align:center}
+  .lock-msg{color:var(--err);font-size:13px;margin-top:10px}
+  .lock-acts{display:flex;gap:10px;margin-top:16px}
+  .lock-acts .btn{flex:1}
 
   /* inputs */
   label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px;letter-spacing:.01em}
@@ -348,6 +358,7 @@
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
       <button class="btn ghost" id="btn-backup">Backup dos dados</button>
       <div class="muted" id="backup-status" style="padding:0 4px;font-size:11px"></div>
+      <button class="btn ghost" id="btn-seguranca">Segurança e acessos</button>
       <button class="btn ghost" id="btn-sigtap" title="TUSS 22 da ANS (.csv), o mapeamento TUSS x SIGTAP (.csv), ou o pacote da SIGTAP (.zip)">Importar tabela de exames</button>
       <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
       <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
@@ -372,6 +383,21 @@
     </div>
     <div class="content"><div class="maxw" id="main-content"></div></div>
   </main>
+</div>
+
+<!-- ======= Tela de bloqueio por inatividade ======= -->
+<div id="lock-screen" class="lock hidden" role="dialog" aria-modal="true" aria-label="Sessão bloqueada">
+  <div class="lock-card">
+    <div class="lock-ico" aria-hidden="true">🔒</div>
+    <h2>Sessão bloqueada</h2>
+    <p class="muted" id="lock-sub">Ficou um tempo sem uso. Digite sua senha para continuar.</p>
+    <input id="lock-pass" class="f" type="password" autocomplete="current-password" placeholder="Senha" aria-label="Senha">
+    <div id="lock-msg" class="lock-msg" hidden></div>
+    <div class="lock-acts">
+      <button class="btn ghost" id="lock-sair" type="button">Sair da conta</button>
+      <button class="btn primary" id="lock-ok" type="button">Desbloquear</button>
+    </div>
+  </div>
 </div>
 
 <!-- ======= MODAL: Novo paciente ======= -->
@@ -1117,8 +1143,11 @@ async function carregarAlertas(){
   else { alertasErro=null; alertasMed=data||[]; }
   renderAvisosRx();
 }
+let emailAtual=null;
 async function enter(session){
   show('app');
+  emailAtual=session.user.email||null;
+  iniciarBloqueio();
   const v=$('versao'); if(v) v.textContent='versão '+VERSAO;
   carregarAnalitos();
   setTimeout(()=>{ OFF.enviarFila(); OFF.preparar(); },1500); await sondarColunas(); await carregarPacientes(); renderMain(); await carregarProf(); await carregarUnidades(); carregarAlertas();
@@ -1127,6 +1156,7 @@ async function enter(session){
     if(pacientes.length&&(!u||d>7)) setTimeout(()=>toast(u?'Seu último backup foi '+haQuanto(d)+'. Faça um em "Backup dos dados".':'Você ainda não fez backup neste aparelho. Use "Backup dos dados".',true),2500); }
   const d=dadosProf();
   $('who').innerHTML='<b>'+esc(d.nome||session.user.email||'Profissional')+'</b>'+(d.especialidade?' · '+esc(d.especialidade):'');
+  registrarAcesso('login');
 }
 $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({email:$('li-email').value.trim(),password:$('li-pass').value});
   if(error) toast(/fetch|network/i.test(error.message||'')||navigator.onLine===false
@@ -1141,16 +1171,17 @@ $('btn-logout').onclick=async()=>{
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
-let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false;
+let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false;
 async function sondarColunas(){
   // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
-  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; }catch(e){} return; }
-  const [a,b,r,n]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; }catch(e){} return; }
+  const [a,b,r,n,sg]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
                                  sb.from('pep_prescricao_itens').select('tipo_receita').limit(1),
                                  sb.from('pep_atendimentos').select('retorno_previsto').limit(1),
-                                 sb.from('pep_encaminhamentos').select('id').limit(1)]);
-  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error;
-  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK})); }catch(e){}
+                                 sb.from('pep_encaminhamentos').select('id').limit(1),
+                                 sb.from('pep_acessos').select('id').limit(1)]);
+  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK}));}catch(e){}
 }
 async function carregarPacientes(q){
   let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
@@ -1188,6 +1219,7 @@ $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('btn-busca').onclick=()=>abrirTela('busca');
 $('btn-agenda').onclick=()=>abrirTela('agenda');
 $('btn-backup').onclick=()=>abrirTela('backup');
+$('btn-seguranca').onclick=()=>abrirTela('seguranca');
 const salvoMsg=(mk,padrao)=>OFF.enfileirouDesde(mk)
   ? padrao.replace(' ✓','')+' neste aparelho — sobe quando a conexão voltar' : padrao;
 $('np-save').onclick=async()=>{
@@ -1313,6 +1345,7 @@ async function carregarProblemasAlergias(){
     sb.from('pep_alergias').select('*').eq('paciente_id',pacienteSel.id).order('criado_em',{ascending:true})]);
   if(rp.error&&/does not exist|schema cache/i.test(rp.error.message||'')) toast('Rode o melhorias_schema.sql no Supabase',true);
   problemas=rp.data||[]; alergias=ra.data||[];
+  if(pacienteSel) registrarAcesso('prontuario',pacienteSel.id);
 }
 function faixaAlergias(){
   if(!alergias.length) return '';
@@ -1414,6 +1447,7 @@ function renderMain(){
   if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
   if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
   if(!pacienteSel&&tela==='backup') return renderBackup(c);
+  if(!pacienteSel&&tela==='seguranca') return renderSeguranca(c);
   if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
   if(atendAtual){ (atendAtual.id && !atendAtual.editando)?renderAtendimentoSalvo(c):renderAtendimento(c); return; }
   renderFichaPaciente(c);
@@ -2228,7 +2262,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-13.10 · CalcMed';
+const VERSAO='2026-11-17.1 · segurança';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2975,10 +3009,12 @@ function renderBackup(c){
     '<button class="btn ghost" id="bk-rest">Escolher arquivo (.zip ou .json)</button><input type="file" id="bk-file" accept=".zip,.json" class="hidden">'+
     '<div class="muted" id="bk-rel" style="margin-top:10px;line-height:1.6"></div></div>'+
     '<div class="bk-box"><h3>Onde guardar</h3><div class="muted" style="line-height:1.5">O arquivo tem dados de saúde identificados (LGPD, dado sensível). Guarde em pasta protegida — por exemplo, um pendrive criptografado ou uma pasta do Google Drive/OneDrive só sua — e apague cópias antigas que não precisar mais.</div></div>';
-  $('bk-baixar').onclick=async()=>{ const b=$('bk-baixar'); b.disabled=true; $('bk-msg').textContent='Gerando…';
+  $('bk-baixar').onclick=async()=>{
+    if(!confirm('O arquivo conterá dados de saúde identificados de todos os pacientes (nome, CPF, consultas).\n\nBaixe só em um aparelho seu e guarde em local protegido. Continuar?')) return;
+    const b=$('bk-baixar'); b.disabled=true; $('bk-msg').textContent='Gerando…';
     try{ const r=await gerarBackup(); const n=Object.values(r.dados).reduce((a,x)=>a+x.length,0);
       $('bk-msg').textContent=n+' registros salvos'+(r.faltou.length?' · tabelas ainda não criadas: '+r.faltou.map(t=>t.replace(/^pep_/,'')).join(', '):'');
-      toast('Backup baixado ✓'); }
+      registrarAcesso('backup',null,n+' registros'); toast('Backup baixado ✓'); }
     catch(err){ $('bk-msg').textContent=''; toast('Erro no backup: '+(err.message||err),true); }
     finally{ b.disabled=false; } };
   $('bk-rest').onclick=()=>$('bk-file').click();
@@ -2990,6 +3026,86 @@ function renderBackup(c){
       const rel=await restaurarBackup(j); $('bk-rel').innerHTML=rel.map(esc).join('<br>'); toast('Restauração concluída');
       carregarPacientes(); }
     catch(err){ $('bk-rel').textContent=''; toast('Não consegui restaurar: '+(err.message||err),true); } });
+}
+
+// ---------- segurança e LGPD: registro de acessos e bloqueio por inatividade ----------
+// Trilha de auditoria: registra login, abertura de prontuário e exportação de backup.
+// É "melhor esforço" — não trava a tela e, offline ou sem a tabela, apenas não registra.
+function registrarAcesso(acao,pacienteId,detalhe){
+  if(!segurancaOK||typeof sb==='undefined'||!sb||!navigator.onLine) return;
+  try{ sb.from('pep_acessos').insert({acao,paciente_id:pacienteId||null,detalhe:detalhe||null}).then(function(){},function(){}); }catch(e){}
+}
+
+// Bloqueio automático de tela: pede a senha de novo depois de um tempo parado.
+// Protege dados abertos num computador compartilhado (ex.: a UBS). Configurável.
+const BLOQ_MIN=()=>{ try{ const v=localStorage.getItem('pep_bloqueio_min'); return v==null?10:(parseInt(v,10)||0); }catch(e){ return 10; } };
+let bloqTimer=null, bloqUltimo=0, bloqueado=false, bloqIniciado=false;
+function resetarBloqueio(){ clearTimeout(bloqTimer); const m=BLOQ_MIN(); if(m>0&&!bloqueado) bloqTimer=setTimeout(bloquear,m*60000); }
+function atividade(){ const t=Date.now(); if(t-bloqUltimo<2000) return; bloqUltimo=t; if(!bloqueado) resetarBloqueio(); }
+function iniciarBloqueio(){
+  if(!bloqIniciado){ bloqIniciado=true;
+    ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(ev=>document.addEventListener(ev,atividade,{passive:true,capture:true})); }
+  resetarBloqueio();
+}
+function bloquear(){
+  if(bloqueado||!emailAtual||$('view-app').classList.contains('hidden')) return;
+  bloqueado=true; clearTimeout(bloqTimer);
+  $('lock-msg').hidden=true; $('lock-pass').value=''; $('lock-screen').classList.remove('hidden');
+  setTimeout(()=>{ try{ $('lock-pass').focus(); }catch(e){} },60);
+}
+async function desbloquear(){
+  const senha=$('lock-pass').value; if(!senha) return;
+  const btn=$('lock-ok'), msg=$('lock-msg'); btn.disabled=true; msg.hidden=true;
+  try{
+    const {error}=await sb.auth.signInWithPassword({email:emailAtual,password:senha});
+    if(error){ msg.textContent=(/fetch|network/i.test(error.message||'')||navigator.onLine===false)
+        ?'Sem conexão — desbloquear exige internet.':'Senha incorreta.'; msg.hidden=false; btn.disabled=false; return; }
+    bloqueado=false; $('lock-pass').value=''; $('lock-screen').classList.add('hidden'); btn.disabled=false; resetarBloqueio();
+  }catch(e){ msg.textContent='Não consegui verificar agora.'; msg.hidden=false; btn.disabled=false; }
+}
+if($('lock-ok')){
+  $('lock-ok').onclick=desbloquear;
+  $('lock-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') desbloquear(); });
+  $('lock-sair').onclick=async()=>{ try{ await sb.auth.signOut(); }catch(e){} bloqueado=false; $('lock-screen').classList.add('hidden'); aplicarSessao(null); };
+}
+
+const ACAO_ROT={login:'Entrou no sistema',prontuario:'Abriu prontuário',backup:'Exportou backup',documento:'Gerou documento'};
+async function renderSeguranca(c){
+  const m=BLOQ_MIN();
+  c.innerHTML='<div class="phead"><div><div class="nm">Segurança e acessos</div><div class="mt">Bloqueio de tela e trilha de auditoria (LGPD)</div></div></div>'+
+    '<div class="bk-box"><h3>Bloqueio automático de tela</h3><div class="muted" style="margin-bottom:10px;line-height:1.5">'+
+    'Depois de um tempo parado, o sistema pede sua senha de novo. Protege os dados se você se afastar do computador — útil numa UBS com máquina compartilhada. '+
+    'O desbloqueio verifica a senha e, por isso, precisa de internet.</div>'+
+    '<label style="display:inline-block">Bloquear após</label> <select id="sg-bloq" class="f" style="width:auto;display:inline-block;margin-left:8px">'+
+    [['0','Desligado'],['5','5 minutos'],['10','10 minutos'],['15','15 minutos'],['30','30 minutos']].map(o=>'<option value="'+o[0]+'"'+(String(m)===o[0]?' selected':'')+'>'+o[1]+'</option>').join('')+
+    '</select> <button class="btn ghost sm" id="sg-testar" type="button" style="margin-left:8px">Bloquear agora</button>'+
+    '<div class="muted" style="margin-top:8px;font-size:12px">A escolha vale só neste aparelho.</div></div>'+
+    '<div class="bk-box"><h3>Registro de acessos</h3>'+
+    (segurancaOK?'<div class="muted" style="margin-bottom:10px;line-height:1.5">Quem abriu cada prontuário, quando entrou e quando exportou backup. Não pode ser editado nem apagado pelo sistema.</div>'+
+       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="btn ghost sm" id="sg-atual" type="button">Atualizar</button><button class="btn ghost sm" id="sg-csv" type="button">Exportar (CSV)</button></div>'+
+       '<div id="sg-lista" class="muted">Carregando…</div>'
+     :'<div class="avso outro">Para guardar a trilha de acessos, rode o seguranca_schema.sql no Supabase. O bloqueio de tela acima já funciona sem isso.</div>')+
+    '</div>';
+  $('sg-bloq').onchange=()=>{ try{ localStorage.setItem('pep_bloqueio_min',$('sg-bloq').value); }catch(e){} resetarBloqueio(); toast('Preferência de bloqueio salva'); };
+  $('sg-testar').onclick=()=>bloquear();
+  if(!segurancaOK) return;
+  let linhas=[];
+  const carregar=async()=>{
+    const el2=$('sg-lista'); if(el2) el2.textContent='Carregando…';
+    const {data,error}=await sb.from('pep_acessos').select('em,acao,detalhe,paciente_id,pep_pacientes(nome)').order('em',{ascending:false}).limit(200);
+    if(!$('sg-lista')) return;
+    if(error){ $('sg-lista').innerHTML='Não consegui carregar: '+esc(error.message); return; }
+    linhas=data||[];
+    if(!linhas.length){ $('sg-lista').textContent='Nenhum acesso registrado ainda.'; return; }
+    $('sg-lista').innerHTML='<table><thead><tr><th>Quando</th><th>Ação</th><th>Paciente</th></tr></thead><tbody>'+
+      linhas.map(x=>'<tr><td style="white-space:nowrap">'+esc(dataHoraBR(x.em))+'</td><td>'+esc(ACAO_ROT[x.acao]||x.acao)+
+        (x.detalhe?' <span class="muted">('+esc(x.detalhe)+')</span>':'')+'</td><td>'+esc((x.pep_pacientes&&x.pep_pacientes.nome)||(x.paciente_id?'(paciente removido)':'—'))+'</td></tr>').join('')+'</tbody></table>';
+  };
+  $('sg-atual').onclick=carregar;
+  $('sg-csv').onclick=()=>{ if(!linhas.length){ toast('Nada para exportar',true); return; }
+    baixarTexto(paraCSV([['Quando','Ação','Paciente','Detalhe'],...linhas.map(x=>[dataHoraBR(x.em),ACAO_ROT[x.acao]||x.acao,(x.pep_pacientes&&x.pep_pacientes.nome)||'',x.detalhe||''])]),
+      'acessos-'+new Date().toISOString().slice(0,10)+'.csv','text/csv'); };
+  carregar();
 }
 
 // ---------- modelos de texto ----------
