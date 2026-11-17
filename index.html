@@ -18,7 +18,7 @@
      SOAP em cores próprias, para a tela não ficar monocromática. */
   :root{
     --bg:#eef3f9; --panel:#ffffff; --panel-2:#f4f8fc; --card:#ffffff; --line:#d8e3ef;
-    --fg:#13293f; --muted:#5e7490; --brand:#0a6fbd; --brand-600:#085c9e; --brand-050:#e6f1fb;
+    --fg:#13293f; --muted:#526882; --line-input:#9fb3c8; --brand:#0a6fbd; --brand-600:#085c9e; --brand-050:#e6f1fb;
     --navy:#0d4f80;
     --ok:#17995c; --err:#cf3b3b; --warn-bg:#fff6e2; --warn-br:#e6c47d; --warn-fg:#8a6414;
     --s:#d6336c; --s-bg:#fdeef4; --o:#1b74c4; --o-bg:#e9f2fc; --a:#c77700; --a-bg:#fdf3e3; --p:#0f9d74; --p-bg:#e6f7f1;
@@ -45,7 +45,7 @@
 
   /* inputs */
   label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px;letter-spacing:.01em}
-  .inp,input.f,select.f,textarea.f{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--fg);
+  .inp,input.f,select.f,textarea.f{width:100%;background:var(--panel-2);border:1px solid var(--line-input);color:var(--fg);
     border-radius:9px;padding:10px 12px;font-size:14px;outline:0}
   .inp:focus,input.f:focus,select.f:focus,textarea.f:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(10,111,189,.17)}
   textarea.f{min-height:80px;resize:vertical}
@@ -61,6 +61,11 @@
   .btn.sm{padding:7px 11px;font-size:13px}
   .btn.block{width:100%}
   .btn:disabled{opacity:.5;cursor:not-allowed}
+  /* foco visível para quem usa teclado */
+  :where(button,a,summary,select,[tabindex],input[type=checkbox]):focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
+  /* botão ✕ com área de toque de pelo menos 32px */
+  .lin .x,.chkp .x{min-width:32px;min-height:32px;display:inline-grid;place-items:center;border-radius:8px}
+  .lin .x:hover,.chkp .x:hover{background:#fdecec}
 
   /* ---------- LOGIN ---------- */
   #view-login{min-height:100%;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#eaf2fb 0%,#f7fafd 55%,#eef6f3 100%)}
@@ -85,6 +90,14 @@
   .side-item .mt{font-size:11.5px;color:var(--muted)}
   .side-foot{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
   .side-foot .btn{justify-content:flex-start}
+  /* ações de configuração recolhidas: a lista de pacientes fica com a altura */
+  .side-list{min-height:180px}
+  .side-cfg>summary{list-style:none;width:100%}
+  .side-cfg>summary::-webkit-details-marker{display:none}
+  .side-cfg>summary::after{content:"▾";margin-left:auto;color:var(--muted)}
+  .side-cfg[open]>summary::after{content:"▴"}
+  .side-cfg-body{display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:min(36vh,330px);overflow:auto}
+  .sidebar{overflow-y:auto}
 
   .main{flex:1;min-width:0;display:flex;flex-direction:column}
   .topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -353,6 +366,20 @@
     .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
     .sidebar.open{transform:none}
     .menu-btn{display:inline-flex!important}
+    .sidebar:not(.open){box-shadow:none;visibility:hidden}
+    .topbar{flex-wrap:wrap;padding:10px 14px;gap:8px}
+    .bp-longo,.who{display:none}
+    .badge-proto{white-space:nowrap}
+    .tb-dir{min-width:0;flex:1 1 auto;justify-content:flex-end}
+    .unid-sel{max-width:100%;min-width:0}
+    .content{padding:14px}
+    /* linhas de atendimento: data e tipo em cima, resumo embaixo */
+    .atd-row{flex-wrap:wrap;row-gap:4px}
+    .atd-row .dt{flex:1 1 100%}
+    .atd-row .tp{order:5;flex:1 1 100%}
+    .atd-row .btn{margin-left:auto}
+    .ch{flex-wrap:wrap}
+    .ch select{max-width:100%}
   }
   .li-ou{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:12px}
   .li-ou::before,.li-ou::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -393,6 +420,9 @@
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
+      <details class="side-cfg" id="side-cfg">
+      <summary class="btn ghost">⚙ Configurações e dados</summary>
+      <div class="side-cfg-body">
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
       <button class="btn ghost" id="btn-backup">Backup dos dados</button>
       <div class="muted" id="backup-status" style="padding:0 4px;font-size:11px"></div>
@@ -404,10 +434,12 @@
       <button class="btn ghost" id="btn-med" title="Lista de preços da CMED/Anvisa (.xlsx), ou planilha com colunas nome / apresentacao / via">Importar medicamentos</button>
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
-      <button class="btn ghost" id="btn-logout">Sair da conta</button>
       <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
       <div class="muted" id="off-status" style="padding:0 4px;font-size:11px;line-height:1.4"></div>
       <div class="muted" id="versao" style="padding:2px 4px;font-size:11px"></div>
+      </div>
+      </details>
+      <button class="btn ghost" id="btn-logout">Sair da conta</button>
     </div>
   </aside>
 
@@ -415,7 +447,7 @@
     <div class="faixa-off" id="faixa-off" role="status" aria-live="polite"></div>
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
-      <span class="badge-proto">Protótipo · dados fictícios · não usar com pacientes reais</span>
+      <span class="badge-proto" title="Protótipo · dados fictícios · não usar com pacientes reais">Protótipo<span class="bp-longo"> · dados fictícios · não usar com pacientes reais</span></span>
       <span class="tb-dir"><select id="unid-ativa" class="unid-sel hidden" title="Unidade onde você está atendendo hoje"></select>
       <span class="who" id="who"></span></span>
     </div>
@@ -2384,7 +2416,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-17.8 · painel + imunização';
+const VERSAO='2026-11-17.9 · ajustes de design e acessibilidade';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2594,36 +2626,35 @@ function renderAtendimento(c){
       </select></div></div>
 
     <div class="sbox s"><div class="h"><span class="bdg">S</span> Subjetivo</div><div class="bd">
-      <textarea id="f-s" class="f" placeholder="Queixa e história do paciente…"></textarea></div></div>
+      <textarea id="f-s" class="f" aria-label="Subjetivo" placeholder="Queixa e história do paciente…"></textarea></div></div>
 
     <div class="sbox o"><div class="h"><span class="bdg">O</span> Objetivo</div><div class="bd">
-      <div class="field"><textarea id="f-o" class="f" placeholder="Exame físico…"></textarea></div>
+      <div class="field"><textarea id="f-o" class="f" aria-label="Objetivo — exame físico" placeholder="Exame físico…"></textarea></div>
       <div class="grid">
-        <div class="field"><label>PA sistólica</label><input id="f-pas" class="f" type="number" placeholder="120"></div>
-        <div class="field"><label>PA diastólica</label><input id="f-pad" class="f" type="number" placeholder="80"></div>
-        <div class="field"><label>FC (bpm)</label><input id="f-fc" class="f" type="number" placeholder="72"></div>
-        <div class="field"><label>Peso (kg)</label><input id="f-peso" class="f" type="number" step="0.1"></div>
-        <div class="field"><label>Altura (cm)</label><input id="f-alt" class="f" type="number" step="0.1"></div>
-        <div class="field"><label>Glicemia (mg/dL)</label><input id="f-gli" class="f" type="number"></div>
-        <div class="field"><label>Creatinina (mg/dL)</label><input id="f-creat" class="f" type="number" step="0.01" placeholder="1,0"></div>
+        <div class="field"><label for="f-pas">PA sistólica</label><input id="f-pas" class="f" type="number"></div>
+        <div class="field"><label for="f-pad">PA diastólica</label><input id="f-pad" class="f" type="number"></div>
+        <div class="field"><label for="f-fc">FC (bpm)</label><input id="f-fc" class="f" type="number"></div>
+        <div class="field"><label for="f-peso">Peso (kg)</label><input id="f-peso" class="f" type="number" step="0.1"></div>
+        <div class="field"><label for="f-alt">Altura (cm)</label><input id="f-alt" class="f" type="number" step="0.1"></div>
+        <div class="field"><label for="f-gli">Glicemia (mg/dL)</label><input id="f-gli" class="f" type="number"></div>
+        <div class="field"><label for="f-creat">Creatinina (mg/dL)</label><input id="f-creat" class="f" type="number" step="0.01"></div>
       </div>
       <div id="o-clcr" class="muted" style="margin-top:10px"></div></div></div>
 
     <div class="sbox a"><div class="h"><span class="bdg">A</span> Avaliação</div><div class="bd">
-      <div class="field"><textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
+      <div class="field"><textarea id="f-a" class="f" aria-label="Avaliação" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
       <label style="margin-bottom:6px">Problemas avaliados nesta consulta</label>
       <div id="f-probs">`+
         (ativos.length ? ativos.map(pb=>'<div class="chkp"><input type="checkbox" value="'+pb.id+'"><span>'+esc(pb.descricao)+
-            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</span>'+
-            '<button class="x" data-rm="'+pb.id+'" data-desc="'+esc(pb.descricao)+'" title="Remover da lista do paciente">✕</button></div>').join('')
+            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</span></div>').join('')
           : '<div class="muted">Nenhum problema ativo. Use o botão abaixo para registrar.</div>')+`
       </div>
-      <div class="muted" style="margin-top:4px">Marque os que você está tratando hoje. O ✕ apaga o problema da lista do paciente.</div>
+      <div class="muted" style="margin-top:4px">Marque os que você está tratando hoje. Para resolver ou apagar um problema, use a ficha do paciente.</div>
       <button class="btn ghost sm" id="f-addprob" style="margin-top:8px">+ Novo problema / condição</button>
     </div></div>
 
     <div class="sbox p"><div class="h"><span class="bdg">P</span> Plano</div><div class="bd">
-      <div class="field"><textarea id="f-p" class="f" placeholder="Plano de cuidado…"></textarea></div>
+      <div class="field"><textarea id="f-p" class="f" aria-label="Plano" placeholder="Plano de cuidado…"></textarea></div>
       <div class="ptabs">
         <button class="ptab active" data-pt="ex">Exames</button>
         <button class="ptab" data-pt="rx">Prescrição</button>
