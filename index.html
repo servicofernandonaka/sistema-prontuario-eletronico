@@ -492,6 +492,22 @@
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
 </div></div>
 
+<div class="overlay" id="m-renova"><div class="modal" style="max-width:560px">
+  <div class="mh"><span>Renovar receita / lista de medicamentos</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" id="rn-dref" style="margin-bottom:8px"></div>
+    <div id="rn-lista"></div>
+    <label class="rn-item" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="rn-sep"> cada medicamento controlado em sua própria Receita de Controle Especial</label>
+  </div>
+  <div class="mf" style="flex-wrap:wrap;gap:6px">
+    <button class="btn ghost" data-close>Cancelar</button>
+    <button class="btn ghost" id="rn-lista-imp">Imprimir lista</button>
+    <button class="btn ghost" id="rn-lista-pdf">PDF da lista</button>
+    <button class="btn ghost" id="rn-imp">Imprimir receita</button>
+    <button class="btn primary" id="rn-pdf">PDF da receita</button>
+  </div>
+</div></div>
+
 <div class="overlay" id="m-vacina"><div class="modal">
   <div class="mh"><span>Registrar vacina</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -1615,11 +1631,12 @@ async function renderFichaPaciente(c){
 
   // ---------- folha de rosto, revisão de medicação e encaminhamentos ----------
   const cardF=el('div','card'); cardF.style.marginBottom='16px';
-  cardF.innerHTML='<div class="ch"><span>Medicamentos em uso e revisão</span><span style="display:flex;gap:6px"><button class="btn ghost sm" id="fr-imp">Folha de rosto</button><button class="btn ghost sm" id="fr-pdf">PDF</button></span></div>'+
+  cardF.innerHTML='<div class="ch"><span>Medicamentos em uso e revisão</span><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost sm" id="fr-receita">Receita / lista</button><button class="btn ghost sm" id="fr-imp">Folha de rosto</button><button class="btn ghost sm" id="fr-pdf">PDF</button></span></div>'+
     '<div class="cb" id="fr-rev"><div class="muted">Carregando…</div></div>';
   c.appendChild(cardF);
   $('fr-imp').onclick=async()=>{ const d=await docFolhaRosto(); if(d) imprimirDoc(d); };
   $('fr-pdf').onclick=async()=>{ const d=await docFolhaRosto(); if(d) baixarPDF(d); };
+  $('fr-receita').onclick=abrirRenovaReceita;
   revisaoNaFicha();
   if(encOK){ const cardE=el('div','card'); cardE.style.marginBottom='16px'; cardE.id='card-enc'; c.appendChild(cardE); renderEncFicha(cardE); }
 
@@ -1686,20 +1703,41 @@ async function renderFichaPaciente(c){
   // dica de leitura do gráfico, já que ponto fora da referência muda de cor
   bodyR.appendChild(el('div','muted','No gráfico, a faixa clara é a referência do laboratório e o ponto vermelho marcado com “!” está fora dela. Passe o mouse para ver data e valor.'));
 
+  const cardTFG=el('div','card'); cardTFG.style.marginTop='16px'; c.appendChild(cardTFG); renderTFG(cardTFG);
+  const cardRisco=el('div','card'); cardRisco.style.marginTop='16px'; cardRisco.id='card-risco'; c.appendChild(cardRisco); renderRiscoCV(cardRisco);
+  const cardRast=el('div','card'); cardRast.style.marginTop='16px'; c.appendChild(cardRast); renderRastreamentos(cardRast);
+
   c.appendChild(el('div','sec-title','Atendimentos'));
   const card=el('div','card'); c.appendChild(card);
-  const {data,error}=await sb.from('pep_atendimentos').select('id,data_atendimento,tipo_atendimento,subjetivo').eq('paciente_id',p.id).order('data_atendimento',{ascending:false});
-  if(error){ card.appendChild(el('div','',' <div style="padding:16px" class="muted">Erro: '+esc(error.message)+'</div>')); return; }
-  if(!data||!data.length){ card.appendChild(el('div','',' <div style="padding:22px;text-align:center" class="muted">Nenhum atendimento ainda.</div>')); return; }
   const tipos={no_dia:'Consulta no dia',agendada:'Consulta agendada',cuidado_continuado:'Cuidado continuado',urgencia:'Urgência'};
-  data.forEach(a=>{
+  const chAt=el('div','ch'); chAt.innerHTML='<span>Histórico</span>';
+  const bw=el('span'); bw.style.cssText='display:flex;gap:6px;align-items:center';
+  bw.innerHTML='<input class="f" id="atd-busca" placeholder="Buscar no prontuário…" style="width:210px;padding:6px 10px;font-size:13px"><button class="btn ghost sm" id="atd-busca-x" style="display:none">limpar</button>';
+  chAt.appendChild(bw); card.appendChild(chAt);
+  const lista=el('div'); lista.id='atd-lista'; card.appendChild(lista);
+  const linha=a=>{
     const r=el('div','atd-row click');
-    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a.subjetivo||'').slice(0,90)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span>';
+    r.innerHTML='<span class="dt">'+esc(dataBR(a.data_atendimento))+'</span><span class="tp">'+esc((a._snip||a.subjetivo||'').slice(0,120)||'—')+'</span><span class="chip">'+esc(tipos[a.tipo_atendimento]||a.tipo_atendimento||'')+'</span>';
     const bAbrir=el('button','btn ghost sm','Abrir'); r.appendChild(bAbrir);
     const abrir=()=>{ atendAtual={id:a.id}; renderMain(); };
     r.onclick=abrir; bAbrir.onclick=e=>{ e.stopPropagation(); abrir(); };
-    card.appendChild(r);
-  });
+    return r;
+  };
+  const mostrar=(arr,vazio)=>{ lista.innerHTML=''; if(!arr.length){ lista.innerHTML='<div style="padding:22px;text-align:center" class="muted">'+vazio+'</div>'; return; } arr.forEach(a=>lista.appendChild(linha(a))); };
+  const {data,error}=await sb.from('pep_atendimentos').select('id,data_atendimento,tipo_atendimento,subjetivo').eq('paciente_id',p.id).order('data_atendimento',{ascending:false});
+  if(error){ lista.innerHTML='<div style="padding:16px" class="muted">Erro: '+esc(error.message)+'</div>'; return; }
+  const todosAt=data||[];
+  mostrar(todosAt,'Nenhum atendimento ainda.');
+  let buscaT=null;
+  const fazerBusca=async()=>{
+    const t=$('atd-busca').value.trim(); $('atd-busca-x').style.display=t?'':'none';
+    if(t.length<2){ mostrar(todosAt,'Nenhum atendimento ainda.'); return; }
+    const res=await buscarProntuario(p.id,t);
+    if($('atd-busca').value.trim()!==t) return;
+    mostrar(res,'Nada encontrado para “'+esc(t)+'” nas evoluções.');
+  };
+  $('atd-busca').addEventListener('input',()=>{ clearTimeout(buscaT); buscaT=setTimeout(fazerBusca,300); });
+  $('atd-busca-x').onclick=()=>{ $('atd-busca').value=''; fazerBusca(); };
 }
 
 // ---------- dados do profissional (ficam neste navegador) ----------
@@ -2384,7 +2422,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-17.9 · excluir anexo';
+const VERSAO='2026-11-17.10 · receita, risco CV, TFG';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3216,6 +3254,202 @@ function renderBackup(c){
       carregarPacientes(); }
     catch(err){ $('bk-rel').textContent=''; toast('Não consegui restaurar: '+(err.message||err),true); } });
 }
+
+// ========== melhorias 17.10 — receita/lista, busca, risco CV, TFG, rastreamentos ==========
+function sexoFem(p){ return /^f/i.test(((p||pacienteSel||{}).sexo)||''); }
+function num(x){ const n=parseFloat(String(x==null?'':x).replace(',','.')); return isFinite(n)?n:null; }
+function ultResultado(chave){ const l=(resultados||[]).filter(r=>r.analito===chave&&r.valor!=null); return l.length?l[l.length-1]:null; }
+
+// ---------- renovar receita / lista de medicamentos ----------
+async function ultimaPrescricaoMeds(){
+  if(!pacienteSel) return null;
+  const {data:ats}=await sb.from('pep_atendimentos').select('id,unidade_id,data_atendimento')
+    .eq('paciente_id',pacienteSel.id).order('data_atendimento',{ascending:false}).limit(40);
+  for(const a of ats||[]){
+    const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',a.id);
+    if(recs&&recs.length){
+      const {data:mi}=await sb.from('pep_prescricao_itens').select('*').in('prescricao_id',recs.map(r=>r.id)).order('ordem',{ascending:true});
+      if(mi&&mi.length) return {meds:mi, unidadeId:a.unidade_id, data:a.data_atendimento};
+    }
+  }
+  return null;
+}
+let renovaMeds=[], renovaUnid=null;
+async function abrirRenovaReceita(){
+  if(!pacienteSel){ toast('Selecione um paciente',true); return; }
+  const r=await ultimaPrescricaoMeds();
+  if(!r){ toast('Este paciente ainda não tem medicamentos prescritos no sistema.',true); return; }
+  renovaMeds=r.meds; renovaUnid=r.unidadeId;
+  const semContinuo=renovaMeds.every(m=>!m.uso_continuo);
+  $('rn-lista').innerHTML=renovaMeds.map((m,i)=>'<label class="rn-item" style="display:flex;gap:8px;align-items:flex-start;padding:5px 0">'+
+    '<input type="checkbox" data-i="'+i+'" '+((m.uso_continuo||semContinuo)?'checked':'')+'>'+
+    '<span>'+esc(m.medicamento)+'<small class="muted" style="display:block">'+
+    esc([m.dose,m.frequencia,m.duracao].filter(Boolean).join(' · ')||'—')+(m.uso_continuo?' · uso contínuo':'')+'</small></span></label>').join('');
+  $('rn-sep').checked=prefSeparar();
+  $('rn-dref').textContent=r.data?('Baseado na última receita, de '+dataBRsimples(r.data)+'. Marque o que renovar.'):'Marque o que renovar.';
+  openM('m-renova');
+}
+function medsRenovaSel(){ return [...document.querySelectorAll('#rn-lista input[type=checkbox]:checked')].map(c=>renovaMeds[+c.dataset.i]).filter(Boolean); }
+function receitaRenova(){ const sel=medsRenovaSel(); if(!sel.length){ toast('Selecione ao menos um medicamento',true); return null; }
+  return docReceita(sel, new Date().toISOString().slice(0,10), renovaUnid, {separar:$('rn-sep').checked}); }
+function docListaMedicamentos(meds,unidadeId){
+  if(!meds||!meds.length){ toast('Selecione ao menos um medicamento',true); return null; }
+  const {itens,grupos}=itensReceita(meds,false);
+  const d=montarDoc('Lista de medicamentos em uso', itens, [], new Date().toISOString().slice(0,10), unidadeId, {grupos});
+  if(!d) return null;
+  d.subtitulo='Para o paciente e o cuidador';
+  d.obsTitulo='Orientações';
+  d.obs=[['Horários','Tome nos horários combinados. Não interrompa por conta própria.'],
+         ['Leve sempre','Apresente esta lista em consultas, exames e no pronto-socorro.'],
+         ['Reações','Em caso de alergia, mal-estar ou dúvida, procure a unidade de saúde.']];
+  return d;
+}
+
+// ---------- busca de texto no prontuário ----------
+async function buscarProntuario(pacId,termo){
+  const t=String(termo||'').replace(/[%,()]/g,' ').trim(); if(t.length<2) return [];
+  const campos=['subjetivo','objetivo','avaliacao','plano'];
+  const orf=campos.map(c=>c+'.ilike.%'+t+'%').join(',');
+  const {data,error}=await sb.from('pep_atendimentos')
+    .select('id,data_atendimento,tipo_atendimento,subjetivo,objetivo,avaliacao,plano')
+    .eq('paciente_id',pacId).or(orf).order('data_atendimento',{ascending:false}).limit(60);
+  if(error) return [];
+  const tl=semAc(t);
+  return (data||[]).map(a=>{ let snip='';
+    for(const c of campos){ const v=a[c]||''; const idx=semAc(v).indexOf(tl);
+      if(idx>=0){ const ini=Math.max(0,idx-30); snip=(ini>0?'…':'')+v.slice(ini,idx+t.length+60).trim(); break; } }
+    return Object.assign({},a,{_snip:snip||a.subjetivo||''});
+  });
+}
+
+// ---------- risco cardiovascular global (D'Agostino 2008 / SBC) ----------
+function ergRisco(v){
+  const {fem,anos,ct,hdl,pas,tratado,fumante,diabetes}=v;
+  if(!(anos>0)||!(ct>0)||!(hdl>0)||!(pas>0)) return null;
+  const L=Math.log; let s,S0,mean;
+  if(fem){ s=2.32888*L(anos)+1.20904*L(ct)-0.70833*L(hdl)+(tratado?2.82263:2.76157)*L(pas)+(fumante?0.52873:0)+(diabetes?0.69154:0);
+    S0=0.95012; mean=26.1931; }
+  else { s=3.06117*L(anos)+1.12370*L(ct)-0.93263*L(hdl)+(tratado?1.99881:1.93303)*L(pas)+(fumante?0.65451:0)+(diabetes?0.57367:0);
+    S0=0.88936; mean=23.9802; }
+  const risco=1-Math.pow(S0,Math.exp(s-mean));
+  return Math.max(0,Math.min(1,risco))*100;
+}
+function categoriaRisco(r){
+  if(r<5) return {rot:'baixo',cor:'#2e7d32',ldl:'< 130 mg/dL'};
+  if(r<10) return {rot:'intermediário',cor:'#f9a825',ldl:'< 100 mg/dL'};
+  if(r<20) return {rot:'alto',cor:'#ef6c00',ldl:'< 70 mg/dL'};
+  return {rot:'muito alto',cor:'#c62828',ldl:'< 50 mg/dL'};
+}
+async function renderRiscoCV(card){
+  const p=pacienteSel||{};
+  card.innerHTML='<div class="ch"><span>Risco cardiovascular em 10 anos (Escore de Risco Global)</span></div>';
+  const body=el('div','cb'); card.appendChild(body);
+  if(!p.data_nascimento||!p.sexo){ body.innerHTML='<div class="muted">Preciso de data de nascimento e sexo para calcular o risco.</div>'; return; }
+  const anos=anosPaciente(), fem=sexoFem(p);
+  const ct=ultResultado('colesterol'), hdl=ultResultado('hdl');
+  let pas=null,paData=null;
+  const {data:pa}=await sb.from('pep_atendimentos').select('pa_sistolica,data_atendimento')
+    .eq('paciente_id',p.id).not('pa_sistolica','is',null).order('data_atendimento',{ascending:false}).limit(1);
+  if(pa&&pa.length){ pas=pa[0].pa_sistolica; paData=pa[0].data_atendimento; }
+  if(!card.isConnected) return;
+  const diabetes=!!condicoesAtivas(problemas).dm;
+  const campo=(id,rot,val,sz)=>'<div class="field" style="margin:0"><label>'+rot+'</label><input class="f" id="'+id+'" value="'+(val!=null?val:'')+'" style="width:'+(sz||90)+'px;padding:6px 8px"></div>';
+  body.innerHTML=
+    ((anos<30||anos>74)?'<div class="muted" style="margin-bottom:8px">⚠️ O escore é validado para 30–74 anos; fora disso é só orientativo.</div>':'')+
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">'+
+      campo('rc-ct','Colesterol total',ct?ct.valor:'',110)+
+      campo('rc-hdl','HDL',hdl?hdl.valor:'',80)+
+      campo('rc-pas','PA sistólica',pas!=null?pas:'',100)+
+      '<label class="rn-item" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rc-trat"> trata HAS</label>'+
+      '<label class="rn-item" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rc-fum"> tabagista</label>'+
+      '<label class="rn-item" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="rc-dm" '+(diabetes?'checked':'')+'> diabetes</label>'+
+    '</div><div id="rc-out" style="margin-top:14px"></div>'+
+    '<div class="muted" style="margin-top:8px;line-height:1.5">Escore de Risco Global (D’Agostino/Framingham 2008), adotado pela Diretriz da SBC. '+
+    'Puxei colesterol/HDL dos exames e a PA sistólica do último atendimento'+(paData?' ('+esc(dataBRsimples(paData))+')':'')+' — ajuste se necessário. '+
+    'Use em prevenção primária: não se aplica a quem já tem doença aterosclerótica, DM com lesão de órgão-alvo ou DRC (já são alto/muito alto risco). '+
+    'As faixas e as metas de LDL seguem a lógica da diretriz de dislipidemia; confirme na versão vigente, que também pondera fatores agravantes.</div>';
+  const calc=()=>{
+    const r=ergRisco({fem,anos,ct:num($('rc-ct').value),hdl:num($('rc-hdl').value),pas:num($('rc-pas').value),
+      tratado:$('rc-trat').checked,fumante:$('rc-fum').checked,diabetes:$('rc-dm').checked});
+    const out=$('rc-out');
+    if(r==null){ out.innerHTML='<span class="muted">Preencha colesterol total, HDL e PA sistólica para calcular.</span>'; return; }
+    const cat=categoriaRisco(r);
+    out.innerHTML='<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'+
+      '<div style="font-size:30px;font-weight:700;color:'+cat.cor+'">'+r.toFixed(1).replace('.',',')+'%</div>'+
+      '<div><div style="font-weight:600;color:'+cat.cor+'">Risco '+cat.rot+'</div>'+
+      '<div class="muted">evento cardiovascular em 10 anos · meta usual de LDL: '+cat.ldl+'</div></div></div>';
+  };
+  ['rc-ct','rc-hdl','rc-pas'].forEach(id=>$(id).addEventListener('input',calc));
+  ['rc-trat','rc-fum','rc-dm'].forEach(id=>$(id).addEventListener('change',calc));
+  calc();
+}
+
+// ---------- curva da função renal (CKD-EPI 2021) ----------
+function ckdepi2021(scr,anos,fem){ if(!(scr>0)||!(anos>0)) return null;
+  const k=fem?0.7:0.9, a=fem?-0.241:-0.302, r=scr/k;
+  let e=142*Math.pow(Math.min(r,1),a)*Math.pow(Math.max(r,1),-1.200)*Math.pow(0.9938,anos);
+  if(fem) e*=1.012; return Math.round(e); }
+function estadioDRC(g){ if(g>=90)return{e:'G1',t:'normal ou alta',cor:'#2e7d32'}; if(g>=60)return{e:'G2',t:'levemente reduzida',cor:'#2e7d32'};
+  if(g>=45)return{e:'G3a',t:'leve a moderada',cor:'#c77700'}; if(g>=30)return{e:'G3b',t:'moderada a grave',cor:'#ef6c00'};
+  if(g>=15)return{e:'G4',t:'grave',cor:'#c62828'}; return{e:'G5',t:'falência renal',cor:'#c62828'}; }
+function serieTFG(){ const p=pacienteSel||{}; if(!p.data_nascimento) return []; const fem=sexoFem(p);
+  return (resultados||[]).filter(r=>r.analito==='creatinina'&&r.valor!=null&&r.data_coleta)
+    .map(r=>{ const anos=Math.floor((new Date(r.data_coleta+'T12:00:00')-new Date(p.data_nascimento))/31557600000);
+      const g=ckdepi2021(Number(r.valor),anos,fem); return g?{data_coleta:r.data_coleta,valor:g,cr:Number(r.valor)}:null; })
+    .filter(Boolean).sort((a,b)=>a.data_coleta<b.data_coleta?-1:1); }
+function renderTFG(card){
+  const p=pacienteSel||{};
+  card.innerHTML='<div class="ch"><span>Função renal — TFG estimada (CKD-EPI 2021)</span></div>';
+  const body=el('div','cb'); card.appendChild(body);
+  if(!p.data_nascimento||!p.sexo){ body.innerHTML='<div class="muted">Preciso de data de nascimento e sexo do paciente para estimar a TFG.</div>'; return; }
+  const s=serieTFG();
+  if(!s.length){ body.innerHTML='<div class="muted">Sem creatinina registrada. Lance uma creatinina em “Resultados” para estimar a TFG.</div>'; return; }
+  const ult=s[s.length-1], est=estadioDRC(ult.valor);
+  let alerta='';
+  if(s.length>=2){ const base=Math.max(...s.slice(0,-1).map(x=>x.valor));
+    const queda=base>0?Math.round((base-ult.valor)/base*100):0, estBase=estadioDRC(base);
+    if(ult.valor<60&&queda>=25&&est.e!==estBase.e) alerta='Queda de ~'+queda+'% ante o melhor valor e mudança de estágio ('+estBase.e+'→'+est.e+'). Avalie progressão de DRC, nefrotóxicos e ajuste de doses.';
+    else if(queda>=30) alerta='Queda de ~'+queda+'% na TFG ante o melhor valor. Investigue causa (desidratação, nefrotóxicos, obstrução) e repita a creatinina.';
+    else if(ult.valor<60) alerta='TFG abaixo de 60 — confirme com nova dosagem (DRC exige persistência ≥3 meses) e revise doses de eliminação renal.';
+  } else if(ult.valor<60){ alerta='TFG abaixo de 60 numa única medida — repita para confirmar antes de estadiar.'; }
+  const meta={chave:'tfg',rotulo:'TFG (CKD-EPI)',unidade:'mL/min/1,73m²',casas:0};
+  const grf=s.length>=2?graficoEvolucao(s,meta):'';
+  body.innerHTML='<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">'+
+    '<div><div style="font-size:30px;font-weight:700;color:'+est.cor+'">'+ult.valor+' <span style="font-size:13px;font-weight:500;color:var(--muted)">mL/min/1,73m²</span></div>'+
+    '<div class="muted">Estágio <b style="color:'+est.cor+'">'+est.e+'</b> — '+esc(est.t)+' · creatinina '+fmtNum(ult.cr,2)+' mg/dL em '+esc(dataBRsimples(ult.data_coleta))+'</div></div>'+
+    (grf?'<div>'+grf+'</div>':'')+'</div>'+
+    (alerta?'<div class="avso idoso" style="margin-top:12px">⚠️ '+esc(alerta)+'</div>':'')+
+    '<div class="muted" style="margin-top:10px;line-height:1.5">A TFG estimada (CKD-EPI 2021, sem fator de raça) é a referência para <b>estadiar</b> a DRC. Para <b>ajuste de dose</b> no idoso a Cockcroft-Gault (ClCr) ainda é a mais usada — veja no apoio à prescrição. Um valor isolado não fecha DRC (precisa persistir ≥3 meses).</div>';
+}
+
+// ---------- rastreamentos por idade e sexo ----------
+function rastreamentos(anos,fem){
+  const L=[]; const push=(nome,aplica,intervalo,nota)=>L.push({nome,aplica,intervalo,nota});
+  if(fem) push('Câncer de colo do útero — citopatológico', anos>=25&&anos<=64, 'a cada 3 anos (após 2 exames anuais normais)','Mulheres 25–64 anos com vida sexual (MS/INCA).');
+  if(fem) push('Câncer de mama — mamografia', anos>=50&&anos<=69, 'a cada 2 anos', (anos>=40&&anos<50)?'40–49 anos: decisão individual.':'Mulheres 50–69 anos (MS/INCA).');
+  push('Câncer colorretal — sangue oculto ou colonoscopia', anos>=50&&anos<=75, 'sangue oculto anual ou colonoscopia a cada 10 anos','Adultos 50–75 anos (INCA).');
+  if(!fem) push('Aneurisma de aorta abdominal — ultrassom', anos>=65&&anos<=75, 'uma vez na vida','Homens 65–75 anos que já fumaram (rastreio único).');
+  push('Osteoporose — densitometria óssea', (fem&&anos>=65)||(!fem&&anos>=70), 'conforme risco', fem?'Mulheres ≥65 anos (ou mais jovens com fatores de risco).':'Homens ≥70 anos (ou mais jovens com fatores de risco).');
+  push('Hepatites B e C — sorologia', anos>=18, 'ao menos uma vez na vida','Rastreio único na vida adulta (MS).');
+  push('Diabetes — glicemia de jejum ou HbA1c', anos>=45, 'a cada 3 anos se normal','≥45 anos, ou mais jovens com sobrepeso e fator de risco.');
+  push('Dislipidemia — perfil lipídico', anos>=20, 'conforme risco','Para estratificar o risco cardiovascular.');
+  return L;
+}
+function renderRastreamentos(card){
+  const p=pacienteSel||{};
+  card.innerHTML='<div class="ch"><span>Rastreamentos recomendados (idade e sexo)</span></div>';
+  const body=el('div','cb'); card.appendChild(body);
+  const anos=anosPaciente();
+  if(anos==null||!p.sexo){ body.innerHTML='<div class="muted">Preciso de data de nascimento e sexo para sugerir os rastreamentos.</div>'; return; }
+  const ap=rastreamentos(anos,sexoFem(p)).filter(x=>x.aplica);
+  body.innerHTML=(ap.length?'<table><tbody>'+ap.map(x=>'<tr><td style="width:22px;vertical-align:top">☐</td><td><b>'+esc(x.nome)+'</b><div class="muted" style="font-size:12px">'+esc(x.intervalo)+' · '+esc(x.nota)+'</div></td></tr>').join('')+'</tbody></table>':'<div class="muted">Nenhum rastreamento em destaque para esta faixa etária.</div>')+
+    '<div class="muted" style="margin-top:10px;line-height:1.5">Apoio por idade e sexo (referência MS/INCA e USPSTF). Não registra o que já foi feito — confirme no prontuário. Protocolos locais podem diferir.</div>';
+}
+$('rn-imp').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); imprimirDoc(d); } };
+$('rn-pdf').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); baixarPDF(d); } };
+$('rn-lista-imp').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),renovaUnid); if(d){ closeM('m-renova'); imprimirDoc(d); } };
+$('rn-lista-pdf').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),renovaUnid); if(d){ closeM('m-renova'); baixarPDF(d); } };
+
 
 // ---------- imunização (vacinas) ----------
 const VACINAS=[
