@@ -8,7 +8,6 @@
 <meta name="theme-color" content="#0a6fbd">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<script>/* tema salvo neste aparelho, aplicado antes de desenhar a página */try{var t=localStorage.getItem('pep_tema');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -19,11 +18,9 @@
      SOAP em cores próprias, para a tela não ficar monocromática. */
   :root{
     --bg:#eef3f9; --panel:#ffffff; --panel-2:#f4f8fc; --card:#ffffff; --line:#d8e3ef;
-    --fg:#13293f; --muted:#526882; --line-input:#9fb3c8; --brand:#0a6fbd; --brand-600:#085c9e; --brand-050:#e6f1fb; --brand-fill:#0a6fbd;
+    --fg:#13293f; --muted:#5e7490; --brand:#0a6fbd; --brand-600:#085c9e; --brand-050:#e6f1fb;
     --navy:#0d4f80;
-    --ok:#17995c; --err:#cf3b3b;
-    --err-fg:#c62828; --err-strong:#8d2020; --err-bg:#fdecec; --err-br:#f1b9b9;
-    --ok-fg:#2e7d32; --ok-bg:#e8f5e9; --ok-br:#c8e6c9; --warn-bg:#fff6e2; --warn-br:#e6c47d; --warn-fg:#8a6414;
+    --ok:#17995c; --err:#cf3b3b; --warn-bg:#fff6e2; --warn-br:#e6c47d; --warn-fg:#8a6414;
     --s:#d6336c; --s-bg:#fdeef4; --o:#1b74c4; --o-bg:#e9f2fc; --a:#c77700; --a-bg:#fdf3e3; --p:#0f9d74; --p-bg:#e6f7f1;
     --radius:12px; --font:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     color-scheme:light;
@@ -48,7 +45,7 @@
 
   /* inputs */
   label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px;letter-spacing:.01em}
-  .inp,input.f,select.f,textarea.f{width:100%;background:var(--panel-2);border:1px solid var(--line-input);color:var(--fg);
+  .inp,input.f,select.f,textarea.f{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--fg);
     border-radius:9px;padding:10px 12px;font-size:14px;outline:0}
   .inp:focus,input.f:focus,select.f:focus,textarea.f:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(10,111,189,.17)}
   textarea.f{min-height:80px;resize:vertical}
@@ -64,11 +61,6 @@
   .btn.sm{padding:7px 11px;font-size:13px}
   .btn.block{width:100%}
   .btn:disabled{opacity:.5;cursor:not-allowed}
-  /* foco visível para quem usa teclado */
-  :where(button,a,summary,select,[tabindex],input[type=checkbox]):focus-visible{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
-  /* botão ✕ com área de toque de pelo menos 32px */
-  .lin .x,.chkp .x{min-width:32px;min-height:32px;display:inline-grid;place-items:center;border-radius:8px}
-  .lin .x:hover,.chkp .x:hover{background:var(--err-bg)}
 
   /* ---------- LOGIN ---------- */
   #view-login{min-height:100%;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#eaf2fb 0%,#f7fafd 55%,#eef6f3 100%)}
@@ -90,20 +82,9 @@
   .side-item:hover{background:var(--panel-2)}
   .side-item.active{background:var(--brand-050);box-shadow:inset 0 0 0 1px #bcd9f2}
   .side-item .nm{font-size:14px;font-weight:600}
-  .side-item .mt{font-size:12.5px;color:var(--muted)}
+  .side-item .mt{font-size:11.5px;color:var(--muted)}
   .side-foot{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
   .side-foot .btn{justify-content:flex-start}
-  /* ações de configuração recolhidas: a lista de pacientes fica com a altura */
-  .side-list{min-height:180px}
-  .side-cfg>summary{list-style:none;width:100%}
-  .side-cfg>summary::-webkit-details-marker{display:none}
-  .side-cfg>summary::after{content:"▾";margin-left:auto;color:var(--muted)}
-  .side-cfg[open]>summary::after{content:"▴"}
-  .tema-lin{display:flex;align-items:center;gap:8px;padding:2px 4px}
-  .tema-lin label{margin:0;font-size:12.5px;color:var(--fg)}
-  .tema-lin select{padding:6px 8px;font-size:13px}
-  .side-cfg-body{display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:min(36vh,330px);overflow:auto}
-  .sidebar{overflow-y:auto}
 
   .main{flex:1;min-width:0;display:flex;flex-direction:column}
   .topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -130,8 +111,8 @@
   .atd-row.click:hover{background:var(--panel-2)}
   .ro{white-space:pre-wrap;font-size:14px}
   .ro.vazio{color:var(--muted);font-style:italic}
-  .alerta{background:var(--err-bg);border:1px solid var(--err-br);color:var(--err-strong);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:13.5px}
-  .alerta b{color:var(--err-fg)}
+  .alerta{background:#fdecec;border:1px solid #f1b9b9;color:#8d2020;border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:13.5px}
+  .alerta b{color:#c62828}
   .resumo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
   @media (max-width:760px){.resumo{grid-template-columns:1fr}}
   .resumo .card{padding:0}
@@ -140,38 +121,28 @@
   .lin{display:flex;align-items:flex-start;gap:8px}
   .lin .x{margin-left:auto;color:var(--err);border:0;background:transparent;font-size:15px}
   .tagc{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;background:var(--brand-050);color:var(--brand)}
-  .tagr{background:var(--err-bg);color:var(--err-fg)}
+  .tagr{background:#fdecec;color:#c62828}
   .chkp{display:flex;align-items:flex-start;gap:9px;padding:7px 0;font-size:13.5px;color:var(--fg);font-weight:400;cursor:pointer}
   .chkp>span{flex:1}
   .chkp .x{margin-left:auto;color:var(--err);border:0;background:transparent;font-size:15px;width:auto;height:auto;padding:0 4px}
   .chkp input{width:auto;margin-top:3px}
   .atd-row .dt{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 150px}
   .atd-row .tp{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
-  .chip{display:inline-block;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line)}
-  .chip.chip-red{background:var(--err-bg);color:var(--err-fg);border-color:var(--err-br)}
-  .chip.chip-ok{background:var(--ok-bg);color:var(--ok-fg);border-color:var(--ok-br)}
+  .chip{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line)}
+  .chip.chip-red{background:#fdecec;color:#c62828;border-color:#f3c0c0}
+  .chip.chip-ok{background:#e8f5e9;color:#2e7d32;border-color:#c8e6c9}
   .ba-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
   .ba-kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
   .ba-kpi .n{font-size:24px;font-weight:700;color:var(--fg)} .ba-kpi .l{font-size:12px;color:var(--muted)}
-  .ba-kpi .n small{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:var(--err-bg);color:var(--err-fg);border:1px solid var(--err-br);margin-left:6px;vertical-align:middle}
-  .ba-kpi .n .chip{vertical-align:middle;margin-left:6px}
-  .chip.chip-warn{background:var(--warn-bg);color:var(--warn-fg);border-color:var(--warn-br)}
-  button.ba-kpi{text-align:left;font:inherit;color:inherit;cursor:pointer}
-  button.ba-kpi:hover{border-color:var(--brand)}
-  .pn-pend.tem{border-left:4px solid var(--err)}
-  .pn-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:6px 0 4px}
-  .pn-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;border-top:4px solid var(--brand)}
-  .pn-bar.ok{border-top-color:var(--ok)} .pn-bar.med{border-top-color:#dd9a2a} .pn-bar.bx{border-top-color:var(--err)} .pn-bar.vazio{border-top-color:var(--line)}
-  .pn-rot{font-size:13px;color:var(--muted);min-height:38px;line-height:1.4}
-  .pn-lin{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
-  .pn-pct{font-size:30px;font-weight:700;color:var(--fg);line-height:1.1;font-variant-numeric:tabular-nums}
-  .pn-bar.vazio .pn-pct{color:var(--muted)}
-  .pn-track{height:8px;background:var(--panel-2);border-radius:6px;overflow:hidden}
+  .ba-kpi .n small{font-size:13px;font-weight:600;color:#c62828;margin-left:6px}
+  .pn-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:14px 0}
+  .pn-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .pn-bar .t{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:8px}
+  .pn-bar .t b{color:var(--fg);font-size:15px}
+  .pn-track{height:10px;background:var(--panel-2);border-radius:6px;overflow:hidden}
   .pn-fill{height:100%;border-radius:6px;background:var(--brand)}
-  .pn-bar.ok .pn-fill{background:var(--ok)} .pn-bar.med .pn-fill{background:#dd9a2a} .pn-bar.bx .pn-fill{background:var(--err)}
+  .pn-fill.alt{background:#c62828}
   .pn-sub{font-size:12px;color:var(--muted);margin-top:6px}
-  .pn-pop{display:flex;flex-wrap:wrap;gap:8px 22px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;font-size:14px;color:var(--muted)}
-  .pn-pop b{color:var(--fg);font-size:17px}
   .ba-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
   .ba-filtros .f{width:auto}
   .ba-pend{display:flex;flex-wrap:wrap;gap:4px}
@@ -200,7 +171,7 @@
   .esc-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
   .esc-card .esc-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
   .esc-card .esc-v{font-size:20px;font-weight:800}
-  .esc-card .esc-v.alt{color:var(--err-fg)}
+  .esc-card .esc-v.alt{color:#c62828}
   .btn.btn-calcmed{display:inline-flex;align-items:center;gap:7px;background:#0E8F80;border:1px solid #0E8F80;color:#fff;font-weight:600}
   .btn.btn-calcmed:hover{background:#0B776B;border-color:#0B776B}
   .btn.btn-calcmed b{font-weight:800;color:#c9f2ec}
@@ -210,38 +181,8 @@
   .cm-menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px;font-size:13.5px;color:var(--fg);cursor:pointer}
   .cm-menu button:hover{background:var(--brand-050)}
   .cm-menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
-  .cm-menu{min-width:260px;max-width:calc(100vw - 16px)}
-  .cm-tit{font-size:11.5px;font-weight:700;color:#0B776B;padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.04em}
-  .btn.soft{background:var(--brand-050);color:var(--brand-600);border-color:#bcd9f2}
-  .btn.soft:hover{background:#d8e9f8}
-  .btn-volta{width:40px;padding:10px 0;font-size:17px}
-  /* documentos do atendimento salvo */
-  .doc-card{margin:0 0 14px}
-  .doc-lin{display:flex;align-items:center;gap:12px;padding:11px 14px;border-top:1px solid var(--line)}
-  .doc-card .ch+.doc-lin{border-top:0}
-  .doc-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;font-size:14px}
-  .doc-tx .muted{font-size:12.5px}
-  .doc-bt{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-  @media (max-width:760px){ .doc-lin{flex-wrap:wrap} .doc-bt{width:100%;justify-content:flex-start} }
-  /* barra de salvar fixa no rodapé do atendimento */
-  /* fixa no rodapé da área principal (o .content tem overflow:auto, que anula o sticky) */
-  .atd-acoes{position:fixed;bottom:0;left:268px;right:0;z-index:20;display:flex;align-items:center;justify-content:flex-end;gap:10px;
-    padding:12px max(22px,calc((100vw - 268px - 1080px)/2));
-    background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(6px);border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(17,42,68,.06)}
-  .atd-espaco{height:84px}
-  @media (max-width:760px){ .atd-acoes{left:0;padding:10px 14px} }
-  .atd-acoes-info{margin-right:auto;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-  @media (max-width:760px){ .atd-acoes-info{display:none} .atd-acoes .btn{white-space:nowrap;padding:11px 12px;font-size:13.5px} #btn-finalizar{flex:1} }
-  /* alertas de revisão recolhidos na ficha */
-  .rev-rec{border:1px solid #e6c47d;background:var(--warn-bg);border-radius:8px;padding:0}
-  .rev-rec>summary{cursor:pointer;padding:9px 11px;font-size:13px;color:var(--warn-fg);list-style:none}
-  .rev-rec>summary::-webkit-details-marker{display:none}
-  .rev-rec>summary::before{content:"▸ ";}
-  .rev-rec[open]>summary::before{content:"▾ ";}
-  .rev-rec[open]{padding:0 8px 2px}
-  .rev-rec[open]>summary{padding-left:3px}
   .ag-sec{font-weight:700;font-size:13px;margin:16px 0 6px;color:var(--fg)}
-  .ag-sec.atraso{color:var(--err-fg)}
+  .ag-sec.atraso{color:#c62828}
   .enc-st{width:auto;padding:4px 8px;font-size:12.5px}
 
   /* SOAP editor */
@@ -270,19 +211,15 @@
   .ta-opt:last-child{border-bottom:0}
   .ta-opt:hover{background:var(--panel-2)}
   .ta-opt .t{font-weight:600;font-size:13.5px}
-  .ta-opt .c{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ta-opt .c{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
   .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
   .chipx{display:inline-flex;align-items:center;gap:7px;background:var(--brand-050);color:var(--brand);border:1px solid var(--line);border-radius:20px;padding:4px 7px 4px 11px;font-size:12.5px;font-weight:600}
   .chipx button{border:0;background:transparent;color:var(--brand);font-size:14px}
 
   /* tabs do plano */
-  .ptabs{display:flex;gap:2px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid var(--line)}
-  .ptab{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);border-radius:0;padding:9px 12px 8px;font-size:13.5px;font-weight:600;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px}
-  .ptab:hover{color:var(--fg);background:var(--panel-2)}
-  .ptab.active{color:var(--brand-600);border-bottom-color:var(--brand)}
-  .pt-n:empty{display:none}
-  .pt-n{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand-050);color:var(--brand-600);font-size:11.5px;display:inline-grid;place-items:center}
-  .ptab.active .pt-n{background:var(--brand);color:#fff}
+  .ptabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
+  .ptab{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600}
+  .ptab.active{background:var(--brand-050);color:var(--fg)}
 
   /* modal */
   .overlay{position:fixed;inset:0;background:rgba(14,36,58,.38);display:none;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto;z-index:50}
@@ -295,13 +232,13 @@
 
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#13293f;border:1px solid #13293f;color:#fff;padding:11px 18px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:80;box-shadow:0 10px 26px rgba(17,42,68,.2)}
   .toast.show{opacity:1}
-  .toast.err{background:var(--err-strong);border-color:var(--err-strong);color:#fff}
+  .toast.err{background:#8d2020;border-color:#8d2020;color:#fff}
   .cfg{background:var(--warn-bg);border:1px solid var(--warn-br);color:var(--warn-fg);padding:11px 13px;border-radius:9px;font-size:13px;margin-bottom:14px}
 
   /* cabeçalho de grupo nas tabelas e caixas de aviso da prescrição */
   tr.gh td{background:#e9f0f8;color:#2f567c;font-size:12px;font-weight:700;letter-spacing:.02em}
   .avso{border-radius:8px;padding:9px 11px;margin-bottom:7px;font-size:13px;line-height:1.45;border-left:3px solid}
-  .avso.alergia{background:var(--err-bg);border-color:var(--err);color:var(--err-strong)}
+  .avso.alergia{background:#fdecec;border-color:#cf3b3b;color:#8d2020}
   .avso.idoso{background:#fff4e0;border-color:#dd9a2a;color:#7d5410}
   .avso.renal{background:#e7f2fb;border-color:#1b74c4;color:#14517f}
   .avso.outro{background:#f1f5fa;border-color:#9bb0c7;color:#3f5570}
@@ -312,7 +249,7 @@
     padding:9px 22px;font-size:13px;line-height:1.45;border-bottom:1px solid}
   .faixa-off.off{background:#fff6e2;color:#6d4c0c;border-color:#efd59a}
   .faixa-off.pend{background:#e7f2fb;color:#14517f;border-color:#bcd9f2}
-  .faixa-off.erro{background:var(--err-bg);color:var(--err-strong);border-color:var(--err-br)}
+  .faixa-off.erro{background:#fdecec;color:#8d2020;border-color:#f1b9b9}
   .faixa-off .fb{display:flex;gap:6px;flex-wrap:wrap}
   .faixa-off button{border:1px solid currentColor;background:#fff;color:inherit;border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:600}
   .offbox{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--fg);padding:4px;margin:2px 0 0;cursor:pointer}
@@ -338,87 +275,16 @@
   .evocard svg{display:block;width:100%;height:auto}
   .evoh{font-size:13px;font-weight:700;color:var(--fg);margin-bottom:2px}
   .evoh span{font-weight:600;color:var(--muted);font-size:11.5px}
-  .evof{font-size:12px;color:var(--muted);margin-top:2px}
+  .evof{font-size:11.5px;color:var(--muted);margin-top:2px}
   .evocard .hit{cursor:crosshair}
-  td.fora{color:var(--err-strong);font-weight:600}
+  td.fora{color:#8d2020;font-weight:600}
   .viztip{position:fixed;z-index:90;display:none;background:#13293f;color:#fff;font-size:12px;
     padding:6px 9px;border-radius:7px;pointer-events:none;box-shadow:0 6px 18px rgba(17,42,68,.22);max-width:260px}
 
-
-  /* ---------- tema escuro: segue o sistema; "Tema" em Configurações força claro ou escuro ---------- */
-  @media screen and (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#0f1924; --panel:#16222f; --panel-2:#1c2a39; --card:#16222f; --line:#2a3b4e; --line-input:#4d6580;
-      --fg:#e3ebf4; --muted:#9fb2c7; --brand:#5aa9ec; --brand-600:#8cc6f5; --brand-050:#173149; --brand-fill:#1769b0; --navy:#8cc6f5;
-      --ok:#3fcf8e; --err:#f06a6a; --err-fg:#ff8f8f; --err-strong:#ffc2c2; --err-bg:#3a1c22; --err-br:#6e2f36;
-      --ok-fg:#74dfac; --ok-bg:#153427; --ok-br:#245c41;
-      --warn-bg:#382c12; --warn-br:#7a5d1e; --warn-fg:#f3cf7a;
-      --s-bg:#3a1a28; --o-bg:#15304a; --a-bg:#3a2c13; --p-bg:#113629;
-      color-scheme:dark;
-    }
-    :root:not([data-theme="light"]) .btn:hover{background:#22344a}
-    :root:not([data-theme="light"]) .btn.primary,:root:not([data-theme="light"]) .logo .tile,:root:not([data-theme="light"]) .es-sn button.on,:root:not([data-theme="light"]) .es-escol button.on,:root:not([data-theme="light"]) .ptab.active .pt-n{background:var(--brand-fill);border-color:var(--brand-fill);color:#fff}
-    :root:not([data-theme="light"]) .btn.primary:hover{background:#125a98}
-    :root:not([data-theme="light"]) #view-login{background:linear-gradient(160deg,#0f1c2b 0%,#111a24 55%,#0f2120 100%)}
-    :root:not([data-theme="light"]) .side-item.active{box-shadow:inset 0 0 0 1px #2f5f8a}
-    :root:not([data-theme="light"]) .btn.soft{border-color:#2f5f8a} :root:not([data-theme="light"]) .btn.soft:hover{background:#1f3d5a}
-    :root:not([data-theme="light"]) .es-res.alt{background:var(--warn-bg)}
-    :root:not([data-theme="light"]) .rev-rec{border-color:var(--warn-br)}
-    tr.gh td{background:#1c2f44;color:#a9c7e6}
-    :root:not([data-theme="light"]) .avso.idoso{background:#382c12;border-color:#dd9a2a;color:#f3cf7a}
-    :root:not([data-theme="light"]) .avso.renal{background:#15304a;border-color:#5aa9ec;color:#b5d9f7}
-    :root:not([data-theme="light"]) .avso.outro{background:#1c2a39;border-color:#5f7690;color:#c1d0e0}
-    :root:not([data-theme="light"]) .faixa-off.off{background:#382c12;color:#f3cf7a;border-color:#7a5d1e}
-    :root:not([data-theme="light"]) .faixa-off.pend{background:#15304a;color:#b5d9f7;border-color:#2f5f8a}
-    :root:not([data-theme="light"]) .faixa-off button{background:transparent}
-    :root:not([data-theme="light"]) .unid-card.ativa{border-color:#2f6fa3}
-    :root:not([data-theme="light"]) .cm-tit{color:#5fd6c4}
-    :root:not([data-theme="light"]) .toast{background:#e3ebf4;border-color:#e3ebf4;color:#0f1924}
-    :root:not([data-theme="light"]) .toast.err{background:#8d2020;border-color:#8d2020;color:#fff}
-    :root:not([data-theme="light"]) .card,:root:not([data-theme="light"]) .sbox,:root:not([data-theme="light"]) .phead{box-shadow:none}
-    :root:not([data-theme="light"]) .lock{background:rgba(3,8,14,.7)}
-    :root:not([data-theme="light"]) .overlay{background:rgba(3,8,14,.6)}
-    :root:not([data-theme="light"]) .pn-bar.med{border-top-color:#e2a53a}
-  }
-  @media screen{
-    :root[data-theme="dark"]{
-      --bg:#0f1924; --panel:#16222f; --panel-2:#1c2a39; --card:#16222f; --line:#2a3b4e; --line-input:#4d6580;
-      --fg:#e3ebf4; --muted:#9fb2c7; --brand:#5aa9ec; --brand-600:#8cc6f5; --brand-050:#173149; --brand-fill:#1769b0; --navy:#8cc6f5;
-      --ok:#3fcf8e; --err:#f06a6a; --err-fg:#ff8f8f; --err-strong:#ffc2c2; --err-bg:#3a1c22; --err-br:#6e2f36;
-      --ok-fg:#74dfac; --ok-bg:#153427; --ok-br:#245c41;
-      --warn-bg:#382c12; --warn-br:#7a5d1e; --warn-fg:#f3cf7a;
-      --s-bg:#3a1a28; --o-bg:#15304a; --a-bg:#3a2c13; --p-bg:#113629;
-      color-scheme:dark;
-    }
-    :root[data-theme="dark"] .btn:hover{background:#22344a}
-    :root[data-theme="dark"] .btn.primary,:root[data-theme="dark"] .logo .tile,:root[data-theme="dark"] .es-sn button.on,:root[data-theme="dark"] .es-escol button.on,:root[data-theme="dark"] .ptab.active .pt-n{background:var(--brand-fill);border-color:var(--brand-fill);color:#fff}
-    :root[data-theme="dark"] .btn.primary:hover{background:#125a98}
-    :root[data-theme="dark"] #view-login{background:linear-gradient(160deg,#0f1c2b 0%,#111a24 55%,#0f2120 100%)}
-    :root[data-theme="dark"] .side-item.active{box-shadow:inset 0 0 0 1px #2f5f8a}
-    :root[data-theme="dark"] .btn.soft{border-color:#2f5f8a} :root[data-theme="dark"] .btn.soft:hover{background:#1f3d5a}
-    :root[data-theme="dark"] .es-res.alt{background:var(--warn-bg)}
-    :root[data-theme="dark"] .rev-rec{border-color:var(--warn-br)}
-    tr.gh td{background:#1c2f44;color:#a9c7e6}
-    :root[data-theme="dark"] .avso.idoso{background:#382c12;border-color:#dd9a2a;color:#f3cf7a}
-    :root[data-theme="dark"] .avso.renal{background:#15304a;border-color:#5aa9ec;color:#b5d9f7}
-    :root[data-theme="dark"] .avso.outro{background:#1c2a39;border-color:#5f7690;color:#c1d0e0}
-    :root[data-theme="dark"] .faixa-off.off{background:#382c12;color:#f3cf7a;border-color:#7a5d1e}
-    :root[data-theme="dark"] .faixa-off.pend{background:#15304a;color:#b5d9f7;border-color:#2f5f8a}
-    :root[data-theme="dark"] .faixa-off button{background:transparent}
-    :root[data-theme="dark"] .unid-card.ativa{border-color:#2f6fa3}
-    :root[data-theme="dark"] .cm-tit{color:#5fd6c4}
-    :root[data-theme="dark"] .toast{background:#e3ebf4;border-color:#e3ebf4;color:#0f1924}
-    :root[data-theme="dark"] .toast.err{background:#8d2020;border-color:#8d2020;color:#fff}
-    :root[data-theme="dark"] .card,:root[data-theme="dark"] .sbox,:root[data-theme="dark"] .phead{box-shadow:none}
-    :root[data-theme="dark"] .lock{background:rgba(3,8,14,.7)}
-    :root[data-theme="dark"] .overlay{background:rgba(3,8,14,.6)}
-    :root[data-theme="dark"] .pn-bar.med{border-top-color:#e2a53a}
-  }
   /* ---------- impressão ---------- */
   #print-area{display:none}
   @media print{
     @page{size:A4;margin:13mm 15mm 12mm}
-    html,body{background:#fff!important}
     body>*{display:none!important}
     #print-area{display:block!important;background:#fff;color:#13293f;font-family:'Helvetica Neue',Arial,sans-serif;font-size:11pt;line-height:1.45;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -449,10 +315,10 @@
     #print-area .pr-qt{font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#0a6fbd;margin:0 0 3px}
     #print-area .pr-qt+.pr-pac{margin-bottom:10px}
     #print-area .pr-branco{display:block;border-bottom:1px solid #b9c7d8;height:14px}
-    #print-area .pr-finais{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:4mm}
+    #print-area .pr-finais{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:6mm}
     #print-area .pr-finais.um{grid-template-columns:1fr}
     #print-area .pr-fq{border:1px solid #d1dbe7;border-radius:2mm;padding:6px 10px}
-    #print-area .pr-fl{font-size:8.4pt;color:#3f5570;border-bottom:1px solid #d1dbe7;padding:7px 0 1px;min-height:13px}
+    #print-area .pr-fl{font-size:8.4pt;color:#3f5570;border-bottom:1px solid #d1dbe7;padding:9px 0 1px;min-height:13px}
     /* corpo */
     #print-area .pr-corpo{flex:0 0 auto}
     #print-area .pr-gt{font-size:9.5pt;font-weight:700;color:#0a6fbd;letter-spacing:.04em;margin:6px 0 8px;
@@ -466,44 +332,27 @@
     #print-area .pr-cod{flex:0 0 auto;font-weight:400;font-size:8.6pt;color:#5e7490}
     #print-area .pr-pos{padding-left:20px;font-size:10pt;color:#3f5570;margin-top:2px}
     #print-area .pr-par{text-align:justify;line-height:1.75;font-size:11.5pt;margin:0 0 10px}
-    #print-area .pr-sec{margin:0 0 6px;page-break-inside:avoid}
-    #print-area .pr-fim{page-break-inside:auto}
-    #print-area .pr-fecho{break-after:avoid;page-break-after:avoid;line-height:1.45!important;margin-bottom:5px!important}
-    #print-area .pr-finais,#print-area .pr-ft{break-inside:avoid;page-break-inside:avoid}
+    #print-area .pr-sec{margin:0 0 12px;page-break-inside:avoid}
+    #print-area .pr-fim{page-break-inside:avoid}
     #print-area .pr-fecho{margin:0 0 6mm}
     #print-area .pr-sec .pr-gt{text-transform:uppercase}
-    #print-area .pr-sec .pr-par{font-size:11pt;line-height:1.45;margin:0 0 2px}
-    #print-area .pr-sec .pr-gt{margin:4px 0 4px}
+    #print-area .pr-sec .pr-par{font-size:11pt;line-height:1.55;margin:0 0 3px}
     #print-area .pr-obs{border:1px solid #d1dbe7;border-radius:2mm;padding:7px 10px;font-size:9.8pt;margin-top:8px;page-break-inside:avoid}
     #print-area .pr-obs-t{font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5e7490;margin-bottom:3px}
     /* assinatura e rodapé — empurrados para o pé da folha */
-    #print-area .pr-fim{margin-top:auto;padding-top:4mm}
+    #print-area .pr-fim{margin-top:auto;padding-top:14mm}
     #print-area .pr-ass{text-align:center;page-break-inside:avoid}
-    #print-area .pr-local{font-size:10.5pt;margin-bottom:11mm}
+    #print-area .pr-local{font-size:10.5pt;margin-bottom:14mm}
     #print-area .pr-linha{border-top:1px solid #13293f;width:78mm;margin:0 auto 5px}
     #print-area .pr-cn{font-weight:700;font-size:10.5pt}
     #print-area .pr-ci{font-size:9.5pt;color:#5e7490}
-    #print-area .pr-ft{border-top:1px solid #d1dbe7;margin-top:4mm;padding-top:4px;text-align:center;font-size:8pt;color:#3f5570;line-height:1.35}
+    #print-area .pr-ft{border-top:1px solid #d1dbe7;margin-top:8mm;padding-top:4px;text-align:center;font-size:8pt;color:#3f5570;line-height:1.35}
     #print-area .pr-emit{font-size:6.8pt;color:#8ea6c0;margin-top:2px}
   }
   @media (max-width:760px){
     .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
     .sidebar.open{transform:none}
     .menu-btn{display:inline-flex!important}
-    .sidebar:not(.open){box-shadow:none;visibility:hidden}
-    .topbar{flex-wrap:wrap;padding:10px 14px;gap:8px}
-    .bp-longo,.who{display:none}
-    .badge-proto{white-space:nowrap}
-    .tb-dir{min-width:0;flex:1 1 auto;justify-content:flex-end}
-    .unid-sel{max-width:100%;min-width:0}
-    .content{padding:14px}
-    /* linhas de atendimento: data e tipo em cima, resumo embaixo */
-    .atd-row{flex-wrap:wrap;row-gap:4px}
-    .atd-row .dt{flex:1 1 100%}
-    .atd-row .tp{order:5;flex:1 1 100%}
-    .atd-row .btn{margin-left:auto}
-    .ch{flex-wrap:wrap}
-    .ch select{max-width:100%}
   }
   .li-ou{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:12px}
   .li-ou::before,.li-ou::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -544,12 +393,9 @@
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
-      <details class="side-cfg" id="side-cfg">
-      <summary class="btn ghost">⚙ Configurações e dados</summary>
-      <div class="side-cfg-body">
       <button class="btn ghost" id="btn-prof">Dados para impressão</button>
       <button class="btn ghost" id="btn-backup">Backup dos dados</button>
-      <div class="muted" id="backup-status" style="padding:0 4px;font-size:12px"></div>
+      <div class="muted" id="backup-status" style="padding:0 4px;font-size:11px"></div>
       <button class="btn ghost" id="btn-seguranca">Segurança e acessos</button>
       <button class="btn ghost" id="btn-sigtap" title="TUSS 22 da ANS (.csv), o mapeamento TUSS x SIGTAP (.csv), ou o pacote da SIGTAP (.zip)">Importar tabela de exames</button>
       <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
@@ -558,13 +404,10 @@
       <button class="btn ghost" id="btn-med" title="Lista de preços da CMED/Anvisa (.xlsx), ou planilha com colunas nome / apresentacao / via">Importar medicamentos</button>
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
-      <div class="tema-lin"><label for="tema-sel">Tema</label><select id="tema-sel" class="f"><option value="">Automático (do sistema)</option><option value="light">Claro</option><option value="dark">Escuro</option></select></div>
-      <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
-      <div class="muted" id="off-status" style="padding:0 4px;font-size:12px;line-height:1.4"></div>
-      <div class="muted" id="versao" style="padding:2px 4px;font-size:12px"></div>
-      </div>
-      </details>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
+      <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
+      <div class="muted" id="off-status" style="padding:0 4px;font-size:11px;line-height:1.4"></div>
+      <div class="muted" id="versao" style="padding:2px 4px;font-size:11px"></div>
     </div>
   </aside>
 
@@ -572,7 +415,7 @@
     <div class="faixa-off" id="faixa-off" role="status" aria-live="polite"></div>
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
-      <span class="badge-proto" title="Protótipo · dados fictícios · não usar com pacientes reais">Protótipo<span class="bp-longo"> · dados fictícios · não usar com pacientes reais</span></span>
+      <span class="badge-proto">Protótipo · dados fictícios · não usar com pacientes reais</span>
       <span class="tb-dir"><select id="unid-ativa" class="unid-sel hidden" title="Unidade onde você está atendendo hoje"></select>
       <span class="who" id="who"></span></span>
     </div>
@@ -1432,14 +1275,6 @@ $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({e
     ?'Sem conexão — entrar exige internet. Depois de entrar, o uso offline funciona.':error.message,true); };
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
 if($('li-google')) $('li-google').onclick=entrarComGoogle;
-// tema: automático segue o sistema; a escolha vale só neste aparelho
-(()=>{ const sel=$('tema-sel'); if(!sel) return;
-  try{ sel.value=localStorage.getItem('pep_tema')||''; }catch(e){}
-  sel.onchange=()=>{ const v=sel.value; try{ v?localStorage.setItem('pep_tema',v):localStorage.removeItem('pep_tema'); }catch(e){}
-    if(v) document.documentElement.dataset.theme=v; else delete document.documentElement.dataset.theme;
-    if(usuarioAtual) renderMain(); };
-  if(window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{ if(!sel.value&&usuarioAtual) renderMain(); });
-})();
 $('btn-logout').onclick=async()=>{
   const n=OFF.pendentes();
   if(n&&!confirm('Há '+n+' registro(s) aguardando envio.\n\nSe você sair, eles continuam guardados neste aparelho, mas só sobem quando você entrar de novo AQUI. Sair mesmo assim?')) return;
@@ -1549,13 +1384,9 @@ function analitoDe(nomeExame){
 // eixos no mesmo gráfico. Série única dispensa legenda: o título nomeia o que
 // está sendo mostrado. Ponto fora da referência ganha cor de status E rótulo
 // visível, para a informação não depender só da cor.
-const VIZ_CLARO={linha:'#0a6fbd', fora:'#c62828', grade:'#e3ebf3', eixo:'#8ea6c0', banda:'#eef5fb', texto:'#13293f', borda:'#fff'};
-const VIZ_ESCURO={linha:'#5aa9ec', fora:'#ff8f8f', grade:'#2a3b4e', eixo:'#7f95ad', banda:'#1a3149', texto:'#e3ebf4', borda:'#16222f'};
-const temaEscuro=()=>{ const t=document.documentElement.dataset.theme; return t==='dark'||(t!=='light'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches); };
-let VIZ=VIZ_CLARO;
+const VIZ={linha:'#0a6fbd', fora:'#c62828', grade:'#e3ebf3', eixo:'#8ea6c0', banda:'#eef5fb'};
 function fmtNum(v,casas){ return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:casas,maximumFractionDigits:casas}); }
 function graficoEvolucao(pontos,meta){
-  VIZ=temaEscuro()?VIZ_ESCURO:VIZ_CLARO;
   const L=46,R=12,T=14,B=26,W=330,H=150, w=W-L-R, h=H-T-B;
   const xs=pontos.map(p=>new Date(p.data_coleta+'T12:00:00').getTime());
   const ys=pontos.map(p=>Number(p.valor));
@@ -1583,7 +1414,7 @@ function graficoEvolucao(pontos,meta){
   pontos.forEach((p,i)=>{
     const fx=(rmin!=null&&ys[i]<rmin)||(rmax!=null&&ys[i]>rmax);
     const cx=px(xs[i]).toFixed(1), cy=py(ys[i]).toFixed(1);
-    g+='<circle cx="'+cx+'" cy="'+cy+'" r="4.5" fill="'+(fx?VIZ.fora:VIZ.linha)+'" stroke="'+VIZ.borda+'" stroke-width="2"></circle>';
+    g+='<circle cx="'+cx+'" cy="'+cy+'" r="4.5" fill="'+(fx?VIZ.fora:VIZ.linha)+'" stroke="#fff" stroke-width="2"></circle>';
     // só o primeiro, o último e os fora da referência ganham rótulo
     if(fx||i===0||i===pontos.length-1){
       // encosta o rótulo das pontas para dentro, senão o primeiro cai sobre os
@@ -1592,7 +1423,7 @@ function graficoEvolucao(pontos,meta){
       const anc=nas?(i===0?'start':'end'):'middle';
       const dx=nas?(i===0?6:-6):0;
       g+='<text x="'+(+cx+dx)+'" y="'+(+cy-9)+'" text-anchor="'+anc+'" font-size="10.5" font-weight="700" fill="'+
-         (fx?VIZ.fora:VIZ.texto)+'">'+esc(fmtNum(ys[i],casas))+(fx?' !':'')+'</text>';
+         (fx?VIZ.fora:'#13293f')+'">'+esc(fmtNum(ys[i],casas))+(fx?' !':'')+'</text>';
     }
     g+='<rect x="'+(+cx-14)+'" y="'+T+'" width="28" height="'+h+'" fill="transparent" class="hit"'+
        ' data-t="'+esc(dataBRsimples(p.data_coleta)+' · '+fmtNum(ys[i],casas)+' '+(p.unidade||meta.unidade||'')+
@@ -1814,7 +1645,7 @@ async function renderFichaPaciente(c){
       if(!porAnalito.has(r.analito)) porAnalito.set(r.analito,[]);
       porAnalito.get(r.analito).push(r); });
     const series=[...porAnalito.entries()]
-      .map(([k,v])=>({meta:analitos.find(a=>a.chave===k)||{chave:k,rotulo:(v.find(r=>r.exame)||{}).exame||k,unidade:(v.find(r=>r.unidade)||{}).unidade||'',casas:2},pontos:v}))
+      .map(([k,v])=>({meta:analitos.find(a=>a.chave===k)||{chave:k,rotulo:k,casas:2},pontos:v}))
       .filter(x=>x.pontos.length>=2)
       .sort((a,b)=>(a.meta.ordem||99)-(b.meta.ordem||99));
     if(series.length){
@@ -2413,7 +2244,7 @@ const qtdExtenso=q=>{ const m=String(q||'').match(/^\s*(\d{1,4})\b\s*(.*)$/); if
 
 function itensReceita(meds,extenso){
   const itens=meds.map(m=>({ n:m.medicamento, q:extenso?qtdExtenso(m.quantidade):(m.quantidade||''), via:viaGrupo(m.via),
-    d:[m.dose,m.frequencia,m.duracao].filter(Boolean).join(', ')+(m.uso_continuo&&!/cont[ií]nuo/i.test(m.duracao||'')?((m.dose||m.frequencia||m.duracao)?' — ':'')+'uso contínuo':'') }));
+    d:[m.dose,m.frequencia,m.duracao].filter(Boolean).join(', ')+(m.uso_continuo?((m.dose||m.frequencia||m.duracao)?' — ':'')+'uso contínuo':'') }));
   const grupos=[]; itens.forEach(it=>{ let g=grupos.find(x=>x.titulo===it.via); if(!g){ g={titulo:it.via,itens:[]}; grupos.push(g); } g.itens.push(it); });
   return {itens,grupos};
 }
@@ -2475,7 +2306,7 @@ function docRelatorio(r,quando,unidadeId){
   if(r.tipo==='inss'){
     titulo='Relatório médico — Para fins de perícia médica';
     secoes.push({t:'',txt:(t(r.destinatario)?t(r.destinatario)+'\n':'')+
-      'Declaro, para fins de avaliação pela Perícia Médica, que '+generoPac(pacienteSel).o+' paciente acima identificad'+generoPac(pacienteSel).ado.slice(2)+' encontra-se em acompanhamento médico nesta unidade, com o quadro descrito a seguir.'});
+      'Declaro, para fins de avaliação pela Perícia Médica, que o(a) paciente acima identificado(a) encontra-se em acompanhamento médico nesta unidade, com o quadro descrito a seguir.'});
     [['Diagnóstico(s)',r.diagnosticos],['História clínica',r.historia],['Exames complementares',r.exames],
      ['Tratamento em curso',r.tratamento],['Limitações funcionais',r.limitacoes],['Prognóstico',r.prognostico]]
       .forEach(([k,v])=>{ if(t(v)) secoes.push({t:k,txt:t(v)}); });
@@ -2493,12 +2324,9 @@ function docRelatorio(r,quando,unidadeId){
     fecho:'Coloco-me à disposição para esclarecimentos adicionais.'});
 }
 
-// concordância pelo sexo do cadastro; sem sexo informado, mantém a forma neutra "o(a)"
-function generoPac(p){ const s=String((p||{}).sexo||'').trim().toLowerCase();
-  return s.startsWith('f')?{o:'a',ado:'ada',apto:'apta'}:s.startsWith('m')?{o:'o',ado:'ado',apto:'apto'}:{o:'o(a)',ado:'ado(a)',apto:'apto(a)'}; }
 function docAtestado(at,quando,unidadeId){
   if(!at) return null;
-  const p=pacienteSel||{}, g=generoPac(p);
+  const p=pacienteSel||{};
   const rot={afastamento:'Atestado médico',comparecimento:'Declaração de comparecimento',
              acompanhante:'Declaração de acompanhante',aptidao:'Atestado de aptidão física'};
   let corpo;
@@ -2507,14 +2335,14 @@ function docAtestado(at,quando,unidadeId){
     'vinte e seis','vinte e sete','vinte e oito','vinte e nove','trinta','trinta e um'];
   const diasTxt=n=> n==null||n==='' ? '___ dias' : (ext[n]? n+' ('+ext[n]+') '+(n==1?'dia':'dias') : n+(n==1?' dia':' dias'));
   if(at.tipo==='afastamento')
-    corpo='Atesto, para os devidos fins, que '+g.o+' paciente acima necessita de afastamento de suas atividades por '+
+    corpo='Atesto, para os devidos fins, que o(a) paciente acima necessita de afastamento de suas atividades por '+
           diasTxt(at.dias)+', a partir desta data.';
   else if(at.tipo==='comparecimento')
-    corpo='Declaro, para os devidos fins, que '+g.o+' paciente acima compareceu a esta consulta médica nesta data.';
+    corpo='Declaro, para os devidos fins, que o(a) paciente acima compareceu a esta consulta médica nesta data.';
   else if(at.tipo==='acompanhante')
     corpo='Declaro, para os devidos fins, que o(a) acima identificado(a) acompanhou paciente a esta consulta médica nesta data.';
   else
-    corpo='Atesto, para os devidos fins, que '+g.o+' paciente acima foi avaliad'+g.ado.slice(2)+' e encontra-se '+g.apto+' para a prática de atividade física.';
+    corpo='Atesto, para os devidos fins, que o(a) paciente acima foi avaliado(a) e encontra-se apto(a) para a prática de atividade física.';
   const pars=[corpo]; if(at.texto) pars.push(at.texto);
   const obs=at.cid10?[['CID-10',at.cid10]]:[];
   return montarDoc(rot[at.tipo]||'Atestado', [], obs, quando, unidadeId, {paragrafos:pars, semNumero:true});
@@ -2556,7 +2384,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-17.11 · documentos, painel, abas e tema escuro';
+const VERSAO='2026-11-17.9 · excluir anexo';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2601,9 +2429,8 @@ function docsExames(exames,cab,quando,unidadeId){
 async function renderAtendimentoSalvo(c){
   const p=pacienteSel, tipos={no_dia:'Consulta no dia',agendada:'Consulta agendada',cuidado_continuado:'Cuidado continuado',urgencia:'Urgência'};
   const head=el('div','phead');
-  const bVolta=el('button','btn ghost btn-volta','←'); bVolta.title='Voltar para a ficha'; bVolta.setAttribute('aria-label','Voltar para a ficha do paciente');
-  bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
-  head.insertAdjacentHTML('beforeend','<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">Atendimento registrado</div></div><div class="sp"></div>');
+  head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">Atendimento registrado</div></div><div class="sp"></div>';
+  const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
   c.appendChild(head);
   const box=el('div','soap'); c.appendChild(box);
   box.appendChild(el('div','muted','Carregando…'));
@@ -2672,50 +2499,27 @@ async function renderAtendimentoSalvo(c){
 
   const cardAxA=el('div','card'); cardAxA.style.margin='14px 0'; box.appendChild(cardAxA); renderAnexos(cardAxA,{atendimentoId:a.id});
 
-  // documentos desta consulta: um cartão logo abaixo da data, uma linha por documento
-  const docCard=el('div','card doc-card');
-  docCard.innerHTML='<div class="ch"><span>Documentos desta consulta</span></div>';
-  const linhaDoc=(titulo,detalhe,botoes)=>{ const r=el('div','doc-lin');
-    r.innerHTML='<div class="doc-tx"><b>'+esc(titulo)+'</b>'+(detalhe?'<span class="muted">'+esc(detalhe)+'</span>':'')+'</div>';
-    const bx=el('div','doc-bt'); botoes.forEach(([rot,cls,fn,tit])=>{ const bb=el('button','btn sm '+cls,rot); if(tit) bb.title=tit; bb.onclick=fn; bx.appendChild(bb); });
-    r.appendChild(bx); docCard.appendChild(r); };
-  if(meds.length){
-    const cl={}; meds.forEach(m=>{ const c=classeMed(m); cl[c]=(cl[c]||0)+1; });
-    const partes=[];
-    if(cl.comum) partes.push('receituário comum');
-    if(cl.controle) partes.push('controle especial (2 vias)');
-    if(cl.antimicrobiano) partes.push('antimicrobiano (2 vias)');
-    if(cl.glp1) partes.push('GLP-1 (2 vias)');
-    const fora=Object.keys(BLOQ).filter(k=>cl[k]).map(k=>BLOQ[k]);
-    linhaDoc('Receita', meds.length+(meds.length>1?' medicamentos':' medicamento')+' · '+partes.join(', ')+(fora.length?' · fora do sistema: '+fora.join('; '):''),[
-      ['PDF','primary',()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id))],
-      ['Imprimir','ghost',()=>imprimirDoc(docReceita(meds,a.data_atendimento,a.unidade_id))],
-      ['Escolher itens…','ghost',()=>abrirSelecaoReceita(meds,a),'Imprimir só alguns medicamentos']]);
-  }
+  const acoes=el('div','', '');
+  acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
   if(exames.length){
     const ng=agruparExames(exames).length;
-    linhaDoc('Solicitação de exames', exames.length+(exames.length>1?' exames':' exame')+(ng>1?' · '+ng+' guias':''),[
-      ['PDF','ghost',()=>baixarPDF(docsExames(exames,cab,a.data_atendimento,a.unidade_id))],
-      ['Imprimir','ghost',()=>imprimirDoc(docsExames(exames,cab,a.data_atendimento,a.unidade_id))]]);
-  }
+    const b1=el('button','btn ghost',ng>1?'Imprimir exames ('+ng+' guias)':'Imprimir exames');
+    b1.onclick=()=>imprimirDoc(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b1);
+    const b2=el('button','btn ghost',ng>1?'PDF dos exames ('+ng+' guias)':'PDF dos exames');
+    b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b2); }
+  if(meds.length){
+    const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b3);
+    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4);
+    const b4b=el('button','btn ghost','Escolher itens da receita…'); b4b.onclick=()=>abrirSelecaoReceita(meds,a); acoes.appendChild(b4b); }
   if(atest){
-    linhaDoc({afastamento:'Atestado de afastamento',comparecimento:'Declaração de comparecimento',acompanhante:'Declaração de acompanhante',aptidao:'Atestado de aptidão física'}[atest.tipo]||'Atestado',
-      [atest.dias?atest.dias+' dia(s)':'',atest.cid10?'com CID '+atest.cid10:'sem CID'].filter(Boolean).join(' · '),[
-      ['PDF','ghost',()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id))],
-      ['Imprimir','ghost',()=>imprimirDoc(docAtestado(atest,a.data_atendimento,a.unidade_id))]]);
-  }
+    const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b5);
+    const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6); }
   if(encs.length){
-    linhaDoc(encs.length>1?'Encaminhamentos ('+encs.length+')':'Encaminhamento', encs.map(e=>e.especialidade).join(', ')+(encs.length>1?' · uma folha para cada':''),[
-      ['PDF','ghost',()=>baixarPDF(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id)))],
-      ['Imprimir','ghost',()=>imprimirDoc(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id)))]]);
-  }
+    const b9=el('button','btn ghost',encs.length>1?'Imprimir encaminhamentos ('+encs.length+')':'Imprimir encaminhamento'); b9.onclick=()=>imprimirDoc(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b9);
+    const b10=el('button','btn ghost',encs.length>1?'PDF dos encaminhamentos':'PDF do encaminhamento'); b10.onclick=()=>baixarPDF(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b10); }
   if(rel){
-    linhaDoc(TIPOS_REL[rel.tipo]||'Relatório', [rel.destinatario,rel.finalidade].filter(Boolean).join(' · '),[
-      ['PDF','ghost',()=>baixarPDF(docRelatorio(rel,a.data_atendimento,a.unidade_id))],
-      ['Imprimir','ghost',()=>imprimirDoc(docRelatorio(rel,a.data_atendimento,a.unidade_id))]]);
-  }
-  if(docCard.querySelector('.doc-lin')) box.insertBefore(docCard, box.children[1]||null);
-
+    const b7=el('button','btn ghost','Imprimir relatório'); b7.onclick=()=>imprimirDoc(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b7);
+    const b8=el('button','btn ghost','PDF do relatório'); b8.onclick=()=>baixarPDF(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b8); }
   const bEd=el('button','btn ghost','Editar atendimento');
   bEd.onclick=()=>{
     examItens.length=0; prescItens.length=0; probSel=new Set();
@@ -2728,7 +2532,8 @@ async function renderAtendimentoSalvo(c){
     encItens=encs.map(e=>Object.assign({},e)); encRemovidos=[];
     atendAtual={id:a.id,editando:true,dados:a}; renderMain();
   };
-  head.appendChild(bEd);
+  acoes.insertBefore(bEd,acoes.firstChild);
+  if(acoes.children.length) box.appendChild(acoes);
 }
 
 // ---------- atendimento (SOAP) ----------
@@ -2762,16 +2567,20 @@ async function repetirUltima(){
 function renderAtendimento(c){
   const p=pacienteSel, edit=!!(atendAtual&&atendAtual.editando);
   const head=el('div','phead');
-  const bVolta=el('button','btn ghost btn-volta','←'); bVolta.title='Voltar para a ficha'; bVolta.setAttribute('aria-label','Voltar para a ficha do paciente');
-  bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
-  head.insertAdjacentHTML('beforeend','<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">'+(edit?'Editando atendimento':'Novo atendimento')+' · '+
-    [p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>');
-  if(!edit){ const bRep=el('button','btn soft','↻ Repetir da última consulta'); bRep.title='Traz medicamentos de uso contínuo e exames da última consulta'; bRep.onclick=repetirUltima; head.appendChild(bRep); }
+  head.innerHTML='<div><div class="nm">'+esc(p.nome)+'</div><div class="mt">'+(edit?'Editando atendimento':'Novo atendimento')+' · '+
+    [p.sexo,idade(p.data_nascimento)].filter(Boolean).map(esc).join(' · ')+'</div></div><div class="sp"></div>';
+  // logotipo do CalcMed (mesmo desenho do site), na cor da marca
+  const bCalc=el('button','btn btn-calcmed','<svg viewBox="0 0 96 96" width="18" height="18" aria-hidden="true"><rect width="96" height="96" rx="22" fill="#fff"/>'+
+    '<g fill="#0E8F80"><rect x="38" y="12" width="20" height="20" rx="6"/><rect x="12" y="38" width="20" height="20" rx="6"/><rect x="38" y="38" width="20" height="20" rx="6"/>'+
+    '<rect x="64" y="38" width="20" height="20" rx="6"/><rect x="38" y="64" width="20" height="20" rx="6"/></g><g fill="#0E8F80" opacity=".4"><rect x="12" y="12" width="20" height="20" rx="6"/>'+
+    '<rect x="64" y="12" width="20" height="20" rx="6"/><rect x="12" y="64" width="20" height="20" rx="6"/><rect x="64" y="64" width="20" height="20" rx="6"/></g></svg>'+
+    '<span>Calc<b>Med</b></span><span class="cm-seta">▾</span>');
+  bCalc.title='Abrir o CalcMed com os dados desta consulta'; bCalc.onclick=ev=>{ ev.stopPropagation(); menuCalcMed(bCalc); }; head.appendChild(bCalc);
+  const bEsc=el('button','btn ghost','Escalas'); bEsc.title='Escalas geriátricas (MEEM, GDS-15, Katz, Lawton, TUG, marcha)';
+  bEsc.onclick=()=>abrirEscala(atendAtual&&atendAtual.id||null,false); head.appendChild(bEsc);
   const bMod=el('button','btn ghost','Modelos de texto'); bMod.onclick=abrirModelos; head.appendChild(bMod);
-  const bFer=el('button','btn ghost','Ferramentas <span class="cm-seta" aria-hidden="true">▾</span>'); bFer.setAttribute('aria-haspopup','menu');
-  bFer.title='CalcMed e escalas geriátricas';
-  bFer.onclick=ev=>{ ev.stopPropagation(); menuCalcMed(bFer,[['Escalas geriátricas (MEEM, GDS-15, Katz, Lawton, TUG, marcha)',()=>abrirEscala(atendAtual&&atendAtual.id||null,false)]]); };
-  head.appendChild(bFer);
+  if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
+  const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
   c.appendChild(head);
   if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
 
@@ -2785,49 +2594,50 @@ function renderAtendimento(c){
       </select></div></div>
 
     <div class="sbox s"><div class="h"><span class="bdg">S</span> Subjetivo</div><div class="bd">
-      <textarea id="f-s" class="f" aria-label="Subjetivo" placeholder="Queixa e história do paciente…"></textarea></div></div>
+      <textarea id="f-s" class="f" placeholder="Queixa e história do paciente…"></textarea></div></div>
 
     <div class="sbox o"><div class="h"><span class="bdg">O</span> Objetivo</div><div class="bd">
-      <div class="field"><textarea id="f-o" class="f" aria-label="Objetivo — exame físico" placeholder="Exame físico…"></textarea></div>
+      <div class="field"><textarea id="f-o" class="f" placeholder="Exame físico…"></textarea></div>
       <div class="grid">
-        <div class="field"><label for="f-pas">PA sistólica</label><input id="f-pas" class="f" type="number"></div>
-        <div class="field"><label for="f-pad">PA diastólica</label><input id="f-pad" class="f" type="number"></div>
-        <div class="field"><label for="f-fc">FC (bpm)</label><input id="f-fc" class="f" type="number"></div>
-        <div class="field"><label for="f-peso">Peso (kg)</label><input id="f-peso" class="f" type="number" step="0.1"></div>
-        <div class="field"><label for="f-alt">Altura (cm)</label><input id="f-alt" class="f" type="number" step="0.1"></div>
-        <div class="field"><label for="f-gli">Glicemia (mg/dL)</label><input id="f-gli" class="f" type="number"></div>
-        <div class="field"><label for="f-creat">Creatinina (mg/dL)</label><input id="f-creat" class="f" type="number" step="0.01"></div>
+        <div class="field"><label>PA sistólica</label><input id="f-pas" class="f" type="number" placeholder="120"></div>
+        <div class="field"><label>PA diastólica</label><input id="f-pad" class="f" type="number" placeholder="80"></div>
+        <div class="field"><label>FC (bpm)</label><input id="f-fc" class="f" type="number" placeholder="72"></div>
+        <div class="field"><label>Peso (kg)</label><input id="f-peso" class="f" type="number" step="0.1"></div>
+        <div class="field"><label>Altura (cm)</label><input id="f-alt" class="f" type="number" step="0.1"></div>
+        <div class="field"><label>Glicemia (mg/dL)</label><input id="f-gli" class="f" type="number"></div>
+        <div class="field"><label>Creatinina (mg/dL)</label><input id="f-creat" class="f" type="number" step="0.01" placeholder="1,0"></div>
       </div>
       <div id="o-clcr" class="muted" style="margin-top:10px"></div></div></div>
 
     <div class="sbox a"><div class="h"><span class="bdg">A</span> Avaliação</div><div class="bd">
-      <div class="field"><textarea id="f-a" class="f" aria-label="Avaliação" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
+      <div class="field"><textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
       <label style="margin-bottom:6px">Problemas avaliados nesta consulta</label>
       <div id="f-probs">`+
         (ativos.length ? ativos.map(pb=>'<div class="chkp"><input type="checkbox" value="'+pb.id+'"><span>'+esc(pb.descricao)+
-            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</span></div>').join('')
+            (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</span>'+
+            '<button class="x" data-rm="'+pb.id+'" data-desc="'+esc(pb.descricao)+'" title="Remover da lista do paciente">✕</button></div>').join('')
           : '<div class="muted">Nenhum problema ativo. Use o botão abaixo para registrar.</div>')+`
       </div>
-      <div class="muted" style="margin-top:4px">Marque os que você está tratando hoje. Para resolver ou apagar um problema, use a ficha do paciente.</div>
+      <div class="muted" style="margin-top:4px">Marque os que você está tratando hoje. O ✕ apaga o problema da lista do paciente.</div>
       <button class="btn ghost sm" id="f-addprob" style="margin-top:8px">+ Novo problema / condição</button>
     </div></div>
 
     <div class="sbox p"><div class="h"><span class="bdg">P</span> Plano</div><div class="bd">
-      <div class="field"><textarea id="f-p" class="f" aria-label="Plano" placeholder="Plano de cuidado…"></textarea></div>
-      <div class="ptabs" role="tablist" aria-label="Documentos do plano">
-        <button class="ptab active" data-pt="ex" role="tab" id="pt-ex" aria-controls="pp-ex" aria-selected="true">Exames<span class="pt-n" aria-hidden="true"></span></button>
-        <button class="ptab" data-pt="rx" role="tab" id="pt-rx" aria-controls="pp-rx" aria-selected="false" tabindex="-1">Prescrição<span class="pt-n" aria-hidden="true"></span></button>
-        <button class="ptab" data-pt="at" role="tab" id="pt-at" aria-controls="pp-at" aria-selected="false" tabindex="-1">Atestado<span class="pt-n" aria-hidden="true"></span></button>
-        <button class="ptab" data-pt="rl" role="tab" id="pt-rl" aria-controls="pp-rl" aria-selected="false" tabindex="-1">Relatório<span class="pt-n" aria-hidden="true"></span></button>
-        <button class="ptab" data-pt="en" role="tab" id="pt-en" aria-controls="pp-en" aria-selected="false" tabindex="-1">Encaminhamento<span class="pt-n" aria-hidden="true"></span></button>
+      <div class="field"><textarea id="f-p" class="f" placeholder="Plano de cuidado…"></textarea></div>
+      <div class="ptabs">
+        <button class="ptab active" data-pt="ex">Exames</button>
+        <button class="ptab" data-pt="rx">Prescrição</button>
+        <button class="ptab" data-pt="at">Atestado</button>
+        <button class="ptab" data-pt="rl">Relatório</button>
+        <button class="ptab" data-pt="en">Encaminhamento</button>
       </div>
-      <div data-panel="ex" role="tabpanel" id="pp-ex" aria-labelledby="pt-ex">
+      <div data-panel="ex">
         <button class="btn primary sm" id="open-exam">+ Adicionar exame</button>
         <table style="margin-top:10px"><thead><tr><th>Exame</th><th>Código</th><th></th></tr></thead><tbody id="ex-tbody"></tbody></table>
         <div id="ex-empty" class="muted" style="margin-top:8px">Nenhum exame adicionado.</div>
         <div id="ex-guias" class="muted" style="margin-top:8px"></div>
       </div>
-      <div data-panel="rx" role="tabpanel" id="pp-rx" aria-labelledby="pt-rx" class="hidden">
+      <div data-panel="rx" class="hidden">
         <button class="btn primary sm" id="open-presc">+ Adicionar medicamento</button>
         <div id="rx-clcr" class="muted" style="margin:8px 0"></div>
         <table style="margin-top:10px"><thead><tr><th>Medicamento</th><th>Posologia</th><th>Qtd.</th><th></th></tr></thead><tbody id="rx-tbody"></tbody></table>
@@ -2836,7 +2646,7 @@ function renderAtendimento(c){
         <div id="rx-avisos" style="margin-top:10px"></div>
         <div id="rx-revisao" style="margin-top:12px"></div>
       </div>
-      <div data-panel="at" role="tabpanel" id="pp-at" aria-labelledby="pt-at" class="hidden">
+      <div data-panel="at" class="hidden">
         <div class="grid">
           <div class="field"><label>Tipo</label><select id="at-tipo" class="f">
             <option value="">Não emitir atestado</option>
@@ -2850,7 +2660,7 @@ function renderAtendimento(c){
         <div class="field" style="margin:0"><label>Observação</label><textarea id="at-obs" class="f" placeholder="Texto adicional do atestado (opcional)"></textarea></div>
         <div class="muted" style="margin-top:8px">O CID só deve constar com autorização do paciente.</div>
       </div>
-      <div data-panel="en" role="tabpanel" id="pp-en" aria-labelledby="pt-en" class="hidden">
+      <div data-panel="en" class="hidden">
         <div id="en-semtabela" class="avso outro hidden">Para salvar encaminhamentos, rode o plano_cuidado_schema.sql no Supabase.</div>
         <div class="grid">
           <div class="field"><label>Especialidade / serviço *</label><input id="en-esp" class="f" list="en-esp-lista" placeholder="Ex.: Cardiologia"></div>
@@ -2876,7 +2686,7 @@ function renderAtendimento(c){
         <table style="margin-top:10px"><tbody id="en-tbody"></tbody></table>
         <div class="muted" id="en-vazio" style="margin-top:6px">Nenhum encaminhamento nesta consulta. Cada especialidade sai numa folha própria.</div>
       </div>
-      <div data-panel="rl" role="tabpanel" id="pp-rl" aria-labelledby="pt-rl" class="hidden">
+      <div data-panel="rl" class="hidden">
         <div class="grid">
           <div class="field"><label>Tipo</label><select id="rl-tipo" class="f">
             <option value="">Não emitir relatório</option>
@@ -2913,29 +2723,14 @@ function renderAtendimento(c){
       <div class="muted hidden" id="rt-semcoluna" style="margin-top:8px">Para guardar o retorno, rode o plano_cuidado_schema.sql no Supabase.</div>
     </div></div>
 
-    <div class="atd-espaco" aria-hidden="true"></div>
-    <div class="atd-acoes">
-      <span class="muted atd-acoes-info">`+esc(p.nome)+`</span>
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:30px">
       <button class="btn ghost" id="btn-cancelar">Cancelar</button>
       <button class="btn primary" id="btn-finalizar">`+(edit?'Salvar alterações':'Finalizar e salvar atendimento')+`</button>
     </div>
    </div>`);
 
-  // abas do plano: clique, setas e Home/End (padrão ARIA de abas); o número mostra o que vai ser emitido
-  const abas=[...c.querySelectorAll('.ptab')];
-  c.querySelector('.ptabs').addEventListener('keydown',ev=>{
-    const i=abas.indexOf(document.activeElement); if(i<0) return;
-    const j={ArrowRight:i+1,ArrowLeft:i-1,Home:0,End:abas.length-1}[ev.key]; if(j==null) return;
-    ev.preventDefault(); const t=abas[(j+abas.length)%abas.length]; t.focus(); t.click(); });
-  const contarAbas=()=>{ const n={ex:c.querySelectorAll('#ex-tbody tr').length, rx:c.querySelectorAll('#rx-tbody tr').length, en:c.querySelectorAll('#en-tbody tr').length,
-      at:$('at-tipo')&&$('at-tipo').value?1:0, rl:$('rl-tipo')&&$('rl-tipo').value?1:0};
-    abas.forEach(t=>{ const v=n[t.dataset.pt]||0, sp=t.querySelector('.pt-n'); sp.textContent=v?(['at','rl'].includes(t.dataset.pt)?'✓':v):'';
-      t.setAttribute('aria-label',t.firstChild.textContent+(v?(['at','rl'].includes(t.dataset.pt)?' (preenchido)':' ('+v+')'):'')); }); };
-  ['ex-tbody','rx-tbody','en-tbody'].forEach(id=>{ const el2=$(id); if(el2) new MutationObserver(contarAbas).observe(el2,{childList:true}); });
-  ['at-tipo','rl-tipo'].forEach(id=>{ const el2=$(id); if(el2) el2.addEventListener('change',contarAbas); });
-  setTimeout(contarAbas,0);
-  abas.forEach(t=>t.onclick=()=>{
-    abas.forEach(x=>{ const on=x===t; x.classList.toggle('active',on); x.setAttribute('aria-selected',on?'true':'false'); x.tabIndex=on?0:-1; });
+  c.querySelectorAll('.ptab').forEach(t=>t.onclick=()=>{
+    c.querySelectorAll('.ptab').forEach(x=>x.classList.toggle('active',x===t));
     c.querySelectorAll('[data-panel]').forEach(pn=>pn.classList.toggle('hidden',pn.dataset.panel!==t.dataset.pt));
   });
   $('open-exam').onclick=()=>{ renderExChips(); exDiag(''); openM('m-exam'); };
@@ -3264,34 +3059,22 @@ async function renderPainel(c){
   $('pn-atual').onclick=()=>renderMain();
   let d; try{ d=await dadosPainel(); }catch(err){ $('pn-corpo').innerHTML='<div class="empty">Não consegui montar o painel: '+esc(err.message||err)+'</div>'; return; }
   if(tela!=='painel'||pacienteSel) return;
-  // faixas: ≥ 70% bom, 50–69% atenção, < 50% abaixo; grupo vazio não vira "0%"
-  const faixa=pct=>pct>=70?['ok','na meta']:pct>=50?['med','atenção']:['bx','abaixo de 50%'];
-  const barra=(rot,n,tot,pct)=>{
-    if(!tot) return '<div class="pn-bar vazio"><div class="pn-rot">'+esc(rot)+'</div><div class="pn-pct">—</div><div class="pn-sub">Nenhum paciente neste grupo</div></div>';
-    const [cls,tx]=faixa(pct);
-    return '<div class="pn-bar '+cls+'"><div class="pn-rot">'+esc(rot)+'</div>'+
-      '<div class="pn-lin"><span class="pn-pct">'+pct+'%</span><span class="chip '+(cls==='ok'?'chip-ok':cls==='bx'?'chip-red':'chip-warn')+'">'+tx+'</span></div>'+
-      '<div class="pn-track" role="img" aria-label="'+pct+'%"><div class="pn-fill" style="width:'+pct+'%"></div></div>'+
-      '<div class="pn-sub">'+n+' de '+tot+' pacientes</div></div>'; };
-  const pend=(n,l,tela,id)=>'<button class="ba-kpi pn-pend'+(n?' tem':'')+'" type="button" data-ir="'+tela+'" id="'+id+'"><div class="n">'+n+
-    (n?' <span class="chip chip-red">atenção</span>':' <span class="chip chip-ok">em dia</span>')+'</div><div class="l">'+esc(l)+(tela?' <span aria-hidden="true">→</span>':'')+'</div></button>';
+  const kpi=(n,l,alerta)=>'<div class="ba-kpi"><div class="n">'+n+(alerta?' <small>'+alerta+'</small>':'')+'</div><div class="l">'+esc(l)+'</div></div>';
+  const barra=(rot,n,tot,pct,inverte)=>'<div class="pn-bar"><div class="t"><span>'+esc(rot)+'</span><b>'+pct+'%</b></div>'+
+    '<div class="pn-track"><div class="pn-fill'+((inverte?pct<50:pct<50)?' alt':'')+'" style="width:'+pct+'%"></div></div>'+
+    '<div class="pn-sub">'+n+' de '+tot+'</div></div>';
   $('pn-corpo').innerHTML=
-    '<h3 class="sec-title">Qualidade do acompanhamento</h3>'+
+    '<div class="ba-kpis">'+kpi(d.total,'Pacientes')+kpi(d.has,'Hipertensos')+kpi(d.dm,'Diabéticos')+kpi(d.idoso,BA.idade_idoso+' anos ou mais')+'</div>'+
+    '<div class="ba-kpis">'+kpi(d.encAberto,'Encaminhamentos em aberto')+kpi(d.retatraso,'Retornos atrasados',d.retatraso?'atenção':'')+
+      (d.vacinasOK?kpi(d.gripe,'Influenza em atraso (grupos)',d.gripe?'atenção':''):'')+'</div>'+
+    '<h3 class="sec-title" style="margin-top:18px">Qualidade do acompanhamento</h3>'+
     '<div class="pn-bars">'+
       barra('Hipertensos com PA controlada (última < 140/90)',d.paOk,d.has,d.paPct)+
       barra('Diabéticos com HbA1c em dia (≤ 6 meses)',d.hbaDia,d.dm,d.hbaPct)+
       barra('Diabéticos com HbA1c < 7%',d.hbaMeta,d.dm,d.hbaMetaPct)+
       barra('HAS/DM com creatinina no último ano',d.creatDia,d.cron,d.creatPct)+
     '</div>'+
-    '<h3 class="sec-title" style="margin-top:18px">Pendências</h3>'+
-    '<div class="ba-kpis">'+pend(d.retatraso,'Retornos atrasados','agenda','pn-ret')+
-      (d.vacinasOK?pend(d.gripe,'Influenza em atraso (grupos)','busca','pn-gripe'):'')+
-      '<div class="ba-kpi"><div class="n">'+d.encAberto+'</div><div class="l">Encaminhamentos em aberto</div></div></div>'+
-    '<h3 class="sec-title" style="margin-top:18px">População acompanhada</h3>'+
-    '<div class="pn-pop">'+[[d.total,'pacientes'],[d.has,'hipertensos'],[d.dm,'diabéticos'],[d.idoso,BA.idade_idoso+' anos ou mais']]
-      .map(([n,l])=>'<div><b>'+n+'</b> '+esc(l)+'</div>').join('')+'</div>'+
     '<div class="muted" style="line-height:1.5">Os grupos vêm da lista de problemas ativos (CID I10–I15 / E10–E14 ou descrição). "PA controlada" usa a última aferição registrada; "em dia" usa os mesmos prazos da busca ativa. Isto resume o que está no sistema — não é um indicador oficial do município.</div>';
-  $('pn-corpo').querySelectorAll('[data-ir]').forEach(b=>b.onclick=()=>abrirTela(b.dataset.ir));
 }
 
 async function renderBuscaAtiva(c){
@@ -3362,7 +3145,7 @@ const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); 
 function statusBackup(){
   const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
   e.textContent=u?'Último backup '+(d===0?'hoje':haQuanto(d))+' neste aparelho':'Nenhum backup feito neste aparelho';
-  e.style.color=(!u||d>7)?'var(--err-fg)':'';
+  e.style.color=(!u||d>7)?'#c62828':'';
 }
 async function gerarBackup(){
   const dados={}, faltou=[];
@@ -3507,7 +3290,7 @@ async function renderVacinas(card){
     (v.dose?' · '+esc(v.dose):'')+'<div class="muted" style="font-size:12px">'+esc(dataBRsimples(v.data))+
     [v.lote?'lote '+v.lote:'',v.observacao||''].filter(Boolean).map(x=>' · '+esc(x)).join('')+'</div></td>'+
     '<td style="text-align:right"><button class="x" data-rv="'+v.id+'" title="Remover">✕</button></td></tr>').join('')+'</tbody></table>';
-  html+='<div class="muted" style="font-size:12.5px;margin-top:8px">Apoio ao calendário do PNI — confira as indicações por condição e a campanha vigente.</div>';
+  html+='<div class="muted" style="font-size:11.5px;margin-top:8px">Apoio ao calendário do PNI — confira as indicações por condição e a campanha vigente.</div>';
   box.innerHTML=html;
   box.querySelectorAll('[data-rv]').forEach(b=>b.onclick=async()=>{
     const v=regs.find(x=>x.id===b.dataset.rv);
@@ -3598,7 +3381,7 @@ function abrirRevisaoLaudo(linhas,nomeArquivo,atendimentoId,viaOCR){
   const achados=casarResultadosLaudo(linhas);
   exContexto={atendimentoId:atendimentoId||null};
   $('ex-data').value=acharDataLaudo(linhas)||new Date().toISOString().slice(0,10);
-  $('ex-info').innerHTML=(viaOCR?'<b style="color:var(--warn-fg)">Leitura por OCR (foto) — confira com atenção redobrada, pode errar mais.</b> ':'')+
+  $('ex-info').innerHTML=(viaOCR?'<b style="color:#8a6414">Leitura por OCR (foto) — confira com atenção redobrada, pode errar mais.</b> ':'')+
     'Confira os valores contra o laudo'+(nomeArquivo?' "'+esc(nomeArquivo)+'"':'')+'. '+achados.length+' valor(es) reconhecido(s).';
   const tb=$('ex-tbody'); tb.innerHTML=achados.map((r,i)=>'<tr>'+
     '<td><input type="checkbox" data-i="'+i+'" checked></td>'+
@@ -3713,8 +3496,10 @@ function renderAnexos(card,opc){
     corpo.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>abrirAnexo(b.dataset.bx,true));
     corpo.querySelectorAll('[data-rx]').forEach(b=>b.onclick=async()=>{ const x=l.find(y=>y.id===b.dataset.rx);
       if(!confirm('Excluir "'+x.nome_arquivo+'"? Não dá para desfazer (a não ser por um backup).')) return;
+      if(!navigator.onLine){ toast('Excluir exige internet (o anexo fica na sua conta).',true); return; }
       const {data:del,error:e}=await sb.from('pep_anexos').delete().eq('id',x.id).select('id');
-      if(e||!del||!del.length){ toast('Não consegui excluir'+(e?': '+e.message:''),true); return; }
+      if(e){ toast('Não consegui excluir: '+e.message,true); return; }
+      if(!del||!del.length){ toast('O banco não permitiu excluir este anexo. Rode de novo o anexos_schema.sql no Supabase — ele corrige a permissão de exclusão.',true); return; }
       toast('Documento excluído'); listar(); });
   };
   btnAdd.onclick=()=>inp.click();
@@ -4306,16 +4091,8 @@ function revisarPrescricao(meds,ctx){
 }
 const NIVEL_REV={alto:{cls:'alergia',rot:'Alto'},atencao:{cls:'idoso',rot:'Atenção'},info:{cls:'outro',rot:'Rever'}};
 const TIPO_REV={interacao:'Interação',duplicidade:'Duplicidade',acb:'Anticolinérgico',stopp:'STOPP',start:'START'};
-function htmlRevisao(r,recolher){
+function htmlRevisao(r){
   if(!r.itens.length) return '<div class="muted">Nenhuma interação, duplicidade ou critério STOPP/START encontrado nas listas do sistema.</div>';
-  if(recolher){
-    // na ficha: alertas de nível alto ficam sempre à vista; os demais, recolhidos num resumo
-    const altos=r.itens.filter(x=>x.nivel==='alto'), resto=r.itens.filter(x=>x.nivel!=='alto');
-    const cont=resto.reduce((o,x)=>(o[TIPO_REV[x.tipo]]=(o[TIPO_REV[x.tipo]]||0)+1,o),{});
-    return (altos.length?htmlRevisao({itens:altos}):'')+(!resto.length?'':
-      '<details class="rev-rec"><summary><b>'+resto.length+(resto.length>1?' alertas de revisão':' alerta de revisão')+'</b> <span class="muted">· '+
-      esc(Object.entries(cont).map(([k,v])=>v+' '+k).join(', '))+'</span></summary>'+htmlRevisao({itens:resto})+'</details>');
-  }
   return r.itens.map(x=>'<div class="avso '+NIVEL_REV[x.nivel].cls+'"><b>'+esc(NIVEL_REV[x.nivel].rot)+' · '+esc(TIPO_REV[x.tipo])+':</b> '+esc(x.titulo)+
     (x.envolvidos.length?' <span class="muted">('+esc([...new Set(x.envolvidos)].join(', '))+')</span>':'')+'<div class="muted" style="margin-top:2px">'+esc(x.texto)+'</div></div>').join('');
 }
@@ -4351,7 +4128,7 @@ function renderRevisao(){
   box.innerHTML='<div class="rev-h">Revisão da prescrição <span class="muted">— '+regime.length+' medicamento(s)'+
     (ant.length?', dos quais '+ant.length+' de uso contínuo de consultas anteriores ('+esc(ant.map(m=>m.medicamento.split(/\s+\d/)[0]).join(', '))+')':'')+
     (r.acb?' · escore anticolinérgico (ACB) '+r.acb:'')+'</span></div>'+htmlRevisao(r)+
-    '<div class="muted" style="font-size:12.5px;margin-top:4px">Listas parciais (STOPP/START v3, ACB, Beers 2023): lembrete clínico, não substitui o julgamento nem a bula.</div>';
+    '<div class="muted" style="font-size:11.5px;margin-top:4px">Listas parciais (STOPP/START v3, ACB, Beers 2023): lembrete clínico, não substitui o julgamento nem a bula.</div>';
 }
 
 // ---------- textos puxados do prontuário (encaminhamento, relatório) ----------
@@ -4405,7 +4182,7 @@ async function puxarEncaminhamento(){
 }
 function docEncaminhamento(e,quando,unidadeId){
   const t=v=>v&&String(v).trim()?String(v).trim():'';
-  const secoes=[{t:'',txt:'Ao serviço de '+e.especialidade+' · Prioridade: '+(PRIOR_ENC[e.prioridade]||e.prioridade)+'.'}];
+  const secoes=[{t:'',txt:'Ao serviço de '+e.especialidade+'.\nPrioridade: '+(PRIOR_ENC[e.prioridade]||e.prioridade)+'.'}];
   if(t(e.motivo)) secoes.push({t:'Motivo do encaminhamento',txt:t(e.motivo)});
   if(t(e.cid10)) secoes.push({t:'Hipótese diagnóstica',txt:'CID-10 '+t(e.cid10)});
   if(t(e.historia)) secoes.push({t:'História clínica',txt:t(e.historia)});
@@ -4414,8 +4191,7 @@ function docEncaminhamento(e,quando,unidadeId){
   if(t(e.pergunta)) secoes.push({t:'O que se espera do especialista',txt:t(e.pergunta)});
   return montarDoc('Encaminhamento — '+e.especialidade, [], [], quando, unidadeId, {secoes, semNumero:true,
     fecho:'Solicito a gentileza da contrarreferência para a continuidade do cuidado nesta unidade.',
-    // o nome do paciente no quadro identifica a folha se ele cair sozinho na página seguinte
-    finais:[{t:'Contrarreferência — '+((pacienteSel&&pacienteSel.nome)||'paciente')+' · '+e.especialidade+' — preenchimento pelo especialista',l:['Diagnóstico','Conduta','Seguimento / retorno à UBS','Data, assinatura e carimbo']}]});
+    finais:[{t:'Contrarreferência — preenchimento pelo especialista',l:['Diagnóstico','Conduta','','Seguimento / retorno à UBS','Data, assinatura e carimbo']}]});
 }
 async function renderEncFicha(card){
   const {data,error}=await sb.from('pep_encaminhamentos').select('*').eq('paciente_id',pacienteSel.id).order('criado_em',{ascending:false});
@@ -4513,7 +4289,7 @@ async function revisaoNaFicha(){
     const r=revisarPrescricao(meds,{anos,clcr,probs:problemas,regimeCompleto:true});
     box.innerHTML=(meds.length?'<div style="margin-bottom:10px">'+meds.map(m=>'<span class="chip" style="margin:0 4px 4px 0">'+esc(m.medicamento)+'</span>').join('')+'</div>'
       :'<div class="muted" style="margin-bottom:8px">Nenhum medicamento de uso contínuo nas últimas 5 consultas.</div>')+
-      (meds.length||problemas.length?htmlRevisao(r,true):'')+
+      (meds.length||problemas.length?htmlRevisao(r):'')+
       (clcr?'<div class="muted" style="font-size:12px;margin-top:4px">ClCr usada: '+clcr+' mL/min (Cockcroft-Gault, última creatinina e último peso).</div>':'');
   }catch(err){ box.innerHTML='<div class="muted">Não consegui montar a revisão: '+esc(err.message||err)+'</div>'; }
 }
@@ -4554,11 +4330,9 @@ const CALCMED_PADRAO='https://servicofernandonaka.github.io/calculadorasmedicas/
 const urlCalcMed=()=>{ try{ return localStorage.getItem('pep_calcmed_url')||CALCMED_PADRAO; }catch(e){ return CALCMED_PADRAO; } };
 const origemCalcMed=()=>{ try{ return new URL(urlCalcMed()).origin; }catch(e){ return ''; } };
 let calcJanela=null, calcPendentes=[];
-function menuCalcMed(btn,extras){
+function menuCalcMed(btn){
   document.querySelectorAll('.cm-menu').forEach(m=>m.remove());
-  const m=el('div','cm-menu'); m.setAttribute('role','menu');
-  (extras||[]).forEach(([t,fn])=>{ const b=el('button','',t); b.type='button'; b.onclick=()=>{ m.remove(); fn(); }; m.appendChild(b); });
-  if(extras&&extras.length){ m.appendChild(el('hr')); m.appendChild(el('div','cm-tit','CalcMed — abre com os dados desta consulta')); }
+  const m=el('div','cm-menu');
   [['clinica','Clínica (escores e risco)'],['geriatria','Geriatria'],['rastreio','Rastreamentos e vacinas'],['mental','Saúde mental'],
    ['gineco','Gineco e obstetrícia'],['paliativos','Paliativos'],['labcore','LabCore (exames)']]
     .forEach(([h,t])=>{ const b=el('button','',t); b.type='button'; b.onclick=()=>{ m.remove(); abrirCalcMed(h); }; m.appendChild(b); });
@@ -4568,8 +4342,7 @@ function menuCalcMed(btn,extras){
     try{ const x=new URL(u.trim()); if(!/^https?:$/.test(x.protocol)) throw 0; localStorage.setItem('pep_calcmed_url',x.href); toast('Endereço do CalcMed salvo'); }
     catch(e){ toast('Endereço inválido',true); } };
   m.appendChild(cfg);
-  m.querySelectorAll('button').forEach(b=>b.setAttribute('role','menuitem'));
-  const r=btn.getBoundingClientRect(); m.style.top=(r.bottom+window.scrollY+4)+'px'; m.style.left=Math.max(8,Math.min(r.right+window.scrollX-260,window.innerWidth-276))+'px';
+  const r=btn.getBoundingClientRect(); m.style.top=(r.bottom+window.scrollY+4)+'px'; m.style.left=Math.max(8,r.right+window.scrollX-240)+'px';
   document.body.appendChild(m);
   setTimeout(()=>document.addEventListener('click',function fora(e){ if(!m.contains(e.target)){ m.remove(); document.removeEventListener('click',fora); } }),0);
 }
