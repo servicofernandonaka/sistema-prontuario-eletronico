@@ -135,6 +135,14 @@
   .ba-kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
   .ba-kpi .n{font-size:24px;font-weight:700;color:var(--fg)} .ba-kpi .l{font-size:12px;color:var(--muted)}
   .ba-kpi .n small{font-size:13px;font-weight:600;color:#c62828;margin-left:6px}
+  .pn-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:14px 0}
+  .pn-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px}
+  .pn-bar .t{font-size:13px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:8px}
+  .pn-bar .t b{color:var(--fg);font-size:15px}
+  .pn-track{height:10px;background:var(--panel-2);border-radius:6px;overflow:hidden}
+  .pn-fill{height:100%;border-radius:6px;background:var(--brand)}
+  .pn-fill.alt{background:#c62828}
+  .pn-sub{font-size:12px;color:var(--muted);margin-top:6px}
   .ba-filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
   .ba-filtros .f{width:auto}
   .ba-pend{display:flex;flex-wrap:wrap;gap:4px}
@@ -381,6 +389,7 @@
       <input id="pac-search" placeholder="Buscar paciente, CPF, CNS…" autocomplete="off">
     </div>
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
+    <button class="btn ghost block" id="btn-painel">Painel da unidade</button>
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
@@ -481,6 +490,35 @@
     <div id="mod-lista"></div>
   </div>
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
+</div></div>
+
+<div class="overlay" id="m-vacina"><div class="modal">
+  <div class="mh"><span>Registrar vacina</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="grid">
+      <div class="field"><label>Vacina</label><select id="va-imuno" class="f"></select></div>
+      <div class="field"><label>Data</label><input id="va-data" class="f" type="date"></div>
+    </div>
+    <div class="field" id="va-outra-wrap" style="display:none"><label>Nome da vacina</label><input id="va-outra" class="f" placeholder="Qual vacina"></div>
+    <div class="grid">
+      <div class="field"><label>Dose (opcional)</label><input id="va-dose" class="f" placeholder="Ex.: reforço, 1ª, anual"></div>
+      <div class="field"><label>Lote (opcional)</label><input id="va-lote" class="f"></div>
+    </div>
+    <div class="field" style="margin:0"><label>Observação (opcional)</label><input id="va-obs" class="f"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="va-save">Salvar</button></div>
+</div></div>
+
+<div class="overlay" id="m-extrair"><div class="modal" style="max-width:720px">
+  <div class="mh"><span>Resultados lidos do PDF</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div id="ex-info" class="muted" style="margin-bottom:10px;line-height:1.5"></div>
+    <div class="field" style="max-width:220px"><label>Data da coleta</label><input id="ex-data" class="f" type="date"></div>
+    <div id="ex-wrap"><table><thead><tr><th style="width:40px"></th><th>Exame</th><th style="width:110px">Valor</th><th style="width:110px">Unidade</th></tr></thead><tbody id="ex-tbody"></tbody></table></div>
+    <div id="ex-vazio" class="muted" hidden></div>
+    <div class="muted" style="margin-top:10px;font-size:12px">Confira cada valor contra o laudo antes de salvar — a leitura automática pode errar. Só os itens marcados são salvos.</div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="ex-salvar">Salvar selecionados</button></div>
 </div></div>
 
 <div class="overlay" id="m-escala"><div class="modal" style="max-width:720px">
@@ -688,7 +726,7 @@ const OFF=(()=>{
   const nativo=window.fetch.bind(window);
   const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
     'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_modelos','pep_encaminhamentos','pep_atendimento_problemas',
-    'pep_problemas','pep_alergias','pep_resultados'];
+    'pep_problemas','pep_alergias','pep_resultados','pep_vacinas'];
   const REFERENCIA=['pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
     'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
   const ESPELHO=new Set([...CLINICAS,...REFERENCIA]);
@@ -1246,18 +1284,20 @@ $('btn-logout').onclick=async()=>{
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
-let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false;
+let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false;
 async function sondarColunas(){
   // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
-  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; }catch(e){} return; }
-  const [a,b,r,n,sg,ec]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; }catch(e){} return; }
+  const [a,b,r,n,sg,ec,ax,va]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
                                  sb.from('pep_prescricao_itens').select('tipo_receita').limit(1),
                                  sb.from('pep_atendimentos').select('retorno_previsto').limit(1),
                                  sb.from('pep_encaminhamentos').select('id').limit(1),
                                  sb.from('pep_acessos').select('id').limit(1),
-                                 sb.from('pep_escalas').select('id').limit(1)]);
-  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error;
-  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK}));}catch(e){}
+                                 sb.from('pep_escalas').select('id').limit(1),
+                                 sb.from('pep_anexos').select('id').limit(1),
+                                 sb.from('pep_vacinas').select('id').limit(1)]);
+  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK}));}catch(e){}
 }
 async function carregarPacientes(q){
   let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
@@ -1294,6 +1334,7 @@ function abrirModalPaciente(p){
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('btn-busca').onclick=()=>abrirTela('busca');
 $('btn-agenda').onclick=()=>abrirTela('agenda');
+$('btn-painel').onclick=()=>abrirTela('painel');
 $('btn-backup').onclick=()=>abrirTela('backup');
 $('btn-seguranca').onclick=()=>abrirTela('seguranca');
 const salvoMsg=(mk,padrao)=>OFF.enfileirouDesde(mk)
@@ -1522,6 +1563,7 @@ function renderMain(){
   const c=$('main-content'); c.innerHTML='';
   if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
   if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
+  if(!pacienteSel&&tela==='painel') return renderPainel(c);
   if(!pacienteSel&&tela==='backup') return renderBackup(c);
   if(!pacienteSel&&tela==='seguranca') return renderSeguranca(c);
   if(!pacienteSel){ c.appendChild(el('div','empty','Selecione um paciente na lista, ou clique em <b>+ Novo paciente</b>.')); return; }
@@ -1582,6 +1624,8 @@ async function renderFichaPaciente(c){
   if(encOK){ const cardE=el('div','card'); cardE.style.marginBottom='16px'; cardE.id='card-enc'; c.appendChild(cardE); renderEncFicha(cardE); }
 
   const cardEsc=el('div','card'); cardEsc.style.marginBottom='16px'; cardEsc.id='card-escalas'; c.appendChild(cardEsc); renderEscalasFicha(cardEsc);
+  const cardAx=el('div','card'); cardAx.style.marginBottom='16px'; cardAx.id='card-anexos'; c.appendChild(cardAx); renderAnexos(cardAx,{});
+  const cardVac=el('div','card'); cardVac.style.marginBottom='16px'; cardVac.id='card-vacinas'; c.appendChild(cardVac); renderVacinas(cardVac);
 
   // ---------- resultados e evolução ----------
   const tit=el('div','sec-title','Resultados de exames');
@@ -2340,7 +2384,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-17.3 · escalas geriátricas';
+const VERSAO='2026-11-17.8 · painel + imunização';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2452,6 +2496,8 @@ async function renderAtendimentoSalvo(c){
 
   box.querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>abrirResultado(
     {exame:b.dataset.res, co_procedimento:b.dataset.co, atendimento_id:a.id, data:(a.data_atendimento||'').slice(0,10)}));
+
+  const cardAxA=el('div','card'); cardAxA.style.margin='14px 0'; box.appendChild(cardAxA); renderAnexos(cardAxA,{atendimentoId:a.id});
 
   const acoes=el('div','', '');
   acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
@@ -2937,8 +2983,9 @@ async function dadosBusca(){
     todos('pep_problemas','paciente_id,descricao,cid10,situacao'),
     todos('pep_atendimentos','paciente_id,data_atendimento,pa_sistolica,pa_diastolica'+(retornoOK?',retorno_previsto':''))]);
   let res=[]; try{ res=await todos('pep_resultados','paciente_id,analito,exame,data_coleta'); }catch(e){ res=[]; }
+  let vacs=[]; if(vacinasOK){ try{ vacs=await todos('pep_vacinas','paciente_id,imuno,data'); }catch(e){ vacs=[]; } }
   if(!analitos.length) await carregarAnalitos();
-  const idx=new Map(pacs.map(p=>[p.id,{p,has:false,dm:false,idoso:false,ultCons:null,ultPA:null,pa:null,ex:{}}]));
+  const idx=new Map(pacs.map(p=>[p.id,{p,has:false,dm:false,idoso:false,ultCons:null,ultPA:null,pa:null,ex:{},vac:[]}]));
   for(const pb of probs){ const r=idx.get(pb.paciente_id); if(!r||pb.situacao!=='ativo') continue;
     const cid=String(pb.cid10||'').toUpperCase(), d=semAc(pb.descricao);
     if(/^I1[0-5]/.test(cid)||/hipertens|\bhas\b/.test(d)) r.has=true;
@@ -2949,6 +2996,7 @@ async function dadosBusca(){
   for(const x of res){ const r=idx.get(x.paciente_id); if(!r) continue;
     const k=x.analito||analitoDe(x.exame||''); if(!k) continue;
     if(!r.ex[k]||x.data_coleta>r.ex[k]) r.ex[k]=x.data_coleta; }
+  for(const v of vacs){ const r=idx.get(v.paciente_id); if(r) r.vac.push({imuno:v.imuno,data:v.data}); }
   const linhas=[];
   for(const r of idx.values()){
     const anos=r.p.data_nascimento?Math.floor(diasDesde(r.p.data_nascimento)/365.25):null;
@@ -2963,11 +3011,72 @@ async function dadosBusca(){
     if(r.retorno&&r.retorno<new Date().toISOString().slice(0,10)) pend.push({t:'Retorno atrasado desde '+dataBRsimples(r.retorno),d:diasDesde(r.retorno)});
     if(r.dm){ venc('HbA1c',diasDesde(r.ex.hba1c),BA.hba1c); venc('Microalbuminúria',diasDesde(r.ex.microalb),BA.microalb); }
     if(r.has||r.dm) venc('Creatinina',diasDesde(r.ex.creatinina),BA.creatinina);
+    if(vacinasOK){ const pv=pendenciasVacina(r.vac,{idade:anos,has:r.has,dm:r.dm}).find(x=>x.imuno==='influenza');
+      if(pv) pend.push({t:'Influenza em atraso',d:5000}); }
     linhas.push({p:r.p,anos,has:r.has,dm:r.dm,idoso:r.idoso,ultCons:r.ultCons,pend});
   }
   linhas.sort((a,b)=>b.pend.length-a.pend.length||(diasDesde(b.ultCons)??99999)-(diasDesde(a.ultCons)??99999));
   return linhas;
 }
+async function dadosPainel(){
+  const [pacs,probs,ats]=await Promise.all([todos('pep_pacientes','id,data_nascimento,sexo'),
+    todos('pep_problemas','paciente_id,descricao,cid10,situacao'),
+    todos('pep_atendimentos','paciente_id,data_atendimento,pa_sistolica,pa_diastolica'+(retornoOK?',retorno_previsto':''))]);
+  let res=[]; try{ res=await todos('pep_resultados','paciente_id,analito,exame,data_coleta,valor'); }catch(e){ res=[]; }
+  let encs=[]; if(encOK){ try{ encs=await todos('pep_encaminhamentos','status'); }catch(e){ encs=[]; } }
+  let vacs=[]; if(vacinasOK){ try{ vacs=await todos('pep_vacinas','paciente_id,imuno,data'); }catch(e){ vacs=[]; } }
+  if(!analitos.length) await carregarAnalitos();
+  const idx=new Map(pacs.map(p=>[p.id,{p,has:false,dm:false,idoso:false,ultPA:null,pa:null,ex:{},hba1c:null,ultAt:null,retorno:null,vac:[]}]));
+  pacs.forEach(p=>{ const r=idx.get(p.id); r.anos=p.data_nascimento?Math.floor(diasDesde(p.data_nascimento)/365.25):null; r.idoso=r.anos!=null&&r.anos>=BA.idade_idoso; });
+  for(const pb of probs){ const r=idx.get(pb.paciente_id); if(!r||pb.situacao!=='ativo') continue;
+    const cid=String(pb.cid10||'').toUpperCase(), d=semAc(pb.descricao);
+    if(/^I1[0-5]/.test(cid)||/hipertens|\bhas\b/.test(d)) r.has=true;
+    if(/^E1[0-4]/.test(cid)||/diabet|\bdm ?[12]?\b/.test(d)) r.dm=true; }
+  for(const a of ats){ const r=idx.get(a.paciente_id); if(!r) continue;
+    if(a.pa_sistolica&&(!r.ultPA||a.data_atendimento>r.ultPA)){ r.ultPA=a.data_atendimento; r.pa=[a.pa_sistolica,a.pa_diastolica]; }
+    if(!r.ultAt||a.data_atendimento>r.ultAt){ r.ultAt=a.data_atendimento; r.retorno=a.retorno_previsto||null; } }
+  for(const x of res){ const r=idx.get(x.paciente_id); if(!r) continue; const k=x.analito||analitoDe(x.exame||''); if(!k) continue;
+    if(!r.ex[k]||x.data_coleta>r.ex[k]){ r.ex[k]=x.data_coleta; if(k==='hba1c'&&x.valor!=null) r.hba1c=Number(x.valor); } }
+  for(const v of vacs){ const r=idx.get(v.paciente_id); if(r) r.vac.push({imuno:v.imuno,data:v.data}); }
+  const L=[...idx.values()], hoje=new Date().toISOString().slice(0,10);
+  const has=L.filter(r=>r.has), dm=L.filter(r=>r.dm), idoso=L.filter(r=>r.idoso), cron=L.filter(r=>r.has||r.dm);
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const paOk=has.filter(r=>r.pa&&r.pa[0]<140&&r.pa[1]<90).length;
+  const hbaDia=dm.filter(r=>r.ex.hba1c&&diasDesde(r.ex.hba1c)<=BA.hba1c).length;
+  const hbaMeta=dm.filter(r=>r.hba1c!=null&&r.hba1c<7).length;
+  const creatDia=cron.filter(r=>r.ex.creatinina&&diasDesde(r.ex.creatinina)<=BA.creatinina).length;
+  const retatraso=L.filter(r=>r.retorno&&r.retorno<hoje).length;
+  const encAberto=encs.filter(e=>e.status==='aguardando'||e.status==='agendado').length;
+  const gripe=cron.concat(idoso.filter(r=>!r.has&&!r.dm)).filter((r,i,a)=>a.indexOf(r)===i)
+    .filter(r=>pendenciasVacina(r.vac,{idade:r.anos,has:r.has,dm:r.dm}).some(x=>x.imuno==='influenza')).length;
+  return {total:L.length,has:has.length,dm:dm.length,idoso:idoso.length,cron:cron.length,
+    paOk,paPct:pct(paOk,has.length), hbaDia,hbaPct:pct(hbaDia,dm.length), hbaMeta,hbaMetaPct:pct(hbaMeta,dm.length),
+    creatDia,creatPct:pct(creatDia,cron.length), retatraso,encAberto,gripe,vacinasOK};
+}
+async function renderPainel(c){
+  c.innerHTML='<div class="phead"><div><div class="nm">Painel da unidade</div><div class="mt">Visão geral dos pacientes em acompanhamento</div></div><div class="sp"></div>'+
+    '<button class="btn ghost" id="pn-atual">Atualizar</button></div><div id="pn-corpo"><div class="muted">Calculando…</div></div>';
+  $('pn-atual').onclick=()=>renderMain();
+  let d; try{ d=await dadosPainel(); }catch(err){ $('pn-corpo').innerHTML='<div class="empty">Não consegui montar o painel: '+esc(err.message||err)+'</div>'; return; }
+  if(tela!=='painel'||pacienteSel) return;
+  const kpi=(n,l,alerta)=>'<div class="ba-kpi"><div class="n">'+n+(alerta?' <small>'+alerta+'</small>':'')+'</div><div class="l">'+esc(l)+'</div></div>';
+  const barra=(rot,n,tot,pct,inverte)=>'<div class="pn-bar"><div class="t"><span>'+esc(rot)+'</span><b>'+pct+'%</b></div>'+
+    '<div class="pn-track"><div class="pn-fill'+((inverte?pct<50:pct<50)?' alt':'')+'" style="width:'+pct+'%"></div></div>'+
+    '<div class="pn-sub">'+n+' de '+tot+'</div></div>';
+  $('pn-corpo').innerHTML=
+    '<div class="ba-kpis">'+kpi(d.total,'Pacientes')+kpi(d.has,'Hipertensos')+kpi(d.dm,'Diabéticos')+kpi(d.idoso,BA.idade_idoso+' anos ou mais')+'</div>'+
+    '<div class="ba-kpis">'+kpi(d.encAberto,'Encaminhamentos em aberto')+kpi(d.retatraso,'Retornos atrasados',d.retatraso?'atenção':'')+
+      (d.vacinasOK?kpi(d.gripe,'Influenza em atraso (grupos)',d.gripe?'atenção':''):'')+'</div>'+
+    '<h3 class="sec-title" style="margin-top:18px">Qualidade do acompanhamento</h3>'+
+    '<div class="pn-bars">'+
+      barra('Hipertensos com PA controlada (última < 140/90)',d.paOk,d.has,d.paPct)+
+      barra('Diabéticos com HbA1c em dia (≤ 6 meses)',d.hbaDia,d.dm,d.hbaPct)+
+      barra('Diabéticos com HbA1c < 7%',d.hbaMeta,d.dm,d.hbaMetaPct)+
+      barra('HAS/DM com creatinina no último ano',d.creatDia,d.cron,d.creatPct)+
+    '</div>'+
+    '<div class="muted" style="line-height:1.5">Os grupos vêm da lista de problemas ativos (CID I10–I15 / E10–E14 ou descrição). "PA controlada" usa a última aferição registrada; "em dia" usa os mesmos prazos da busca ativa. Isto resume o que está no sistema — não é um indicador oficial do município.</div>';
+}
+
 async function renderBuscaAtiva(c){
   c.innerHTML='<div class="phead"><div><div class="nm">Busca ativa</div><div class="mt">Hipertensos, diabéticos e pessoas com '+BA.idade_idoso+
     ' anos ou mais com acompanhamento em atraso</div></div><div class="sp"></div>'+
@@ -3031,7 +3140,7 @@ const baixarTexto=(txt,nome,tipo)=>baixarBlob(new Blob([txt],{type:(tipo||'text/
 // ordem de restauração: quem é referenciado vem antes
 const TAB_BACKUP=['pep_unidades','pep_pacientes','pep_problemas','pep_alergias','pep_atendimentos','pep_atendimento_problemas',
   'pep_solicitacoes_exames','pep_solicitacao_itens','pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios',
-  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_escalas','pep_profissional'];
+  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_escalas','pep_anexos','pep_vacinas','pep_profissional'];
 const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); }catch(e){ return null; } };
 function statusBackup(){
   const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
@@ -3045,7 +3154,7 @@ async function gerarBackup(){
   const zip=new JSZip();
   zip.file('backup.json',JSON.stringify({sistema:'PEP Clínico',versao:VERSAO,gerado_em:quando,tabelas:dados}));
   for(const [t,rows] of Object.entries(dados)){ if(!rows.length) continue;
-    const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))].filter(k=>!(t==='pep_unidades'&&/^logo/.test(k)));
+    const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))].filter(k=>!(t==='pep_unidades'&&/^logo/.test(k))&&!(t==='pep_anexos'&&k==='conteudo'));
     zip.file('planilhas/'+t.replace(/^pep_/,'')+'.csv',paraCSV([cols,...rows.map(r=>cols.map(k=>r[k]))])); }
   zip.file('LEIA-ME.txt','Backup do PEP Clínico gerado em '+dataHoraBR(quando)+'.\r\n\r\n'+
     'backup.json: todos os dados, para restaurar no sistema (Backup dos dados > Restaurar).\r\n'+
@@ -3069,10 +3178,10 @@ async function restaurarBackup(j){
   const rel=[];
   for(const t of TAB_BACKUP){ const rows=j.tabelas[t]; if(!rows||!rows.length) continue;
     if(t==='pep_profissional'){ rel.push(t+': mantido o cadastro atual'); continue; }
-    const pk=t==='pep_profissional'?'user_id':'id'; let ok=0, erro='';
-    for(let i=0;i<rows.length;i+=500){
-      const {error}=await sb.from(t).upsert(rows.slice(i,i+500),{onConflict:pk,ignoreDuplicates:true});
-      if(error){ erro=error.message; break; } ok+=Math.min(500,rows.length-i); }
+    const pk=t==='pep_profissional'?'user_id':'id', lote=t==='pep_anexos'?5:500; let ok=0, erro='';
+    for(let i=0;i<rows.length;i+=lote){
+      const {error}=await sb.from(t).upsert(rows.slice(i,i+lote),{onConflict:pk,ignoreDuplicates:true});
+      if(error){ erro=error.message; break; } ok+=Math.min(lote,rows.length-i); }
     rel.push(t.replace(/^pep_/,'')+': '+(erro?'erro — '+erro:ok+' registro(s) conferido(s)'));
   }
   return rel;
@@ -3106,6 +3215,317 @@ function renderBackup(c){
       const rel=await restaurarBackup(j); $('bk-rel').innerHTML=rel.map(esc).join('<br>'); toast('Restauração concluída');
       carregarPacientes(); }
     catch(err){ $('bk-rel').textContent=''; toast('Não consegui restaurar: '+(err.message||err),true); } });
+}
+
+// ---------- imunização (vacinas) ----------
+const VACINAS=[
+  {chave:'influenza', nome:'Influenza (gripe)'},
+  {chave:'covid',     nome:'COVID-19'},
+  {chave:'dt',        nome:'dT / dTpa (difteria, tétano)'},
+  {chave:'hepb',      nome:'Hepatite B'},
+  {chave:'pneumo',    nome:'Pneumocócica (VPP23 / VPC)'},
+  {chave:'fa',        nome:'Febre amarela'},
+  {chave:'zoster',    nome:'Herpes-zóster'},
+  {chave:'outra',     nome:'Outra'}
+];
+const VAC_NOME=Object.fromEntries(VACINAS.map(v=>[v.chave,v.nome]));
+const mesesDesdeD=iso=>iso?Math.floor((Date.now()-new Date(iso+'T12:00:00'))/(30.44*864e5)):null;
+const anosDesdeD=iso=>iso?(Date.now()-new Date(iso+'T12:00:00'))/(365.25*864e5):null;
+// regs: [{imuno,data}]; ctx: {idade,has,dm,condicao}. Apoio ao PNI, não o calendário completo.
+function pendenciasVacina(regs,ctx){
+  ctx=ctx||{}; const grupo=(ctx.idade!=null&&ctx.idade>=60)||ctx.has||ctx.dm||ctx.condicao;
+  const ult=k=>{ const l=(regs||[]).filter(r=>r.imuno===k).map(r=>r.data).sort(); return l.length?l[l.length-1]:null; };
+  const conta=k=>(regs||[]).filter(r=>r.imuno===k).length;
+  const out=[];
+  if(grupo){ const u=ult('influenza'), m=mesesDesdeD(u);
+    if(u==null) out.push({imuno:'influenza', txt:'Influenza: sem registro (dose anual)'});
+    else if(m>=12) out.push({imuno:'influenza', txt:'Influenza: última há '+Math.round(m)+' meses — dose anual vencida'}); }
+  if(ctx.idade!=null&&ctx.idade>=60){ const u=ult('covid'), m=mesesDesdeD(u);
+    if(u==null) out.push({imuno:'covid', txt:'COVID-19: sem registro'});
+    else if(m>=12) out.push({imuno:'covid', txt:'COVID-19: última há '+Math.round(m)+' meses — reforço anual'}); }
+  { const u=ult('dt'), a=anosDesdeD(u);
+    if(u==null) out.push({imuno:'dt', txt:'dT/dTpa: sem registro de reforço'});
+    else if(a>=10) out.push({imuno:'dt', txt:'dT/dTpa: último há '+Math.floor(a)+' anos — reforço vencido (10/10 anos)'}); }
+  { const n=conta('hepb'); if(n>0&&n<3) out.push({imuno:'hepb', txt:'Hepatite B: esquema incompleto ('+n+'/3)'}); }
+  if(ctx.idade!=null&&ctx.idade>=60&&conta('pneumo')===0) out.push({imuno:'pneumo', txt:'Pneumocócica: avaliar indicação (idoso)'});
+  return out;
+}
+let vacEditandoPac=null;
+function abrirVacina(){
+  $('va-imuno').innerHTML=VACINAS.map(v=>'<option value="'+v.chave+'">'+esc(v.nome)+'</option>').join('');
+  $('va-data').value=new Date().toISOString().slice(0,10);
+  ['va-dose','va-lote','va-obs','va-outra'].forEach(i=>$(i).value='');
+  $('va-outra-wrap').style.display='none';
+  openM('m-vacina');
+}
+$('va-imuno').addEventListener('change',()=>{ $('va-outra-wrap').style.display=$('va-imuno').value==='outra'?'':'none'; });
+$('va-save').onclick=async()=>{
+  if(!pacienteSel){ toast('Selecione um paciente',true); return; }
+  const imuno=$('va-imuno').value; if(!$('va-data').value){ toast('Informe a data',true); return; }
+  let obs=$('va-obs').value.trim()||null;
+  if(imuno==='outra'){ const nm=$('va-outra').value.trim(); if(!nm){ toast('Informe o nome da vacina',true); return; } obs='Vacina: '+nm+(obs?' — '+obs:''); }
+  const reg={paciente_id:pacienteSel.id, imuno, dose:$('va-dose').value.trim()||null, data:$('va-data').value,
+    lote:$('va-lote').value.trim()||null, observacao:obs};
+  const mk=OFF.marca();
+  const {error}=await sb.from('pep_vacinas').insert(reg);
+  if(error){ toast(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))
+    ?'Para registrar vacinas, rode o vacinas_schema.sql no Supabase':'Erro ao salvar: '+error.message,true); return; }
+  closeM('m-vacina'); toast(salvoMsg(mk,'Vacina registrada ✓'));
+  if($('card-vacinas')) renderVacinas($('card-vacinas'));
+};
+async function renderVacinas(card){
+  card.innerHTML='<div class="ch"><span>Vacinas</span><button class="btn ghost sm" id="vac-add">Registrar vacina</button></div><div class="cb" id="vac-corpo"><div class="muted">Carregando…</div></div>';
+  $('vac-add').onclick=abrirVacina;
+  const box=card.querySelector('#vac-corpo');
+  if(!vacinasOK){ box.innerHTML='<div class="muted">Para registrar vacinas e ver o que está em atraso, rode o vacinas_schema.sql no Supabase.</div>'; return; }
+  const {data,error}=await sb.from('pep_vacinas').select('*').eq('paciente_id',pacienteSel.id).order('data',{ascending:false});
+  if(!card.isConnected) return;
+  if(error){ box.innerHTML='<div class="muted">Não consegui carregar: '+esc(error.message)+'</div>'; return; }
+  const regs=data||[], c=condicoesAtivas(problemas);
+  const pend=pendenciasVacina(regs,{idade:anosPaciente(),has:c.has,dm:c.dm});
+  let html='';
+  if(pend.length) html+='<div class="avso idoso" style="margin-bottom:10px"><b>Pode estar em atraso:</b><br>'+pend.map(p=>esc(p.txt)).join('<br>')+'</div>';
+  if(!regs.length) html+='<div class="muted">Nenhuma vacina registrada ainda.</div>';
+  else html+='<table><tbody>'+regs.map(v=>'<tr><td><b>'+esc(VAC_NOME[v.imuno]||v.imuno)+'</b>'+
+    (v.dose?' · '+esc(v.dose):'')+'<div class="muted" style="font-size:12px">'+esc(dataBRsimples(v.data))+
+    [v.lote?'lote '+v.lote:'',v.observacao||''].filter(Boolean).map(x=>' · '+esc(x)).join('')+'</div></td>'+
+    '<td style="text-align:right"><button class="x" data-rv="'+v.id+'" title="Remover">✕</button></td></tr>').join('')+'</tbody></table>';
+  html+='<div class="muted" style="font-size:11.5px;margin-top:8px">Apoio ao calendário do PNI — confira as indicações por condição e a campanha vigente.</div>';
+  box.innerHTML=html;
+  box.querySelectorAll('[data-rv]').forEach(b=>b.onclick=async()=>{
+    const v=regs.find(x=>x.id===b.dataset.rv);
+    if(!confirm('Remover o registro de '+(VAC_NOME[v.imuno]||v.imuno)+' de '+dataBRsimples(v.data)+'?')) return;
+    const {data:del,error:e}=await sb.from('pep_vacinas').delete().eq('id',v.id).select('id');
+    if(e||!del||!del.length){ toast('Não consegui remover'+(e?': '+e.message:''),true); return; }
+    toast('Registro removido'); renderVacinas(card); });
+}
+
+// ---------- anexos: exames, laudos e documentos (foto ou PDF) ----------
+const TIPOS_ANEXO={exame_lab:'Exame laboratorial',imagem:'Imagem de exame (raio-X, foto)',laudo:'Laudo',
+  receita:'Receita externa',encaminhamento:'Encaminhamento / contrarreferência',documento:'Documento',outro:'Outro'};
+const LIMITE_ANEXO=8*1024*1024;   // 8 MB por arquivo
+// imagens são reduzidas antes de salvar; mantém proporção, no máx. 1600 px, JPEG
+async function reduzirImagemDoc(file){
+  const url=await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>ko(r.error); r.readAsDataURL(file); });
+  const img=await new Promise((ok,ko)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=()=>ko(new Error('Imagem não reconhecida')); i.src=url; });
+  const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height, k=Math.min(1,1600/Math.max(w,h));
+  const c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.82);
+}
+function dataURLparaBlob(u){
+  const i=u.indexOf(','), meta=u.slice(0,i), b64=u.slice(i+1), mime=(meta.match(/data:([^;]+)/)||[])[1]||'application/octet-stream';
+  const bin=atob(b64), arr=new Uint8Array(bin.length); for(let j=0;j<bin.length;j++) arr[j]=bin.charCodeAt(j);
+  return new Blob([arr],{type:mime});
+}
+// ---- leitura de resultados de laudos em PDF (texto), local, sem enviar nada ----
+const PDFJS_SRC='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let pdfjsPronto=null;
+function carregarPdfjs(){
+  if(pdfjsPronto) return pdfjsPronto;
+  pdfjsPronto=new Promise((ok,ko)=>{
+    if(window.pdfjsLib){ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER; }catch(e){} return ok(window.pdfjsLib); }
+    const sc=document.createElement('script'); sc.src=PDFJS_SRC;
+    sc.onload=()=>{ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_WORKER; }catch(e){} ok(window.pdfjsLib); };
+    sc.onerror=()=>{ pdfjsPronto=null; ko(new Error('Não consegui carregar o leitor de PDF (precisa de internet).')); };
+    document.head.appendChild(sc);
+  });
+  return pdfjsPronto;
+}
+function dataURLparaBytes(u){ const i=u.indexOf(','), bin=atob(u.slice(i+1)), a=new Uint8Array(bin.length); for(let j=0;j<bin.length;j++) a[j]=bin.charCodeAt(j); return a; }
+async function extrairTextoPDF(dataURL){
+  const lib=await carregarPdfjs();
+  const pdf=await lib.getDocument({data:dataURLparaBytes(dataURL)}).promise;
+  const linhas=[];
+  for(let pg=1;pg<=pdf.numPages;pg++){
+    const page=await pdf.getPage(pg), tc=await page.getTextContent(), porY=new Map();
+    tc.items.forEach(it=>{ if(!it.str||!it.str.trim()) return; const y=Math.round(it.transform[5]);
+      if(!porY.has(y)) porY.set(y,[]); porY.get(y).push({x:it.transform[4],s:it.str}); });
+    [...porY.entries()].sort((a,b)=>b[0]-a[0]).forEach(([,arr])=>{ arr.sort((a,b)=>a.x-b.x);
+      const t=arr.map(o=>o.s).join(' ').replace(/\s+/g,' ').trim(); if(t) linhas.push(t); });
+  }
+  return linhas;
+}
+const UNID_RX='mg\\/dl|g\\/dl|%|mui\\/l|µui\\/ml|uui\\/l|ng\\/dl|ng\\/ml|pg\\/ml|u\\/l|ui\\/l|mg\\/l|mmol\\/l|meq\\/l|mg\\/g|mil\\/mm3|\\/mm3|ml\\/min[^ ]*';
+function extrairValorLinha(linha,posFim){
+  const resto=linha.slice(posFim).replace(/\([^)]*\)/g,' ');
+  const mu=resto.match(new RegExp('(-?\\d+(?:[.,]\\d+)?)\\s*('+UNID_RX+')','i'));
+  if(mu) return {valor:parseFloat(mu[1].replace(',','.')), unidade:mu[2]};
+  const mn=resto.match(/(-?\d+(?:[.,]\d+)?)/);
+  if(mn) return {valor:parseFloat(mn[1].replace(',','.')), unidade:''};
+  return null;
+}
+function casarResultadosLaudo(linhas){
+  const out=[], usados=new Set(), norm=linhas.map(l=>({raw:l,n:semAc(l)}));
+  for(const a of analitos){ if(usados.has(a.chave)) continue;
+    for(const li of norm){
+      let melhor=null;
+      for(const pad of (a.padroes||[])){ const sp=semAc(pad), idx=li.n.indexOf(sp); if(idx>=0&&(!melhor||sp.length>melhor.len)) melhor={padFim:idx+sp.length,len:sp.length}; }
+      if(!melhor) continue;
+      const v=extrairValorLinha(li.raw,melhor.padFim);
+      if(v&&Number.isFinite(v.valor)&&Math.abs(v.valor)<100000){ out.push({chave:a.chave,rotulo:a.rotulo,valor:v.valor,unidade:v.unidade||a.unidade||'',casas:a.casas}); usados.add(a.chave); break; }
+    }
+  }
+  return out;
+}
+function acharDataLaudo(linhas){
+  const txt=linhas.join('  ');
+  const col=txt.match(/coleta[^0-9]{0,24}(\d{2})\/(\d{2})\/(\d{4})/i);
+  if(col) return col[3]+'-'+col[2]+'-'+col[1];
+  const m=txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+  return m?m[3]+'-'+m[2]+'-'+m[1]:'';
+}
+let exContexto={atendimentoId:null}, exAchados=[];
+function abrirRevisaoLaudo(linhas,nomeArquivo,atendimentoId,viaOCR){
+  const achados=casarResultadosLaudo(linhas);
+  exContexto={atendimentoId:atendimentoId||null};
+  $('ex-data').value=acharDataLaudo(linhas)||new Date().toISOString().slice(0,10);
+  $('ex-info').innerHTML=(viaOCR?'<b style="color:#8a6414">Leitura por OCR (foto) — confira com atenção redobrada, pode errar mais.</b> ':'')+
+    'Confira os valores contra o laudo'+(nomeArquivo?' "'+esc(nomeArquivo)+'"':'')+'. '+achados.length+' valor(es) reconhecido(s).';
+  const tb=$('ex-tbody'); tb.innerHTML=achados.map((r,i)=>'<tr>'+
+    '<td><input type="checkbox" data-i="'+i+'" checked></td>'+
+    '<td>'+esc(r.rotulo)+'</td>'+
+    '<td><input class="f ex-v" data-i="'+i+'" value="'+esc(String(r.valor).replace('.',','))+'" style="padding:6px 8px"></td>'+
+    '<td><input class="f ex-u" data-i="'+i+'" value="'+esc(r.unidade||'')+'" style="padding:6px 8px"></td></tr>').join('');
+  exAchados=achados;
+  $('ex-wrap').style.display=achados.length?'':'none';
+  $('ex-vazio').hidden=achados.length>0;
+  $('ex-vazio').textContent=achados.length?'':'Não reconheci nenhum valor. '+(viaOCR?'A foto pode estar com baixa qualidade, inclinada ou mal iluminada.':'O laudo pode ter um layout incomum.')+' Você pode lançar manualmente em "Registrar resultado".';
+  $('ex-salvar').disabled=!achados.length;
+  openM('m-extrair');
+}
+async function lerExamesAnexo(id,atendimentoId){
+  if(!analitos.length) await carregarAnalitos();
+  try{
+    const {data,error}=await sb.from('pep_anexos').select('conteudo,nome_arquivo').eq('id',id).maybeSingle();
+    if(error||!data) throw new Error(error?error.message:'anexo não encontrado');
+    toast('Lendo o PDF…');
+    const linhas=await extrairTextoPDF(data.conteudo);
+    if(!linhas.length) throw new Error('Este PDF não tem texto — parece foto ou escaneado. Anexe a foto do laudo (JPG/PNG) e use "Ler exames (OCR)".');
+    abrirRevisaoLaudo(linhas,data.nome_arquivo,atendimentoId,false);
+  }catch(err){ toast(err.message||String(err),true); }
+}
+// OCR local (Tesseract) para laudos fotografados — nada sai do aparelho
+const TESS_SRC='https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js';
+let tessPronto=null;
+function carregarTesseract(){
+  if(tessPronto) return tessPronto;
+  tessPronto=new Promise((ok,ko)=>{
+    if(window.Tesseract) return ok(window.Tesseract);
+    const sc=document.createElement('script'); sc.src=TESS_SRC;
+    sc.onload=()=>ok(window.Tesseract); sc.onerror=()=>{ tessPronto=null; ko(new Error('Não consegui carregar o leitor de imagem (precisa de internet).')); };
+    document.head.appendChild(sc);
+  });
+  return tessPronto;
+}
+async function ocrImagem(dataURL,onProg){
+  const T=await carregarTesseract();
+  const {data}=await T.recognize(dataURL,'por',{logger:m=>{ if(onProg&&m.status==='recognizing text') onProg(Math.round((m.progress||0)*100)); }});
+  return (data&&data.text||'').split(/\r?\n/).map(l=>l.replace(/\s+/g,' ').trim()).filter(Boolean);
+}
+async function lerExamesImagem(id,atendimentoId,btn){
+  if(!analitos.length) await carregarAnalitos();
+  const rot=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Lendo…'; }
+  try{
+    const {data,error}=await sb.from('pep_anexos').select('conteudo,nome_arquivo').eq('id',id).maybeSingle();
+    if(error||!data) throw new Error(error?error.message:'anexo não encontrado');
+    toast('Reconhecendo o texto da foto… a primeira vez baixa o idioma e pode demorar.');
+    const linhas=await ocrImagem(data.conteudo,pc=>{ if(btn) btn.textContent='Lendo '+pc+'%'; });
+    if(!linhas.length) throw new Error('Não consegui ler texto nesta imagem. Tente uma foto mais nítida, reta e bem iluminada.');
+    abrirRevisaoLaudo(linhas,data.nome_arquivo,atendimentoId,true);
+  }catch(err){ toast(err.message||String(err),true); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=rot; } }
+}
+$('ex-salvar').onclick=async()=>{
+  const data=$('ex-data').value; if(!data){ toast('Informe a data da coleta',true); return; }
+  const tb=$('ex-tbody'), regs=[];
+  tb.querySelectorAll('input[type=checkbox][data-i]').forEach(cb=>{ if(!cb.checked) return; const i=+cb.dataset.i, a=exAchados[i];
+    const vtxt=(tb.querySelector('.ex-v[data-i="'+i+'"]').value||'').replace(',','.'), val=parseFloat(vtxt);
+    if(!Number.isFinite(val)) return;
+    regs.push({paciente_id:pacienteSel.id, atendimento_id:exContexto.atendimentoId||null, exame:a.rotulo, analito:a.chave,
+      data_coleta:data, valor:val, unidade:(tb.querySelector('.ex-u[data-i="'+i+'"]').value||'').trim()||null}); });
+  if(!regs.length){ toast('Marque ao menos um resultado',true); return; }
+  const btn=$('ex-salvar'); btn.disabled=true;
+  const {error}=await sb.from('pep_resultados').insert(regs);
+  btn.disabled=false;
+  if(error){ toast('Erro ao salvar: '+error.message,true); return; }
+  registrarAcesso('documento',pacienteSel.id,regs.length+' resultado(s) do laudo');
+  closeM('m-extrair'); await carregarResultados(); renderMain(); toast(regs.length+' resultado(s) salvos — veja a evolução ✓');
+};
+
+async function abrirAnexo(id,baixar){
+  const {data,error}=await sb.from('pep_anexos').select('nome_arquivo,conteudo').eq('id',id).maybeSingle();
+  if(error||!data){ toast('Não consegui abrir: '+(error?error.message:'não encontrado'),true); return; }
+  const blob=dataURLparaBlob(data.conteudo), url=URL.createObjectURL(blob);
+  if(baixar){ const a=document.createElement('a'); a.href=url; a.download=data.nome_arquivo; document.body.appendChild(a); a.click(); a.remove(); }
+  else window.open(url,'_blank','noopener');
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+function renderAnexos(card,opc){
+  const atId=opc&&opc.atendimentoId||null, naFicha=!atId;
+  card.innerHTML='<div class="ch"><span>'+(naFicha?'Documentos e exames anexados':'Documentos anexados a esta consulta')+'</span>'+
+    '<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+
+    '<select class="f ax-tipo" style="width:auto;padding:6px 8px;font-size:12.5px">'+Object.entries(TIPOS_ANEXO).map(x=>'<option value="'+x[0]+'">'+esc(x[1])+'</option>').join('')+'</select>'+
+    '<button class="btn ghost sm ax-add">+ Anexar</button></span></div>'+
+    '<div class="cb ax-corpo"><div class="muted">Carregando…</div></div>'+
+    '<input type="file" class="ax-file hidden" accept="image/*,application/pdf" capture="environment">';
+  const corpo=card.querySelector('.ax-corpo'), inp=card.querySelector('.ax-file'), selTipo=card.querySelector('.ax-tipo'), btnAdd=card.querySelector('.ax-add');
+  if(!anexosOK){ corpo.innerHTML='<div class="muted">Para anexar exames e documentos, rode o anexos_schema.sql no Supabase.</div>'; btnAdd.disabled=true; selTipo.disabled=true; return; }
+  const listar=async()=>{
+    let q=sb.from('pep_anexos').select('id,tipo,nome_arquivo,mime,tamanho,atendimento_id,criado_em').order('criado_em',{ascending:false});
+    q = atId ? q.eq('atendimento_id',atId) : q.eq('paciente_id',pacienteSel.id);
+    const {data,error}=await q;
+    if(!card.isConnected) return;
+    if(error){ corpo.innerHTML='<div class="muted">Não consegui listar: '+esc(error.message)+'</div>'; return; }
+    const l=data||[];
+    if(!l.length){ corpo.innerHTML='<div class="muted">Nenhum documento anexado'+(naFicha?'. Use "+ Anexar" para guardar uma foto ou PDF de exame, laudo ou receita.':' nesta consulta.')+'</div>'; return; }
+    corpo.innerHTML='<table><tbody>'+l.map(x=>{
+      const pdf=/pdf/i.test(x.mime||'')||/\.pdf$/i.test(x.nome_arquivo||'');
+      const img=/^image\//i.test(x.mime||'')||/\.(jpe?g|png|webp|gif)$/i.test(x.nome_arquivo||'');
+      return '<tr><td style="width:30px">'+(pdf?'📄':'🖼️')+'</td><td><b>'+esc(TIPOS_ANEXO[x.tipo]||x.tipo)+'</b>'+
+        '<div class="muted" style="font-size:12px">'+esc(x.nome_arquivo)+' · '+Math.max(1,Math.round((x.tamanho||0)/1024))+' KB · '+esc(dataHoraBR(x.criado_em))+'</div></td>'+
+        '<td style="white-space:nowrap;text-align:right">'+(pdf?'<button class="btn ghost sm" data-ex="'+x.id+'" title="Ler os valores do laudo (PDF com texto)">Ler exames</button> ':'')+
+        (img?'<button class="btn ghost sm" data-ocr="'+x.id+'" title="Ler os valores da foto do laudo (OCR, no aparelho)">Ler exames (OCR)</button> ':'')+
+        '<button class="btn ghost sm" data-ver="'+x.id+'">Ver</button> '+
+        '<button class="btn ghost sm" data-bx="'+x.id+'">Baixar</button> <button class="btn ghost sm" data-rx="'+x.id+'">Excluir</button></td></tr>';
+    }).join('')+'</tbody></table>';
+    corpo.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>lerExamesAnexo(b.dataset.ex,atId));
+    corpo.querySelectorAll('[data-ocr]').forEach(b=>b.onclick=()=>lerExamesImagem(b.dataset.ocr,atId,b));
+    corpo.querySelectorAll('[data-ver]').forEach(b=>b.onclick=()=>abrirAnexo(b.dataset.ver,false));
+    corpo.querySelectorAll('[data-bx]').forEach(b=>b.onclick=()=>abrirAnexo(b.dataset.bx,true));
+    corpo.querySelectorAll('[data-rx]').forEach(b=>b.onclick=async()=>{ const x=l.find(y=>y.id===b.dataset.rx);
+      if(!confirm('Excluir "'+x.nome_arquivo+'"? Não dá para desfazer (a não ser por um backup).')) return;
+      const {data:del,error:e}=await sb.from('pep_anexos').delete().eq('id',x.id).select('id');
+      if(e||!del||!del.length){ toast('Não consegui excluir'+(e?': '+e.message:''),true); return; }
+      toast('Documento excluído'); listar(); });
+  };
+  btnAdd.onclick=()=>inp.click();
+  inp.addEventListener('change',async e=>{
+    const files=[...e.target.files]; e.target.value=''; if(!files.length) return;
+    if(!navigator.onLine){ toast('Anexar exige internet (o arquivo vai para a sua conta).',true); return; }
+    btnAdd.disabled=true; const orig=btnAdd.textContent; btnAdd.textContent='Enviando…';
+    let n=0;
+    try{
+      for(const f of files){
+        const ehImg=/^image\//i.test(f.type), ehPdf=/pdf/i.test(f.type)||/\.pdf$/i.test(f.name);
+        if(!ehImg&&!ehPdf){ toast('"'+f.name+'": só aceito imagem ou PDF',true); continue; }
+        if(f.size>LIMITE_ANEXO){ toast('"'+f.name+'" tem '+Math.round(f.size/1048576)+' MB — o limite é 8 MB'+(ehImg?'':'. Para PDF grande, reduza antes.'),true); continue; }
+        let conteudo, tamanho;
+        if(ehImg){ conteudo=await reduzirImagemDoc(f); tamanho=Math.round(conteudo.length*0.75); }
+        else { conteudo=await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>ko(r.error); r.readAsDataURL(f); }); tamanho=f.size; }
+        const reg={paciente_id:pacienteSel.id, atendimento_id:atId, tipo:selTipo.value,
+          nome_arquivo:f.name||(ehImg?'imagem.jpg':'documento.pdf'), mime:ehImg?'image/jpeg':(f.type||'application/pdf'), tamanho, conteudo};
+        const {error}=await sb.from('pep_anexos').insert(reg);
+        if(error){ toast(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))
+          ?'Rode o anexos_schema.sql no Supabase':'Erro ao anexar: '+error.message,true); break; }
+        n++;
+      }
+      if(n){ registrarAcesso('documento',pacienteSel.id,n+' anexo(s)'); toast(n+' documento(s) anexado(s) ✓'); listar(); }
+    }catch(err){ toast('Falha ao anexar: '+(err.message||err),true); }
+    finally{ btnAdd.disabled=false; btnAdd.textContent=orig; }
+  });
+  listar();
 }
 
 // ---------- escalas e testes de avaliação geriátrica ----------
@@ -3850,7 +4270,8 @@ async function dadosFolha(){
   const cr=crRes?{v:Number(crRes.valor),d:crRes.data_coleta}:((ats||[]).find(a=>a.creatinina)?{v:Number((ats||[]).find(a=>a.creatinina).creatinina),d:(ats||[]).find(a=>a.creatinina).data_atendimento}:null);
   const clcr=cr&&peso&&anos?Math.round(((140-anos)*peso.peso_kg)/(72*cr.v)*(fem?0.85:1)):null;
   const rev=revisarPrescricao(meds,{anos,clcr,probs:problemas,regimeCompleto:true});
-  return {ats:ats||[],meds,res,encs,anos,fem,peso,alt,cr,clcr,rev};
+  let vacs=[]; if(vacinasOK){ const {data:vv}=await sb.from('pep_vacinas').select('imuno,data').eq('paciente_id',p.id); vacs=vv||[]; }
+  return {ats:ats||[],meds,res,encs,anos,fem,peso,alt,cr,clcr,rev,vacs};
 }
 async function revisaoNaFicha(){
   const box=$('fr-rev'); if(!box) return;
@@ -3894,6 +4315,7 @@ async function docFolhaRosto(){
   if(cond.dm){ venc('HbA1c',ex('hba1c'),BA.hba1c); venc('Microalbuminúria',ex('microalb'),BA.microalb); }
   if(cond.dm||cond.has) venc('Creatinina',ex('creatinina'),BA.creatinina);
   if(cond.has) venc('Aferição de PA',pas.length?diasDesde(pas[0].data_atendimento):null,BA.pa);
+  if(vacinasOK) pendenciasVacina(f.vacs,{idade:f.anos,has:cond.has,dm:cond.dm}).forEach(pv=>pend.push(pv.txt));
   if(pend.length) secoes.push({t:'Pendências',txt:pend.join('\n')});
   return montarDoc('Folha de rosto — Resumo clínico em '+br(new Date().toISOString()), [], [], null, null, {secoes, semAssinatura:true});
 }
