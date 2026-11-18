@@ -555,6 +555,16 @@
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
 </div></div>
 
+<div class="overlay" id="m-vincular"><div class="modal" style="max-width:460px">
+  <div class="mh"><span>Vincular a um paciente cadastrado</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" style="margin-bottom:8px">Escolha o paciente do sistema a que esta consulta pertence.</div>
+    <input id="av-busca" class="f" placeholder="Buscar por nome…" autocomplete="off">
+    <div id="av-resultados" class="ag-resultados" style="margin-top:6px"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Fechar</button></div>
+</div></div>
+
 <div class="overlay" id="m-consulta"><div class="modal" style="max-width:540px">
   <div class="mh"><span>Nova consulta</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -1404,6 +1414,7 @@ function linhaConsulta(a){
     '<div class="ag-badge" style="color:'+st.cor+';background:'+st.bg+'">'+st.rot+'</div>'+
     '<div class="ag-ac">'+
       (vinc&&!cancel?'<button class="btn ghost sm" data-atend="'+a.paciente_id+'">Atender</button>':'')+
+      (!vinc&&!cancel?'<button class="btn ghost sm" data-vinc="'+a.id+'">Vincular</button>':'')+
       '<select class="f ag-status" data-st="'+a.id+'" style="width:auto;padding:5px 8px;font-size:12px">'+
         Object.keys(STATUS_AG).map(k=>'<option value="'+k+'"'+(k===a.status?' selected':'')+'>'+STATUS_AG[k].rot+'</option>').join('')+'</select>'+
       '<button class="btn ghost sm" data-del="'+a.id+'" title="Remover da agenda">✕</button>'+
@@ -1439,6 +1450,7 @@ async function renderAgendaConsultas(c){
     '<div class="card"><div class="cb" style="gap:0;padding:0">'+lista.map(linhaConsulta).join('')+'</div></div>';
   box.querySelectorAll('[data-abrir]').forEach(b=>b.onclick=()=>abrirPacientePorId(b.dataset.abrir,false));
   box.querySelectorAll('[data-atend]').forEach(b=>b.onclick=()=>abrirPacientePorId(b.dataset.atend,true));
+  box.querySelectorAll('[data-vinc]').forEach(b=>b.onclick=()=>abrirVincular(b.dataset.vinc));
   box.querySelectorAll('[data-st]').forEach(sel=>sel.onchange=async()=>{
     const {error}=await sb.from('pep_agenda').update({status:sel.value}).eq('id',sel.dataset.st);
     if(error){ toast('Não consegui atualizar: '+error.message,true); return; } toast('Status atualizado ✓'); renderMain(); });
@@ -1484,6 +1496,21 @@ function wireBuscaConsulta(){
   },300); });
   $('ag-avulso').addEventListener('change',()=>{ const av=$('ag-avulso').checked;
     $('ag-avulso-campos').style.display=av?'':'none'; $('ag-cad').style.display=av?'none':''; if(av) agConsultaPac=null; });
+}
+let agVincId=null;
+function abrirVincular(id){ agVincId=id; $('av-busca').value=''; $('av-resultados').innerHTML=''; openM('m-vincular'); }
+let avBuscaT=null;
+function wireBuscaVincular(){
+  $('av-busca').addEventListener('input',()=>{ clearTimeout(avBuscaT); avBuscaT=setTimeout(async()=>{
+    const q=$('av-busca').value.trim(); if(q.length<2){ $('av-resultados').innerHTML=''; return; }
+    const {data}=await sb.from('pep_pacientes').select('id,nome,data_nascimento').ilike('nome','%'+q+'%').order('nome').limit(12);
+    $('av-resultados').innerHTML=(data||[]).map(x=>'<button class="ag-opt" data-pv="'+x.id+'">'+esc(x.nome)+(x.data_nascimento?' <span class="muted">· '+idade(x.data_nascimento)+'</span>':'')+'</button>').join('')||'<div class="muted" style="padding:4px">Nenhum paciente encontrado.</div>';
+    $('av-resultados').querySelectorAll('[data-pv]').forEach(b=>b.onclick=async()=>{
+      const {error}=await sb.from('pep_agenda').update({paciente_id:b.dataset.pv, nome:null}).eq('id',agVincId);
+      if(error){ toast('Não consegui vincular: '+error.message,true); return; }
+      closeM('m-vincular'); toast('Paciente vinculado ✓'); renderMain();
+    });
+  },300); });
 }
 $('ag-salvar').onclick=async()=>{
   const av=$('ag-avulso').checked;
@@ -2849,7 +2876,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.9 · agenda de consultas';
+const VERSAO='2026-11-18.10 · Cal.com + vincular';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -5970,7 +5997,7 @@ $('off-ligado').addEventListener('change',async e=>{
   const ok=await OFF.alternar(quer);
   if(ok) toast(quer?'Uso offline ligado — baixando os dados':'Uso offline desligado e dados locais apagados');
 });
-ligarBotaoInstalar(); try{ wireBuscaConsulta(); }catch(e){}
+ligarBotaoInstalar(); try{ wireBuscaConsulta(); wireBuscaVincular(); }catch(e){}
 try{ $('btn-assinatura').onclick=abrirAssinatura; atualizarBotaoAssinatura(); }catch(e){}
 try{ window.matchMedia('(display-mode: standalone)').addEventListener('change',atualizarInstalar); }catch(e){}
 boot();
