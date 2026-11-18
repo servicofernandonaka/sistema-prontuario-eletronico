@@ -399,6 +399,18 @@
   .evocard .evoh{margin-bottom:5px}
   /* linhas de problemas/alergias com um respiro e divisor sutil */
   .cb .lin + .lin{border-top:1px solid #eef3f9;padding-top:7px;margin-top:1px}
+  /* ---------- agenda de consultas ---------- */
+  .ag-row{display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid var(--line)}
+  .ag-row:last-child{border-bottom:0}
+  .ag-row.cancel{opacity:.55}
+  .ag-hora{font-weight:700;font-size:15px;min-width:66px;display:flex;flex-direction:column}
+  .ag-hora small{font-weight:500;font-size:11px;color:var(--muted)}
+  .ag-nm{flex:1;min-width:0}
+  .ag-badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
+  .ag-ac{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .ag-resultados{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow:auto}
+  .ag-opt{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 10px;font-size:13.5px;cursor:pointer}
+  .ag-opt:hover{background:var(--brand-050);border-color:#bcd9f2}
 </style>
 </head>
 <body>
@@ -428,6 +440,7 @@
       <input id="pac-search" placeholder="Buscar paciente, CPF, CNS…" autocomplete="off">
     </div>
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
+    <button class="btn ghost block" id="btn-agconsultas">Agenda de consultas</button>
     <button class="btn ghost block" id="btn-painel">Painel da unidade</button>
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
@@ -540,6 +553,34 @@
     <div id="mod-lista"></div>
   </div>
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
+</div></div>
+
+<div class="overlay" id="m-consulta"><div class="modal" style="max-width:540px">
+  <div class="mh"><span>Nova consulta</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div id="ag-cad">
+      <div class="field"><label>Paciente cadastrado</label><input id="ag-busca" class="f" placeholder="Buscar por nome…" autocomplete="off"></div>
+      <div id="ag-resultados" class="ag-resultados"></div>
+      <div id="ag-selecionado" style="font-size:13px;margin:4px 0 6px"></div>
+    </div>
+    <label class="offbox" style="margin:2px 0 8px"><input type="checkbox" id="ag-avulso"> <span>Paciente sem cadastro (avulso)</span></label>
+    <div id="ag-avulso-campos" style="display:none">
+      <div class="grid">
+        <div class="field"><label>Nome</label><input id="ag-nome" class="f"></div>
+        <div class="field"><label>Telefone (opcional)</label><input id="ag-tel" class="f"></div>
+      </div>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Data</label><input id="ag-cdata" class="f" type="date"></div>
+      <div class="field"><label>Hora</label><input id="ag-hora" class="f" type="time"></div>
+    </div>
+    <div class="grid">
+      <div class="field"><label>Duração (min)</label><input id="ag-dur" class="f" type="number" min="5" step="5" value="30"></div>
+      <div class="field"><label>Tipo</label><select id="ag-tipo" class="f"><option>Consulta</option><option>Retorno</option><option>Encaixe</option><option>Avaliação</option><option>Procedimento</option></select></div>
+    </div>
+    <div class="field" style="margin:0"><label>Observação (opcional)</label><input id="ag-obs" class="f"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="ag-salvar">Marcar consulta</button></div>
 </div></div>
 
 <div class="overlay" id="m-recibo"><div class="modal" style="max-width:560px">
@@ -868,7 +909,7 @@ const OFF=(()=>{
   const nativo=window.fetch.bind(window);
   const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
     'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_modelos','pep_encaminhamentos','pep_atendimento_problemas',
-    'pep_problemas','pep_alergias','pep_resultados','pep_vacinas','pep_rastreamentos'];
+    'pep_problemas','pep_alergias','pep_resultados','pep_vacinas','pep_rastreamentos','pep_agenda'];
   const REFERENCIA=['pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
     'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
   const ESPELHO=new Set([...CLINICAS,...REFERENCIA]);
@@ -1344,6 +1385,120 @@ const OFF=(()=>{
            pendentes:()=>estado.pendentes, apagarTudo, estado };
 })();
 
+// ---------- agenda de consultas (agenda interna) ----------
+let agendaData=new Date().toISOString().slice(0,10);
+let agConsultaPac=null;
+const STATUS_AG={marcada:{rot:'Marcada',cor:'#5e7490',bg:'#eef2f7'},confirmada:{rot:'Confirmada',cor:'#0a6fbd',bg:'#e6f1fb'},
+  atendida:{rot:'Atendida',cor:'#17995c',bg:'#e6f7ef'},faltou:{rot:'Faltou',cor:'#c62828',bg:'#fdecec'},cancelada:{rot:'Cancelada',cor:'#8a8a8a',bg:'#eef0f2'}};
+function addDiasISO(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function nomeDaConsulta(a){ if(a.paciente_id){ const pc=(pacientes||[]).find(x=>x.id===a.paciente_id); return (pc&&pc.nome)||'(paciente cadastrado)'; } return a.nome||'(sem nome)'; }
+function linhaConsulta(a){
+  const st=STATUS_AG[a.status]||STATUS_AG.marcada, nm=nomeDaConsulta(a), vinc=!!a.paciente_id, cancel=a.status==='cancelada';
+  return '<div class="ag-row'+(cancel?' cancel':'')+'">'+
+    '<div class="ag-hora">'+esc(a.hora||'--:--')+'<small>'+(a.duracao_min||30)+' min</small></div>'+
+    '<div class="ag-nm">'+(vinc?'<button class="ba-nome" data-abrir="'+a.paciente_id+'">'+esc(nm)+'</button>':'<b>'+esc(nm)+'</b>')+
+      (a.tipo?' <span class="chip">'+esc(a.tipo)+'</span>':'')+
+      (a.origem&&a.origem!=='manual'?' <span class="chip" style="background:#e9f6ff">via '+esc(a.origem)+'</span>':'')+
+      (a.telefone?'<div class="muted" style="font-size:12px">'+esc(a.telefone)+'</div>':'')+
+      (a.observacao?'<div class="muted" style="font-size:12px">'+esc(a.observacao)+'</div>':'')+'</div>'+
+    '<div class="ag-badge" style="color:'+st.cor+';background:'+st.bg+'">'+st.rot+'</div>'+
+    '<div class="ag-ac">'+
+      (vinc&&!cancel?'<button class="btn ghost sm" data-atend="'+a.paciente_id+'">Atender</button>':'')+
+      '<select class="f ag-status" data-st="'+a.id+'" style="width:auto;padding:5px 8px;font-size:12px">'+
+        Object.keys(STATUS_AG).map(k=>'<option value="'+k+'"'+(k===a.status?' selected':'')+'>'+STATUS_AG[k].rot+'</option>').join('')+'</select>'+
+      '<button class="btn ghost sm" data-del="'+a.id+'" title="Remover da agenda">✕</button>'+
+    '</div></div>';
+}
+async function renderAgendaConsultas(c){
+  c.innerHTML='<div class="phead"><div><div class="nm">Agenda de consultas</div><div class="mt" id="ag-sub"></div></div><div class="sp"></div>'+
+    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+    '<button class="btn ghost" id="ag-ant" title="Dia anterior">‹</button>'+
+    '<input type="date" class="f" id="ag-data" style="width:auto;padding:7px 10px">'+
+    '<button class="btn ghost" id="ag-prox" title="Próximo dia">›</button>'+
+    '<button class="btn ghost" id="ag-hoje">Hoje</button>'+
+    '<button class="btn primary" id="ag-nova">+ Nova consulta</button></div></div>'+
+    '<div id="ag-corpo"><div class="muted">Carregando…</div></div>';
+  $('ag-data').value=agendaData;
+  $('ag-ant').onclick=()=>{ agendaData=addDiasISO(agendaData,-1); renderMain(); };
+  $('ag-prox').onclick=()=>{ agendaData=addDiasISO(agendaData,1); renderMain(); };
+  $('ag-hoje').onclick=()=>{ agendaData=new Date().toISOString().slice(0,10); renderMain(); };
+  $('ag-data').onchange=()=>{ if($('ag-data').value){ agendaData=$('ag-data').value; renderMain(); } };
+  $('ag-nova').onclick=abrirNovaConsulta;
+  const diaTxt=new Date(agendaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  $('ag-sub').textContent=diaTxt.charAt(0).toUpperCase()+diaTxt.slice(1);
+  if(!agendaOK){ $('ag-corpo').innerHTML='<div class="empty">Para usar a agenda, rode o agenda_schema.sql no Supabase.</div>'; return; }
+  const alvo=agendaData;
+  const {data,error}=await sb.from('pep_agenda').select('*').eq('data',alvo).order('hora',{ascending:true});
+  if(tela!=='agconsultas'||pacienteSel||agendaData!==alvo) return;
+  const box=$('ag-corpo'); if(!box) return;
+  if(error){ box.innerHTML='<div class="empty">Não consegui carregar a agenda: '+esc(error.message)+'</div>'; return; }
+  const lista=data||[];
+  const ativas=lista.filter(x=>x.status!=='cancelada').length;
+  if(!lista.length){ box.innerHTML='<div class="empty">Nenhuma consulta neste dia. Use "+ Nova consulta" para marcar.</div>'; return; }
+  box.innerHTML='<div class="muted" style="margin:0 0 8px">'+ativas+' consulta(s) neste dia'+(lista.length>ativas?' · '+(lista.length-ativas)+' cancelada(s)':'')+'</div>'+
+    '<div class="card"><div class="cb" style="gap:0;padding:0">'+lista.map(linhaConsulta).join('')+'</div></div>';
+  box.querySelectorAll('[data-abrir]').forEach(b=>b.onclick=()=>abrirPacientePorId(b.dataset.abrir,false));
+  box.querySelectorAll('[data-atend]').forEach(b=>b.onclick=()=>abrirPacientePorId(b.dataset.atend,true));
+  box.querySelectorAll('[data-st]').forEach(sel=>sel.onchange=async()=>{
+    const {error}=await sb.from('pep_agenda').update({status:sel.value}).eq('id',sel.dataset.st);
+    if(error){ toast('Não consegui atualizar: '+error.message,true); return; } toast('Status atualizado ✓'); renderMain(); });
+  box.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Remover esta consulta da agenda?')) return;
+    const {data:d,error:e}=await sb.from('pep_agenda').delete().eq('id',b.dataset.del).select('id');
+    if(e){ toast('Não consegui remover: '+e.message,true); return; }
+    if(!d||!d.length){ toast('O banco não permitiu remover. Rode de novo o agenda_schema.sql.',true); return; }
+    toast('Consulta removida'); renderMain(); });
+}
+async function abrirPacientePorId(id, atender){
+  let p=(pacientes||[]).find(x=>x.id===id);
+  if(!p){ const {data}=await sb.from('pep_pacientes').select('*').eq('id',id).maybeSingle(); p=data; }
+  if(!p){ toast('Paciente não encontrado',true); return; }
+  tela=null; pacienteSel=p; atendAtual=null; renderSideList(); renderMain();
+  await carregarProblemasAlergias(); await carregarResultados();
+  if(atender) novoAtendimento(); else renderMain();
+}
+// ---- nova consulta ----
+function abrirNovaConsulta(){
+  if(!agendaOK){ toast('Rode o agenda_schema.sql no Supabase',true); return; }
+  agConsultaPac=null;
+  $('ag-busca').value=''; $('ag-resultados').innerHTML=''; $('ag-selecionado').innerHTML='';
+  $('ag-avulso').checked=false; $('ag-avulso-campos').style.display='none';
+  $('ag-cad').style.display='';
+  $('ag-nome').value=''; $('ag-tel').value='';
+  $('ag-cdata').value=agendaData; $('ag-hora').value=''; $('ag-dur').value='30';
+  $('ag-tipo').value='Consulta'; $('ag-obs').value='';
+  openM('m-consulta');
+}
+let agBuscaT=null;
+function wireBuscaConsulta(){
+  $('ag-busca').addEventListener('input',()=>{ clearTimeout(agBuscaT); agBuscaT=setTimeout(async()=>{
+    const q=$('ag-busca').value.trim(); if(q.length<2){ $('ag-resultados').innerHTML=''; return; }
+    const {data}=await sb.from('pep_pacientes').select('id,nome,data_nascimento,cpf').ilike('nome','%'+q+'%').order('nome').limit(12);
+    $('ag-resultados').innerHTML=(data||[]).map(p=>'<button class="ag-opt" data-pac="'+p.id+'" data-nome="'+esc(p.nome).replace(/"/g,'&quot;')+'">'+esc(p.nome)+(p.data_nascimento?' <span class="muted">· '+idade(p.data_nascimento)+'</span>':'')+'</button>').join('')||'<div class="muted" style="padding:4px">Nenhum paciente encontrado.</div>';
+    $('ag-resultados').querySelectorAll('[data-pac]').forEach(b=>b.onclick=()=>{
+      agConsultaPac={id:b.dataset.pac,nome:b.dataset.nome};
+      $('ag-selecionado').innerHTML='Selecionado: <b>'+esc(agConsultaPac.nome)+'</b> <button class="btn ghost sm" id="ag-limpar-sel">trocar</button>';
+      $('ag-resultados').innerHTML=''; $('ag-busca').value='';
+      $('ag-limpar-sel').onclick=()=>{ agConsultaPac=null; $('ag-selecionado').innerHTML=''; };
+    });
+  },300); });
+  $('ag-avulso').addEventListener('change',()=>{ const av=$('ag-avulso').checked;
+    $('ag-avulso-campos').style.display=av?'':'none'; $('ag-cad').style.display=av?'none':''; if(av) agConsultaPac=null; });
+}
+$('ag-salvar').onclick=async()=>{
+  const av=$('ag-avulso').checked;
+  if(!av&&!agConsultaPac){ toast('Escolha um paciente ou marque "avulso"',true); return; }
+  if(av&&!$('ag-nome').value.trim()){ toast('Informe o nome do paciente avulso',true); return; }
+  if(!$('ag-cdata').value){ toast('Informe a data',true); return; }
+  const reg={ data:$('ag-cdata').value, hora:$('ag-hora').value||null, duracao_min:Number($('ag-dur').value)||30,
+    tipo:$('ag-tipo').value.trim()||null, observacao:$('ag-obs').value.trim()||null, origem:'manual',
+    paciente_id: av?null:agConsultaPac.id, nome: av?$('ag-nome').value.trim():null, telefone: av?($('ag-tel').value.trim()||null):null };
+  const {error}=await sb.from('pep_agenda').insert(reg);
+  if(error){ toast(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))?'Rode o agenda_schema.sql no Supabase':'Erro ao salvar: '+error.message,true); return; }
+  closeM('m-consulta'); toast('Consulta marcada ✓');
+  if(reg.data===agendaData && tela==='agconsultas') renderMain();
+};
+
 // ---------- recibo de honorários e declaração de comparecimento ----------
 function tresCent(n){ if(n===0)return''; if(n===100)return'cem'; let s=''; const c=Math.floor(n/100),r=n%100;
   if(c)s+=CEN[c]; if(r){ if(s)s+=' e '; if(r<20)s+=UNI[r]; else { s+=DEZ[Math.floor(r/10)]; if(r%10)s+=' e '+UNI[r%10]; } } return s; }
@@ -1556,11 +1711,11 @@ $('btn-logout').onclick=async()=>{
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
-let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false, rastreamentosOK=false;
+let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false, rastreamentosOK=false, agendaOK=false;
 async function sondarColunas(){
   // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
-  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; rastreamentosOK=!!c.ra; }catch(e){} return; }
-  const [a,b,r,n,sg,ec,ax,va,rs]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; rastreamentosOK=!!c.ra; agendaOK=!!c.ag; }catch(e){} return; }
+  const [a,b,r,n,sg,ec,ax,va,rs,agd]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
                                  sb.from('pep_prescricao_itens').select('tipo_receita').limit(1),
                                  sb.from('pep_atendimentos').select('retorno_previsto').limit(1),
                                  sb.from('pep_encaminhamentos').select('id').limit(1),
@@ -1568,9 +1723,10 @@ async function sondarColunas(){
                                  sb.from('pep_escalas').select('id').limit(1),
                                  sb.from('pep_anexos').select('id').limit(1),
                                  sb.from('pep_vacinas').select('id').limit(1),
-                                 sb.from('pep_rastreamentos').select('id').limit(1)]);
-  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error;
-  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK}));}catch(e){}
+                                 sb.from('pep_rastreamentos').select('id').limit(1),
+                                 sb.from('pep_agenda').select('id').limit(1)]);
+  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error; agendaOK=!agd.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK,ag:agendaOK}));}catch(e){}
 }
 async function carregarPacientes(q){
   let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
@@ -1606,6 +1762,7 @@ function abrirModalPaciente(p){
 }
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('btn-busca').onclick=()=>abrirTela('busca');
+$('btn-agconsultas').onclick=()=>abrirTela('agconsultas');
 $('btn-agenda').onclick=()=>abrirTela('agenda');
 $('btn-painel').onclick=()=>abrirTela('painel');
 $('btn-backup').onclick=()=>abrirTela('backup');
@@ -1836,6 +1993,7 @@ function renderMain(){
   const c=$('main-content'); c.innerHTML='';
   if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
   if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
+  if(!pacienteSel&&tela==='agconsultas') return renderAgendaConsultas(c);
   if(!pacienteSel&&tela==='painel') return renderPainel(c);
   if(!pacienteSel&&tela==='backup') return renderBackup(c);
   if(!pacienteSel&&tela==='seguranca') return renderSeguranca(c);
@@ -2691,7 +2849,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.8 · acabamento das fichas';
+const VERSAO='2026-11-18.9 · agenda de consultas';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3448,7 +3606,7 @@ const baixarTexto=(txt,nome,tipo)=>baixarBlob(new Blob([txt],{type:(tipo||'text/
 // ordem de restauração: quem é referenciado vem antes
 const TAB_BACKUP=['pep_unidades','pep_pacientes','pep_problemas','pep_alergias','pep_atendimentos','pep_atendimento_problemas',
   'pep_solicitacoes_exames','pep_solicitacao_itens','pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios',
-  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_escalas','pep_anexos','pep_vacinas','pep_rastreamentos','pep_profissional'];
+  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_escalas','pep_anexos','pep_vacinas','pep_rastreamentos','pep_agenda','pep_profissional'];
 const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); }catch(e){ return null; } };
 function statusBackup(){
   const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
@@ -5812,7 +5970,7 @@ $('off-ligado').addEventListener('change',async e=>{
   const ok=await OFF.alternar(quer);
   if(ok) toast(quer?'Uso offline ligado — baixando os dados':'Uso offline desligado e dados locais apagados');
 });
-ligarBotaoInstalar();
+ligarBotaoInstalar(); try{ wireBuscaConsulta(); }catch(e){}
 try{ $('btn-assinatura').onclick=abrirAssinatura; atualizarBotaoAssinatura(); }catch(e){}
 try{ window.matchMedia('(display-mode: standalone)').addEventListener('change',atualizarInstalar); }catch(e){}
 boot();
