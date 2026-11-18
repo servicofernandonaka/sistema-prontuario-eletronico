@@ -409,6 +409,7 @@
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
+      <button class="btn ghost" id="btn-assinatura">Assinatura digital (A1)</button>
       <button class="btn ghost" id="btn-instalar" style="display:none">Instalar aplicativo</button>
       <div class="muted" id="instalar-dica" style="display:none;padding:0 4px;font-size:11px;line-height:1.4"></div>
       <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
@@ -496,6 +497,19 @@
     <div id="mod-lista"></div>
   </div>
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
+</div></div>
+
+<div class="overlay" id="m-assinar"><div class="modal" style="max-width:560px">
+  <div class="mh"><span>Assinatura digital (certificado A1)</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" id="as-estado" style="margin-bottom:10px"></div>
+    <div class="field"><label>Arquivo do certificado (.pfx ou .p12)</label><input type="file" id="as-file" class="f" accept=".pfx,.p12"></div>
+    <div class="field"><label>Senha do certificado</label><input type="password" id="as-senha" class="f" autocomplete="off"></div>
+    <label class="offbox" style="margin:2px 0 8px"><input type="checkbox" id="as-auto" checked> <span>Assinar automaticamente os PDFs ao gerar</span></label>
+    <div id="as-info" style="font-size:13px;margin-bottom:8px"></div>
+    <div class="muted" style="font-size:12px;line-height:1.5">O arquivo e a senha ficam <b>só na memória deste aparelho, nesta sessão</b> — não são salvos nem enviados. Ao sair da conta ou recarregar a página, carregue de novo. A assinatura é ICP-Brasil (PAdES) e vale como a de próprio punho (MP 2.200-2/2001).<br><br><b>Não tem certificado A1?</b> Gere o PDF normalmente e assine no aplicativo ou assinador do seu VIDaaS; a validade é a mesma. Receitas de controle especial ainda dependem do SNCR da Anvisa, à parte da assinatura.</div>
+  </div>
+  <div class="mf"><button class="btn ghost" id="as-limpar" style="display:none">Esquecer certificado</button><button class="btn ghost" data-close>Fechar</button><button class="btn primary" id="as-carregar">Carregar certificado</button></div>
 </div></div>
 
 <div class="overlay" id="m-renova"><div class="modal" style="max-width:560px">
@@ -1255,6 +1269,58 @@ const OFF=(()=>{
            pendentes:()=>estado.pendentes, apagarTudo, estado };
 })();
 
+// ---------- assinatura digital no próprio aparelho (certificado A1) ----------
+// O arquivo .pfx/.p12 e a senha ficam só na memória desta sessão: nunca são salvos
+// nem enviados. A assinatura (PAdES / ICP-Brasil) é montada aqui no aparelho.
+let assinadorCarregando=null;
+function carregarAssinador(){
+  if(window.PEPAssinador) return Promise.resolve();
+  if(assinadorCarregando) return assinadorCarregando;
+  assinadorCarregando=new Promise((ok,ko)=>{ const s=document.createElement('script'); s.src='./assinador.js';
+    s.onload=()=>window.PEPAssinador?ok():ko(new Error('assinador.js não inicializou'));
+    s.onerror=()=>ko(new Error('não consegui carregar o assinador.js (publique-o junto do index.html)')); document.head.appendChild(s); });
+  return assinadorCarregando;
+}
+const ASS={ pfx:null, senha:null, nome:null, ate:null, auto:false };
+function assinaturaArmada(){ return !!(ASS.pfx&&ASS.senha); }
+function limparAssinatura(){ ASS.pfx=null; ASS.senha=null; ASS.nome=null; ASS.ate=null; ASS.auto=false; atualizarBotaoAssinatura(); }
+function atualizarBotaoAssinatura(){ const b=document.getElementById('btn-assinatura'); if(!b) return;
+  const on=assinaturaArmada()&&ASS.auto; b.textContent=on?'Assinatura: ligada ✓':'Assinatura digital (A1)'; b.classList.toggle('primary',on); }
+function abrirAssinatura(){
+  const venc=ASS.ate&&ASS.ate.getTime()<Date.now();
+  $('as-estado').innerHTML= assinaturaArmada()
+    ? 'Certificado carregado nesta sessão: <b>'+esc(ASS.nome||'')+'</b>'+(ASS.ate?' · válido até '+esc(dataBRsimples(ASS.ate.toISOString().slice(0,10)))+(venc?' (VENCIDO)':''):'')+'.'
+    : 'Nenhum certificado carregado nesta sessão.';
+  $('as-info').textContent=''; $('as-senha').value=''; try{ $('as-file').value=''; }catch(e){}
+  $('as-auto').checked=ASS.auto; $('as-limpar').style.display=assinaturaArmada()?'':'none';
+  openM('m-assinar');
+}
+$('as-carregar').onclick=async()=>{
+  const f=$('as-file').files[0]; if(!f){ toast('Escolha o arquivo .pfx ou .p12',true); return; }
+  const senha=$('as-senha').value; if(!senha){ toast('Digite a senha do certificado',true); return; }
+  $('as-carregar').disabled=true; $('as-info').textContent='Lendo o certificado…';
+  try{
+    await carregarAssinador();
+    const buf=await f.arrayBuffer();
+    const info=await window.PEPAssinador.infoCertificado(buf.slice(0), senha);
+    if(!info) throw new Error('Não consegui ler o certificado. Confira o arquivo e a senha.');
+    const venc=info.ate&&info.ate.getTime()<Date.now();
+    ASS.pfx=buf; ASS.senha=senha; ASS.nome=info.nome; ASS.ate=info.ate; ASS.auto=$('as-auto').checked;
+    $('as-info').innerHTML='Certificado: <b>'+esc(info.nome||'')+'</b>'+(info.ate?' · válido até '+esc(dataBRsimples(info.ate.toISOString().slice(0,10))):'')+(venc?' <span style="color:#c62828">— VENCIDO</span>':'');
+    $('as-limpar').style.display='';
+    atualizarBotaoAssinatura();
+    toast(venc?'Certificado carregado, mas está vencido':'Certificado carregado para esta sessão ✓');
+  }catch(e){ $('as-info').innerHTML='<span style="color:#c62828">'+esc(e.message||e)+'</span>'; }
+  finally{ $('as-carregar').disabled=false; }
+};
+$('as-auto').onchange=()=>{ ASS.auto=$('as-auto').checked; atualizarBotaoAssinatura(); };
+$('as-limpar').onclick=()=>{ limparAssinatura(); $('as-estado').textContent='Certificado removido desta sessão.'; $('as-info').textContent=''; $('as-limpar').style.display='none'; toast('Certificado esquecido'); };
+async function assinarBytes(bytes){
+  await carregarAssinador();
+  return await window.PEPAssinador.assinar(bytes, ASS.pfx, ASS.senha,
+    {name:ASS.nome||'', reason:'Assinatura do documento médico', location:(dadosProf().unidade||'')});
+}
+
 // ---------- instalação como aplicativo (PWA) ----------
 let promptInstalar=null;
 function appInstalado(){ try{ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true; }catch(e){ return false; } }
@@ -1356,6 +1422,7 @@ $('btn-logout').onclick=async()=>{
   const n=OFF.pendentes();
   if(n&&!confirm('Há '+n+' registro(s) aguardando envio.\n\nSe você sair, eles continuam guardados neste aparelho, mas só sobem quando você entrar de novo AQUI. Sair mesmo assim?')) return;
   try{ await sb.auth.signOut(); }catch(e){}
+  limparAssinatura();    // o certificado não sobrevive ao logout
   aplicarSessao(null);   // volta para o login mesmo se a rede falhar
 };
 
@@ -2279,11 +2346,17 @@ function nomeArquivo(entrada){
           dataBRsimples(d.quando).replace(/\//g,'-')].filter(Boolean).join('-')+'.pdf';
 }
 async function baixarPDF(d){
-  const bytes=await gerarPDF(d); if(!bytes) return;
+  let bytes=await gerarPDF(d); if(!bytes) return;
+  let assinado=false;
+  if(assinaturaArmada()&&ASS.auto){
+    try{ bytes=await assinarBytes(bytes); assinado=true; }
+    catch(e){ toast('Não consegui assinar ('+(e.message||e)+') — baixando sem assinatura.',true); }
+  }
+  const nome=assinado?nomeArquivo(d).replace(/\.pdf$/i,'')+'-assinado.pdf':nomeArquivo(d);
   const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
-  const a=document.createElement('a'); a.href=url; a.download=nomeArquivo(d); document.body.appendChild(a); a.click(); a.remove();
+  const a=document.createElement('a'); a.href=url; a.download=nome; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),4000);
-  toast(Array.isArray(d)&&d.length>1 ? 'PDF com '+d.length+' guias gerado ✓' : 'PDF gerado ✓');
+  toast(assinado?'PDF assinado gerado ✓':(Array.isArray(d)&&d.length>1 ? 'PDF com '+d.length+' guias gerado ✓' : 'PDF gerado ✓'));
 }
 // "Via oral" vira o cabeçalho "USO ORAL", com a concordância certa
 function viaGrupo(v){
@@ -2489,7 +2562,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.2 · app instalável';
+const VERSAO='2026-11-18.4 · novo ícone';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -5611,6 +5684,7 @@ $('off-ligado').addEventListener('change',async e=>{
   if(ok) toast(quer?'Uso offline ligado — baixando os dados':'Uso offline desligado e dados locais apagados');
 });
 ligarBotaoInstalar();
+try{ $('btn-assinatura').onclick=abrirAssinatura; atualizarBotaoAssinatura(); }catch(e){}
 try{ window.matchMedia('(display-mode: standalone)').addEventListener('change',atualizarInstalar); }catch(e){}
 boot();
 </script>
