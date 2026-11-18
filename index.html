@@ -380,6 +380,25 @@
   .btn-google{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f2937;border:1px solid #d8e3ef;font-weight:600}
   .btn-google:hover{background:#f6f9fc}
   .menu-btn{display:none;border:1px solid var(--line);background:transparent;color:var(--fg);width:38px;height:38px;border-radius:9px;align-items:center;justify-content:center}
+  /* ================= acabamento das fichas (18.8) ================= */
+  .card{box-shadow:0 1px 3px rgba(17,42,68,.06),0 1px 2px rgba(17,42,68,.04);border-color:#e4edf6;margin-bottom:16px}
+  .resumo .card{margin-bottom:0}
+  .ch{position:relative;background:linear-gradient(180deg,#fbfdff,#f2f8fd);border-bottom:1px solid #e7eff8;
+      font-size:14px;color:var(--fg);padding:12px 14px 12px 17px;letter-spacing:-.005em}
+  .ch::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--brand);opacity:.9}
+  .ch .btn.sm{font-weight:600}
+  .cb{padding:13px 15px}
+  .lin{padding:3px 0;line-height:1.45}
+  .sec-title{display:flex;align-items:center;gap:12px;margin:20px 0 11px;font-size:11.5px}
+  .sec-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),rgba(216,227,239,0))}
+  .phead{background:linear-gradient(135deg,#ffffff 0%,#f3f9fe 100%);border-color:#e1eaf5;box-shadow:0 2px 7px rgba(17,42,68,.06);padding:18px 20px}
+  .phead .avatar{width:52px;height:52px;font-size:17px;box-shadow:0 0 0 3px #fff,0 0 0 4px var(--brand-050)}
+  .phead .nm{font-size:19px;letter-spacing:-.01em}
+  .phead .mt{font-size:12.5px;margin-top:2px}
+  .evocard{background:#fff;border-color:#e7eff8;box-shadow:0 1px 2px rgba(17,42,68,.04);padding:12px 12px 9px}
+  .evocard .evoh{margin-bottom:5px}
+  /* linhas de problemas/alergias com um respiro e divisor sutil */
+  .cb .lin + .lin{border-top:1px solid #eef3f9;padding-top:7px;margin-top:1px}
 </style>
 </head>
 <body>
@@ -2672,7 +2691,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.7 · menu organizado';
+const VERSAO='2026-11-18.8 · acabamento das fichas';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
