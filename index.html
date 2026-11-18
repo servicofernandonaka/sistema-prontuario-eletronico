@@ -76,8 +76,17 @@
   #view-app{display:flex;min-height:100%}
   .sidebar{flex:0 0 268px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;
     padding:16px 14px;gap:12px;position:sticky;top:0;height:100vh}
-  .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;padding:4px 6px}
-  .logo .tile{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:20px;font-weight:700}
+  .brand{display:flex;align-items:center;gap:11px;padding:4px 6px 8px}
+  .brand-mark{width:40px;height:40px;flex:0 0 auto}
+  .brand-mark svg{width:100%;height:100%;display:block}
+  .brand-txt{display:flex;flex-direction:column;line-height:1.02;min-width:0}
+  .brand-txt .nm{font-weight:800;font-size:19px;letter-spacing:-.01em;color:var(--fg)}
+  .brand-txt .nm b{color:var(--brand);font-weight:800}
+  .brand-txt .tg{font-weight:500;font-size:11px;letter-spacing:.03em;color:var(--muted);margin-top:3px}
+  .brand.hero{flex-direction:column;text-align:center;gap:12px;margin-bottom:22px}
+  .brand.hero .brand-mark{width:60px;height:60px;filter:drop-shadow(0 6px 16px rgba(10,92,158,.28))}
+  .brand.hero .brand-txt{align-items:center}
+  .brand.hero .brand-txt .nm{font-size:24px}
   .search-box{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
   .search-box svg{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
   .search-box input{border:0;background:transparent;color:var(--fg);outline:0;width:100%;font-size:14px}
@@ -89,6 +98,14 @@
   .side-item .mt{font-size:11.5px;color:var(--muted)}
   .side-foot{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
   .side-foot .btn{justify-content:flex-start}
+  .side-grp{border:1px solid var(--line);border-radius:9px;background:var(--panel-2);overflow:hidden}
+  .side-grp>summary{list-style:none;cursor:pointer;padding:9px 11px;font-size:12.5px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;user-select:none}
+  .side-grp>summary::-webkit-details-marker{display:none}
+  .side-grp>summary::after{content:"\25BE";margin-left:auto;font-size:10px;transition:transform .15s}
+  .side-grp[open]>summary{color:var(--fg);border-bottom:1px solid var(--line);background:var(--card)}
+  .side-grp[open]>summary::after{transform:rotate(180deg)}
+  .side-grp .grp-body{display:flex;flex-direction:column;gap:6px;padding:8px}
+  .side-grp .grp-body .btn{background:var(--card)}
 
   .main{flex:1;min-width:0;display:flex;flex-direction:column}
   .topbar{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
@@ -370,8 +387,7 @@
 <!-- ================= LOGIN ================= -->
 <div id="view-login" class="hidden">
   <div class="login-card">
-    <h1>Entrar no PEP</h1>
-    <p>Acesso restrito. Seus dados ficam na sua conta.</p>
+    <div class="brand hero"><span class="brand-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f93d8"/><stop offset="1" stop-color="#0a5c9e"/></linearGradient><filter id="sB" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0.6" stdDeviation="0.7" flood-color="#06365c" flood-opacity="0.35"/></filter></defs><rect x="1" y="1" width="46" height="46" rx="12" fill="url(#gB)"/><rect x="13" y="8.5" width="22" height="31" rx="4.5" fill="#fff" filter="url(#sB)"/><g fill="#0a6fbd"><rect x="21.6" y="12.6" width="4.8" height="13" rx="1.7"/><rect x="17.5" y="16.6" width="13" height="4.8" rx="1.7"/></g><rect x="17.5" y="28.6" width="13" height="1.3" rx="0.65" fill="#0a6fbd" opacity="0.22"/><path d="M17.5 33.6 H21 L22.4 31 L24 36 L25.6 32 L26.9 33.6 H30.5" fill="none" stroke="#0a6fbd" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="brand-txt"><span class="nm"><b>PEP</b> Clínico</span><span class="tg">Prontuário eletrônico · acesso restrito</span></span></div>
     <div id="cfg" class="cfg hidden"></div>
     <div class="field"><label>E-mail</label><input id="li-email" class="f" type="email" autocomplete="username"></div>
     <div class="field"><label>Senha</label><input id="li-pass" class="f" type="password" autocomplete="current-password"></div>
@@ -387,7 +403,7 @@
 <!-- ================= APP ================= -->
 <div id="view-app" class="hidden">
   <aside class="sidebar" id="sidebar">
-    <div class="logo"><span class="tile">+</span> PEP Clínico</div>
+    <div class="brand"><span class="brand-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f93d8"/><stop offset="1" stop-color="#0a5c9e"/></linearGradient><filter id="sA" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0.6" stdDeviation="0.7" flood-color="#06365c" flood-opacity="0.35"/></filter></defs><rect x="1" y="1" width="46" height="46" rx="12" fill="url(#gA)"/><rect x="13" y="8.5" width="22" height="31" rx="4.5" fill="#fff" filter="url(#sA)"/><g fill="#0a6fbd"><rect x="21.6" y="12.6" width="4.8" height="13" rx="1.7"/><rect x="17.5" y="16.6" width="13" height="4.8" rx="1.7"/></g><rect x="17.5" y="28.6" width="13" height="1.3" rx="0.65" fill="#0a6fbd" opacity="0.22"/><path d="M17.5 33.6 H21 L22.4 31 L24 36 L25.6 32 L26.9 33.6 H30.5" fill="none" stroke="#0a6fbd" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="brand-txt"><span class="nm"><b>PEP</b> Clínico</span><span class="tg">Prontuário eletrônico</span></span></div>
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input id="pac-search" placeholder="Buscar paciente, CPF, CNS…" autocomplete="off">
@@ -397,26 +413,34 @@
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
     <div class="side-foot">
-      <button class="btn ghost" id="btn-prof">Dados para impressão</button>
-      <button class="btn ghost" id="btn-backup">Backup dos dados</button>
-      <div class="muted" id="backup-status" style="padding:0 4px;font-size:11px"></div>
-      <button class="btn ghost" id="btn-seguranca">Segurança e acessos</button>
-      <button class="btn ghost" id="btn-sigtap" title="TUSS 22 da ANS (.csv), o mapeamento TUSS x SIGTAP (.csv), ou o pacote da SIGTAP (.zip)">Importar tabela de exames</button>
-      <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
-      <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
-      <input type="file" id="cid10-file" accept=".zip,.csv,.txt" class="hidden">
-      <button class="btn ghost" id="btn-med" title="Lista de preços da CMED/Anvisa (.xlsx), ou planilha com colunas nome / apresentacao / via">Importar medicamentos</button>
-      <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
-      <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
-      <button class="btn ghost" id="btn-logout">Sair da conta</button>
-      <button class="btn ghost" id="btn-assinatura">Assinatura digital (A1)</button>
-      <button class="btn ghost" id="btn-instalar" style="display:none">Instalar aplicativo</button>
-      <div class="muted" id="instalar-dica" style="display:none;padding:0 4px;font-size:11px;line-height:1.4"></div>
-      <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
-      <div class="muted" id="off-status" style="padding:0 4px;font-size:11px;line-height:1.4"></div>
+      <details class="side-grp"><summary>Impressão e assinatura</summary><div class="grp-body">
+        <button class="btn ghost" id="btn-prof">Dados para impressão</button>
+        <button class="btn ghost" id="btn-assinatura">Assinatura digital (A1)</button>
+      </div></details>
+      <details class="side-grp"><summary>Backup e segurança</summary><div class="grp-body">
+        <button class="btn ghost" id="btn-backup">Backup dos dados</button>
+        <div class="muted" id="backup-status" style="padding:0 4px;font-size:11px"></div>
+        <button class="btn ghost" id="btn-seguranca">Segurança e acessos</button>
+      </div></details>
+      <details class="side-grp"><summary>Importar tabelas</summary><div class="grp-body">
+        <button class="btn ghost" id="btn-sigtap" title="TUSS 22 da ANS (.csv), o mapeamento TUSS x SIGTAP (.csv), ou o pacote da SIGTAP (.zip)">Importar tabela de exames</button>
+        <input type="file" id="sigtap-file" accept=".zip,.csv,.txt,.xlsx,.xls" class="hidden">
+        <button class="btn ghost" id="btn-cid10" title="Aceita o CID10CSV.zip do DATASUS, um .csv de dentro dele, ou o próprio pacote da SIGTAP (tb_cid.txt)">Importar CID-10</button>
+        <input type="file" id="cid10-file" accept=".zip,.csv,.txt" class="hidden">
+        <button class="btn ghost" id="btn-med" title="Lista de preços da CMED/Anvisa (.xlsx), ou planilha com colunas nome / apresentacao / via">Importar medicamentos</button>
+        <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
+        <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
+      </div></details>
+      <details class="side-grp"><summary>Aparelho e conta</summary><div class="grp-body">
+        <button class="btn ghost" id="btn-instalar" style="display:none">Instalar aplicativo</button>
+        <div class="muted" id="instalar-dica" style="display:none;padding:0 4px;font-size:11px;line-height:1.4"></div>
+        <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
+        <div class="muted" id="off-status" style="padding:0 4px;font-size:11px;line-height:1.4"></div>
+        <button class="btn ghost" id="btn-logout">Sair da conta</button>
+      </div></details>
       <div class="muted" id="versao" style="padding:2px 4px;font-size:11px"></div>
     </div>
-  </aside>
+    </aside>
 
   <main class="main">
     <div class="faixa-off" id="faixa-off" role="status" aria-live="polite"></div>
@@ -497,6 +521,38 @@
     <div id="mod-lista"></div>
   </div>
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
+</div></div>
+
+<div class="overlay" id="m-recibo"><div class="modal" style="max-width:560px">
+  <div class="mh"><span>Recibo / declaração</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field"><label>Tipo de documento</label><select id="rb-tipo" class="f">
+      <option value="recibo">Recibo de honorários</option>
+      <option value="comparecimento">Declaração de comparecimento</option></select></div>
+    <div id="rb-campos-recibo">
+      <div class="grid">
+        <div class="field"><label>Valor (R$)</label><input id="rb-valor" class="f" inputmode="decimal" placeholder="Ex.: 250,00"></div>
+        <div class="field"><label>Data</label><input id="rb-data" class="f" type="date"></div>
+      </div>
+      <div class="field"><label>Referente a</label><input id="rb-ref" class="f"></div>
+      <div class="grid">
+        <div class="field"><label>Forma de pagamento (opcional)</label><input id="rb-pagamento" class="f" placeholder="Dinheiro, Pix, cartão…"></div>
+        <div class="field"><label>Pago por (se não for o paciente)</label><input id="rb-pagador" class="f"></div>
+      </div>
+      <div class="field" style="margin:0"><label>CPF do pagador (opcional)</label><input id="rb-cpf" class="f"></div>
+    </div>
+    <div id="rb-campos-comp" style="display:none">
+      <div class="field"><label>Data da consulta</label><input id="rb-datac" class="f" type="date"></div>
+      <div class="grid">
+        <div class="field"><label>Das (opcional)</label><input id="rb-de" class="f" placeholder="Ex.: 14:00"></div>
+        <div class="field"><label>Às (opcional)</label><input id="rb-ate" class="f" placeholder="Ex.: 14:40"></div>
+      </div>
+      <div class="field"><label>Acompanhante (opcional)</label><input id="rb-acomp" class="f" placeholder="Nome de quem acompanhou"></div>
+      <div class="field" style="margin:0"><label>Observação (opcional)</label><input id="rb-final" class="f"></div>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:8px">A declaração de comparecimento não traz diagnóstico nem CID, preservando o sigilo. Com a assinatura digital ligada, o PDF já sai assinado.</div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn ghost" id="rb-imp">Imprimir</button><button class="btn primary" id="rb-pdf">PDF</button></div>
 </div></div>
 
 <div class="overlay" id="m-assinar"><div class="modal" style="max-width:560px">
@@ -1269,6 +1325,59 @@ const OFF=(()=>{
            pendentes:()=>estado.pendentes, apagarTudo, estado };
 })();
 
+// ---------- recibo de honorários e declaração de comparecimento ----------
+function tresCent(n){ if(n===0)return''; if(n===100)return'cem'; let s=''; const c=Math.floor(n/100),r=n%100;
+  if(c)s+=CEN[c]; if(r){ if(s)s+=' e '; if(r<20)s+=UNI[r]; else { s+=DEZ[Math.floor(r/10)]; if(r%10)s+=' e '+UNI[r%10]; } } return s; }
+function extensoInteiro(n){ n=Math.floor(n); if(n===0)return'zero'; const mil=Math.floor(n/1000),resto=n%1000; let s='';
+  if(mil)s+=(mil===1?'mil':tresCent(mil)+' mil'); if(resto){ if(s)s+=(resto<100||resto%100===0)?' e ':' '; s+=tresCent(resto); } return s; }
+function valorExtenso(v){ v=Math.round(v*100); const r=Math.floor(v/100),c=v%100;
+  const pr=r===0?'':extensoInteiro(r)+(r===1?' real':' reais'); const pc=c===0?'':extensoInteiro(c)+(c===1?' centavo':' centavos');
+  if(pr&&pc)return pr+' e '+pc; return pr||pc||'zero real'; }
+function parseReais(s){ s=String(s==null?'':s).trim(); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/[^0-9.]/g,''); return Number(s); }
+
+function docRecibo(dados){
+  const p=pacienteSel||{};
+  const v=parseReais(dados.valor);
+  if(!(v>0)){ toast('Informe um valor válido (ex.: 250,00)',true); return null; }
+  const valorFmt='R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pagador=(dados.pagador||'').trim()||p.nome||'___';
+  const ref=(dados.referente||'').trim()||'consulta médica particular';
+  const pars=[
+    'Recebi de '+pagador+(dados.cpf?' (CPF '+dados.cpf+')':'')+' a importância de '+valorFmt+' ('+valorExtenso(v)+'), referente a '+ref+(dados.pagamento?', paga em '+dados.pagamento:'')+'.',
+    'Para clareza e comprovação, firmo o presente recibo.'
+  ];
+  return montarDoc('Recibo', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true});
+}
+function docComparecimento(dados){
+  const p=pacienteSel||{};
+  const horario=(dados.de&&dados.ate)?', no período das '+dados.de+' às '+dados.ate:(dados.de?', a partir das '+dados.de:'');
+  const pars=['Declaro, para os devidos fins, que '+(p.nome||'o(a) paciente')+(p.cpf?' (CPF '+p.cpf+')':'')+
+    ' compareceu a consulta médica neste serviço no dia '+dataBRsimples(dados.data||new Date().toISOString().slice(0,10))+horario+'.'];
+  if(dados.acompanhante) pars.push('Esteve acompanhado(a) por '+dados.acompanhante+'.');
+  if(dados.finalidade) pars.push(dados.finalidade);
+  return montarDoc('Declaração de comparecimento', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true});
+}
+function trocarTipoRecibo(){ const r=$('rb-tipo').value==='recibo';
+  $('rb-campos-recibo').style.display=r?'':'none'; $('rb-campos-comp').style.display=r?'none':''; }
+function abrirRecibo(){
+  if(!pacienteSel){ toast('Selecione um paciente',true); return; }
+  const hoje=new Date().toISOString().slice(0,10);
+  $('rb-data').value=hoje; $('rb-datac').value=hoje;
+  ['rb-valor','rb-pagamento','rb-pagador','rb-cpf','rb-de','rb-ate','rb-acomp','rb-final'].forEach(i=>$(i).value='');
+  $('rb-ref').value='consulta médica particular'; $('rb-tipo').value='recibo'; trocarTipoRecibo();
+  openM('m-recibo');
+}
+function docDoRecibo(){
+  if($('rb-tipo').value==='recibo')
+    return docRecibo({valor:$('rb-valor').value, referente:$('rb-ref').value, data:$('rb-data').value,
+      pagamento:$('rb-pagamento').value.trim(), pagador:$('rb-pagador').value.trim(), cpf:$('rb-cpf').value.trim()});
+  return docComparecimento({data:$('rb-datac').value, de:$('rb-de').value.trim(), ate:$('rb-ate').value.trim(),
+    acompanhante:$('rb-acomp').value.trim(), finalidade:$('rb-final').value.trim()});
+}
+$('rb-tipo').onchange=trocarTipoRecibo;
+$('rb-imp').onclick=()=>{ const d=docDoRecibo(); if(d){ closeM('m-recibo'); imprimirDoc(d); } };
+$('rb-pdf').onclick=()=>{ const d=docDoRecibo(); if(d){ closeM('m-recibo'); baixarPDF(d); } };
+
 // ---------- assinatura digital no próprio aparelho (certificado A1) ----------
 // O arquivo .pfx/.p12 e a senha ficam só na memória desta sessão: nunca são salvos
 // nem enviados. A assinatura (PAdES / ICP-Brasil) é montada aqui no aparelho.
@@ -1726,6 +1835,7 @@ async function renderFichaPaciente(c){
   const bEdit=el('button','btn ghost','Editar'); bEdit.onclick=()=>abrirModalPaciente(p); head.appendChild(bEdit);
   const bOri=el('button','btn ghost','Orientações'); bOri.title='Folha de orientação para o paciente levar'; bOri.onclick=abrirOrientacoes; head.appendChild(bOri);
   const bPront=el('button','btn ghost','Prontuário (PDF)'); bPront.onclick=async()=>{ const d=await docProntuario(); if(d) baixarPDF(d); }; head.appendChild(bPront);
+  const bRecibo=el('button','btn ghost','Recibo / declaração'); bRecibo.onclick=abrirRecibo; head.appendChild(bRecibo);
   const bNovo=el('button','btn primary','+ Novo atendimento'); bNovo.onclick=novoAtendimento; head.appendChild(bNovo);
   c.appendChild(head);
 
@@ -2562,7 +2672,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.4 · novo ícone';
+const VERSAO='2026-11-18.7 · menu organizado';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
