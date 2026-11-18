@@ -508,6 +508,37 @@
   </div>
 </div></div>
 
+<div class="overlay" id="m-rast"><div class="modal" style="max-width:480px">
+  <div class="mh"><span>Registrar rastreamento</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="field" style="margin:0 0 10px"><label>Rastreamento</label><div id="rs-tit" style="font-weight:600"></div><input type="hidden" id="rs-chave"></div>
+    <div class="grid">
+      <div class="field"><label>Data</label><input id="rs-data" class="f" type="date"></div>
+      <div class="field"><label>Resultado (opcional)</label><input id="rs-res" class="f" placeholder="Normal / alterado"></div>
+    </div>
+    <div class="field" style="margin:0"><label>Observação (opcional)</label><input id="rs-obs" class="f"></div>
+  </div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="rs-save">Salvar</button></div>
+</div></div>
+
+<div class="overlay" id="m-protocolos"><div class="modal" style="max-width:760px">
+  <div class="mh"><span>Protocolos de conduta</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" style="margin-bottom:10px">"Inserir no Plano" acrescenta a conduta ao fim do campo Plano do SOAP (não apaga o que já está escrito). Troque os ___ pelos dados da consulta. É apoio, não substitui o seu julgamento.</div>
+    <div id="proto-lista"></div>
+  </div>
+  <div class="mf"><button class="btn primary" data-close>Fechar</button></div>
+</div></div>
+
+<div class="overlay" id="m-orienta"><div class="modal" style="max-width:720px">
+  <div class="mh"><span>Orientações ao paciente</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" style="margin-bottom:10px">Folha de orientação para o paciente ou cuidador levar para casa. Sai com o nome do paciente e a sua identificação.</div>
+    <div id="ori-lista"></div>
+  </div>
+  <div class="mf"><button class="btn primary" data-close>Fechar</button></div>
+</div></div>
+
 <div class="overlay" id="m-vacina"><div class="modal">
   <div class="mh"><span>Registrar vacina</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -742,7 +773,7 @@ const OFF=(()=>{
   const nativo=window.fetch.bind(window);
   const CLINICAS=['pep_pacientes','pep_atendimentos','pep_solicitacoes_exames','pep_solicitacao_itens',
     'pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios','pep_modelos','pep_encaminhamentos','pep_atendimento_problemas',
-    'pep_problemas','pep_alergias','pep_resultados','pep_vacinas'];
+    'pep_problemas','pep_alergias','pep_resultados','pep_vacinas','pep_rastreamentos'];
   const REFERENCIA=['pep_profissional','pep_unidades','pep_analitos','pep_alertas_medicamento','pep_medicamentos',
     'cid10','pep_cid10','tuss_procedimento','sigtap_procedimento'];
   const ESPELHO=new Set([...CLINICAS,...REFERENCIA]);
@@ -1300,20 +1331,21 @@ $('btn-logout').onclick=async()=>{
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
-let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false;
+let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false, rastreamentosOK=false;
 async function sondarColunas(){
   // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
-  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; }catch(e){} return; }
-  const [a,b,r,n,sg,ec,ax,va]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; rastreamentosOK=!!c.ra; }catch(e){} return; }
+  const [a,b,r,n,sg,ec,ax,va,rs]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
                                  sb.from('pep_prescricao_itens').select('tipo_receita').limit(1),
                                  sb.from('pep_atendimentos').select('retorno_previsto').limit(1),
                                  sb.from('pep_encaminhamentos').select('id').limit(1),
                                  sb.from('pep_acessos').select('id').limit(1),
                                  sb.from('pep_escalas').select('id').limit(1),
                                  sb.from('pep_anexos').select('id').limit(1),
-                                 sb.from('pep_vacinas').select('id').limit(1)]);
-  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error;
-  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK}));}catch(e){}
+                                 sb.from('pep_vacinas').select('id').limit(1),
+                                 sb.from('pep_rastreamentos').select('id').limit(1)]);
+  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK}));}catch(e){}
 }
 async function carregarPacientes(q){
   let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
@@ -1595,10 +1627,14 @@ async function renderFichaPaciente(c){
     '<div class="mt">'+[p.sexo,idade(p.data_nascimento),p.cpf?('CPF '+p.cpf):'',p.telefone||''].filter(Boolean).map(esc).join(' · ')+'</div></div>'+
     '<div class="sp"></div>';
   const bEdit=el('button','btn ghost','Editar'); bEdit.onclick=()=>abrirModalPaciente(p); head.appendChild(bEdit);
+  const bOri=el('button','btn ghost','Orientações'); bOri.title='Folha de orientação para o paciente levar'; bOri.onclick=abrirOrientacoes; head.appendChild(bOri);
+  const bPront=el('button','btn ghost','Prontuário (PDF)'); bPront.onclick=async()=>{ const d=await docProntuario(); if(d) baixarPDF(d); }; head.appendChild(bPront);
   const bNovo=el('button','btn primary','+ Novo atendimento'); bNovo.onclick=novoAtendimento; head.appendChild(bNovo);
   c.appendChild(head);
 
   if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
+
+  const cardPend=el('div','card'); cardPend.style.marginBottom='16px'; cardPend.id='card-pend'; c.appendChild(cardPend); renderPendencias(cardPend);
 
   // resumo: problemas e alergias
   const res=el('div','resumo');
@@ -1703,9 +1739,10 @@ async function renderFichaPaciente(c){
   // dica de leitura do gráfico, já que ponto fora da referência muda de cor
   bodyR.appendChild(el('div','muted','No gráfico, a faixa clara é a referência do laboratório e o ponto vermelho marcado com “!” está fora dela. Passe o mouse para ver data e valor.'));
 
+  const cardVit=el('div','card'); cardVit.style.marginTop='16px'; c.appendChild(cardVit); renderVitais(cardVit);
   const cardTFG=el('div','card'); cardTFG.style.marginTop='16px'; c.appendChild(cardTFG); renderTFG(cardTFG);
   const cardRisco=el('div','card'); cardRisco.style.marginTop='16px'; cardRisco.id='card-risco'; c.appendChild(cardRisco); renderRiscoCV(cardRisco);
-  const cardRast=el('div','card'); cardRast.style.marginTop='16px'; c.appendChild(cardRast); renderRastreamentos(cardRast);
+  const cardRast=el('div','card'); cardRast.style.marginTop='16px'; cardRast.id='card-rast'; c.appendChild(cardRast); renderRastreamentos(cardRast);
 
   c.appendChild(el('div','sec-title','Atendimentos'));
   const card=el('div','card'); c.appendChild(card);
@@ -2422,7 +2459,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-17.10 · receita, risco CV, TFG';
+const VERSAO='2026-11-18.1 · pendências, protocolos, vitais';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2617,6 +2654,7 @@ function renderAtendimento(c){
   const bEsc=el('button','btn ghost','Escalas'); bEsc.title='Escalas geriátricas (MEEM, GDS-15, Katz, Lawton, TUG, marcha)';
   bEsc.onclick=()=>abrirEscala(atendAtual&&atendAtual.id||null,false); head.appendChild(bEsc);
   const bMod=el('button','btn ghost','Modelos de texto'); bMod.onclick=abrirModelos; head.appendChild(bMod);
+  const bProto=el('button','btn ghost','Protocolos'); bProto.title='Condutas por condição que preenchem o Plano'; bProto.onclick=abrirProtocolos; head.appendChild(bProto);
   if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
   const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
   c.appendChild(head);
@@ -3178,7 +3216,7 @@ const baixarTexto=(txt,nome,tipo)=>baixarBlob(new Blob([txt],{type:(tipo||'text/
 // ordem de restauração: quem é referenciado vem antes
 const TAB_BACKUP=['pep_unidades','pep_pacientes','pep_problemas','pep_alergias','pep_atendimentos','pep_atendimento_problemas',
   'pep_solicitacoes_exames','pep_solicitacao_itens','pep_prescricoes','pep_prescricao_itens','pep_atestados','pep_relatorios',
-  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_escalas','pep_anexos','pep_vacinas','pep_profissional'];
+  'pep_resultados','pep_modelos','pep_encaminhamentos','pep_escalas','pep_anexos','pep_vacinas','pep_rastreamentos','pep_profissional'];
 const ultimoBackup=()=>{ try{ return localStorage.getItem('pep_ultimo_backup'); }catch(e){ return null; } };
 function statusBackup(){
   const u=ultimoBackup(), d=diasDesde(u), e=$('backup-status'); if(!e) return;
@@ -3424,32 +3462,221 @@ function renderTFG(card){
 
 // ---------- rastreamentos por idade e sexo ----------
 function rastreamentos(anos,fem){
-  const L=[]; const push=(nome,aplica,intervalo,nota)=>L.push({nome,aplica,intervalo,nota});
-  if(fem) push('Câncer de colo do útero — citopatológico', anos>=25&&anos<=64, 'a cada 3 anos (após 2 exames anuais normais)','Mulheres 25–64 anos com vida sexual (MS/INCA).');
-  if(fem) push('Câncer de mama — mamografia', anos>=50&&anos<=69, 'a cada 2 anos', (anos>=40&&anos<50)?'40–49 anos: decisão individual.':'Mulheres 50–69 anos (MS/INCA).');
-  push('Câncer colorretal — sangue oculto ou colonoscopia', anos>=50&&anos<=75, 'sangue oculto anual ou colonoscopia a cada 10 anos','Adultos 50–75 anos (INCA).');
-  if(!fem) push('Aneurisma de aorta abdominal — ultrassom', anos>=65&&anos<=75, 'uma vez na vida','Homens 65–75 anos que já fumaram (rastreio único).');
-  push('Osteoporose — densitometria óssea', (fem&&anos>=65)||(!fem&&anos>=70), 'conforme risco', fem?'Mulheres ≥65 anos (ou mais jovens com fatores de risco).':'Homens ≥70 anos (ou mais jovens com fatores de risco).');
-  push('Hepatites B e C — sorologia', anos>=18, 'ao menos uma vez na vida','Rastreio único na vida adulta (MS).');
-  push('Diabetes — glicemia de jejum ou HbA1c', anos>=45, 'a cada 3 anos se normal','≥45 anos, ou mais jovens com sobrepeso e fator de risco.');
-  push('Dislipidemia — perfil lipídico', anos>=20, 'conforme risco','Para estratificar o risco cardiovascular.');
+  const L=[]; const push=(chave,nome,aplica,dias,intervalo,nota)=>L.push({chave,nome,aplica,dias,intervalo,nota});
+  if(fem) push('colo','Câncer de colo do útero — citopatológico', anos>=25&&anos<=64, 3*365,'a cada 3 anos (após 2 exames anuais normais)','Mulheres 25–64 anos com vida sexual (MS/INCA).');
+  if(fem) push('mama','Câncer de mama — mamografia', anos>=50&&anos<=69, 2*365,'a cada 2 anos', (anos>=40&&anos<50)?'40–49 anos: decisão individual.':'Mulheres 50–69 anos (MS/INCA).');
+  push('colorretal','Câncer colorretal — sangue oculto ou colonoscopia', anos>=50&&anos<=75, 365,'sangue oculto anual ou colonoscopia a cada 10 anos','Adultos 50–75 anos (INCA).');
+  if(!fem) push('aaa','Aneurisma de aorta abdominal — ultrassom', anos>=65&&anos<=75, null,'uma vez na vida','Homens 65–75 anos que já fumaram (rastreio único).');
+  push('osteo','Osteoporose — densitometria óssea', (fem&&anos>=65)||(!fem&&anos>=70), 2*365,'conforme risco', fem?'Mulheres ≥65 anos (ou mais jovens com fatores de risco).':'Homens ≥70 anos (ou mais jovens com fatores de risco).');
+  push('hepatite','Hepatites B e C — sorologia', anos>=18, null,'ao menos uma vez na vida','Rastreio único na vida adulta (MS).');
+  push('dm','Diabetes — glicemia de jejum ou HbA1c', anos>=45, 3*365,'a cada 3 anos se normal','≥45 anos, ou mais jovens com sobrepeso e fator de risco.');
+  push('lipid','Dislipidemia — perfil lipídico', anos>=20, 3*365,'conforme risco','Para estratificar o risco cardiovascular.');
   return L;
 }
-function renderRastreamentos(card){
-  const p=pacienteSel||{};
+function statusRastreio(item,rasts){
+  const regs=(rasts||[]).filter(r=>r.tipo===item.chave).map(r=>r.data).filter(Boolean).sort();
+  const ult=regs.length?regs[regs.length-1]:null;
+  if(!ult) return {feito:false, vencido:true, ult:null, txt:'nunca registrado'};
+  if(item.dias==null) return {feito:true, vencido:false, ult, txt:'feito em '+dataBRsimples(ult)};
+  const venc=diasDesde(ult)>item.dias;
+  return {feito:true, vencido:venc, ult, txt:(venc?'vencido — ':'em dia — ')+'último em '+dataBRsimples(ult)};
+}
+async function carregarRastreamentos(){
+  if(!rastreamentosOK||!pacienteSel) return [];
+  const {data}=await sb.from('pep_rastreamentos').select('tipo,data,resultado').eq('paciente_id',pacienteSel.id);
+  return data||[];
+}
+async function renderRastreamentos(card){
+  const p=pacienteSel||{}, id=p.id;
   card.innerHTML='<div class="ch"><span>Rastreamentos recomendados (idade e sexo)</span></div>';
   const body=el('div','cb'); card.appendChild(body);
   const anos=anosPaciente();
   if(anos==null||!p.sexo){ body.innerHTML='<div class="muted">Preciso de data de nascimento e sexo para sugerir os rastreamentos.</div>'; return; }
   const ap=rastreamentos(anos,sexoFem(p)).filter(x=>x.aplica);
-  body.innerHTML=(ap.length?'<table><tbody>'+ap.map(x=>'<tr><td style="width:22px;vertical-align:top">☐</td><td><b>'+esc(x.nome)+'</b><div class="muted" style="font-size:12px">'+esc(x.intervalo)+' · '+esc(x.nota)+'</div></td></tr>').join('')+'</tbody></table>':'<div class="muted">Nenhum rastreamento em destaque para esta faixa etária.</div>')+
-    '<div class="muted" style="margin-top:10px;line-height:1.5">Apoio por idade e sexo (referência MS/INCA e USPSTF). Não registra o que já foi feito — confirme no prontuário. Protocolos locais podem diferir.</div>';
+  if(!ap.length){ body.innerHTML='<div class="muted">Nenhum rastreamento em destaque para esta faixa etária.</div>'; return; }
+  const rasts=await carregarRastreamentos();
+  if(!pacienteSel||pacienteSel.id!==id||!card.isConnected) return;
+  const row=item=>{ const st=statusRastreio(item,rasts), cor=st.vencido?'#c62828':'#2e7d32', marca=st.feito?(st.vencido?'⚠️':'✓'):'☐';
+    return '<tr><td style="width:22px;vertical-align:top;color:'+cor+'">'+marca+'</td>'+
+      '<td><b>'+esc(item.nome)+'</b><div class="muted" style="font-size:12px">'+esc(item.intervalo)+' · '+esc(item.nota)+'</div>'+
+      '<div style="font-size:12px;color:'+cor+'">'+esc(st.txt)+'</div></td>'+
+      '<td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-rast="'+item.chave+'"'+(rastreamentosOK?'':' disabled')+'>Registrar</button></td></tr>'; };
+  body.innerHTML=(rastreamentosOK?'':'<div class="muted" style="margin-bottom:8px">Para marcar o que já foi feito, rode o rastreamentos_schema.sql no Supabase.</div>')+
+    '<table><tbody>'+ap.map(row).join('')+'</tbody></table>'+
+    '<div class="muted" style="margin-top:10px;line-height:1.5">Apoio por idade e sexo (referência MS/INCA e USPSTF). Registre o que foi feito para o card cobrar só o que está vencido. Protocolos locais podem diferir.</div>';
+  body.querySelectorAll('[data-rast]').forEach(b=>b.onclick=()=>abrirRegistroRast(b.dataset.rast, ap.find(x=>x.chave===b.dataset.rast)));
 }
+function abrirRegistroRast(chave,item){
+  if(!rastreamentosOK){ toast('Rode o rastreamentos_schema.sql no Supabase',true); return; }
+  $('rs-tit').textContent=item?item.nome:chave; $('rs-chave').value=chave;
+  $('rs-data').value=new Date().toISOString().slice(0,10); $('rs-res').value=''; $('rs-obs').value='';
+  openM('m-rast');
+}
+$('rs-save').onclick=async()=>{
+  if(!pacienteSel){ toast('Selecione um paciente',true); return; }
+  if(!$('rs-data').value){ toast('Informe a data',true); return; }
+  const reg={paciente_id:pacienteSel.id, tipo:$('rs-chave').value, data:$('rs-data').value, resultado:$('rs-res').value.trim()||null, observacao:$('rs-obs').value.trim()||null};
+  const {error}=await sb.from('pep_rastreamentos').insert(reg);
+  if(error){ toast(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))?'Rode o rastreamentos_schema.sql no Supabase':'Erro ao salvar: '+error.message,true); return; }
+  closeM('m-rast'); toast('Rastreamento registrado ✓');
+  const card=document.querySelector('#card-rast'); if(card) renderRastreamentos(card);
+  const cp=document.querySelector('#card-pend'); if(cp) renderPendencias(cp);
+};
 $('rn-imp').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); imprimirDoc(d); } };
 $('rn-pdf').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); baixarPDF(d); } };
 $('rn-lista-imp').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),renovaUnid); if(d){ closeM('m-renova'); imprimirDoc(d); } };
 $('rn-lista-pdf').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),renovaUnid); if(d){ closeM('m-renova'); baixarPDF(d); } };
 
+
+// ========== melhorias 17.11 — pendências, protocolos, vitais, prontuário PDF, orientações ==========
+// ---------- pendências deste paciente ----------
+function pendenciasClinicas(f,rasts,anos,fem){
+  const out=[], br=dataBRsimples, hoje=new Date().toISOString().slice(0,10);
+  const add=(grau,txt)=>out.push({grau,txt});
+  const ult=f.ats&&f.ats[0];
+  if(ult&&ult.retorno_previsto&&ult.retorno_previsto<hoje) add('alto','Retorno atrasado — previsto para '+br(ult.retorno_previsto)+(ult.retorno_motivo?' ('+ult.retorno_motivo+')':''));
+  (f.encs||[]).forEach(e=>add('medio','Encaminhamento '+((STATUS_ENC[e.status]||e.status).toLowerCase())+': '+e.especialidade));
+  const cond=(f.rev&&f.rev.cond)||condicoesAtivas(problemas);
+  const pas=(f.ats||[]).filter(a=>a.pa_sistolica);
+  const exd=k=>{ const r=(resultados||[]).filter(x=>x.analito===k&&x.valor!=null).sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta)))[0]; return r?diasDesde(r.data_coleta):null; };
+  const venc=(rot,d,lim)=>{ if(d==null) add('medio',rot+': sem registro'); else if(d>lim) add('medio',rot+' vencido — último há '+Math.round(d/30)+' meses'); };
+  if(cond.dm){ venc('HbA1c',exd('hba1c'),BA.hba1c); venc('Microalbuminúria',exd('microalb'),BA.microalb); }
+  if(cond.dm||cond.has) venc('Creatinina',exd('creatinina'),BA.creatinina);
+  if(cond.has) venc('Aferição de PA',pas.length?diasDesde(pas[0].data_atendimento):null,BA.pa);
+  if(vacinasOK) pendenciasVacina(f.vacs,{idade:anos,has:cond.has,dm:cond.dm}).forEach(pv=>add('medio',pv.txt));
+  if(anos!=null&&fem!=null) rastreamentos(anos,fem).filter(x=>x.aplica).forEach(item=>{ const st=statusRastreio(item,rasts);
+    if(!st.feito) add('medio','Rastreamento nunca feito: '+item.nome.split(' — ')[0]);
+    else if(st.vencido) add('medio','Rastreamento vencido: '+item.nome.split(' — ')[0]+' (último '+br(st.ult)+')'); });
+  ((f.rev&&f.rev.itens)||[]).filter(x=>x.nivel==='alto').forEach(x=>add('alto','Medicação — '+x.titulo));
+  return out;
+}
+async function renderPendencias(card){
+  const p=pacienteSel; if(!p) return; const id=p.id;
+  card.innerHTML='<div class="ch"><span>Pendências deste paciente</span></div><div class="cb" id="pend-corpo"><div class="muted">Verificando…</div></div>';
+  let f=null; try{ f=await dadosFolha(); }catch(e){ f=null; }
+  if(!pacienteSel||pacienteSel.id!==id||!card.isConnected) return;
+  const rasts=await carregarRastreamentos();
+  if(!pacienteSel||pacienteSel.id!==id||!card.isConnected) return;
+  const anos=anosPaciente(), fem=p.sexo?sexoFem(p):null;
+  const lista=f?pendenciasClinicas(f,rasts,anos,fem):[];
+  const box=card.querySelector('#pend-corpo'); if(!box) return;
+  if(!lista.length){ box.innerHTML='<div class="muted">Sem pendências no momento. 👍</div>'; return; }
+  const ord=lista.filter(x=>x.grau==='alto').concat(lista.filter(x=>x.grau!=='alto'));
+  const chip=x=>'<div style="padding:7px 11px;margin:5px 0;border-left:3px solid '+(x.grau==='alto'?'#c62828':'#dd9a2a')+';background:'+(x.grau==='alto'?'#fdecec':'#fff7e6')+';border-radius:6px;font-size:13px;color:#333">'+esc(x.txt)+'</div>';
+  box.innerHTML=ord.map(chip).join('');
+}
+
+// ---------- protocolos de conduta (preenchem o Plano) ----------
+const PROTOCOLOS=[
+ {chave:'has',cond:'has',titulo:'Hipertensão arterial',
+  p:'Meta pressórica geralmente <140/90 mmHg (individualizar; idoso frágil pode tolerar um pouco mais alta). Reforçar MEV: reduzir sal (<5 g/dia), atividade física regular, perda de peso, moderar álcool, cessar tabagismo. Anti-hipertensivo: ___ (opções de 1ª linha: IECA/BRA, bloqueador de canal de cálcio, tiazídico; associar cedo se PA ≥20/10 acima da meta). Avaliar lesão de órgão-alvo e causas secundárias se refratária. Exames: creatinina/TFG, potássio, EAS, lipídios, glicemia, ECG. Retorno em ___.'},
+ {chave:'dm',cond:'dm',titulo:'Diabetes mellitus 2',
+  p:'Meta de HbA1c em torno de <7% (individualizar; até <8% em idoso frágil). MEV e educação em diabetes. Metformina como 1ª linha, salvo contraindicação. Preferir iSGLT2 ou agonista de GLP-1 se doença cardiovascular, insuficiência cardíaca ou DRC. Rastreio anual de complicações: fundo de olho, exame dos pés (monofilamento e pulsos), microalbuminúria, creatinina/TFG, lipídios. Estatina conforme risco. Vacinação em dia. Retorno em ___.'},
+ {chave:'lipid',cond:null,titulo:'Dislipidemia / prevenção CV',
+  p:'Estratificar o risco cardiovascular (ver o Escore de Risco Global na ficha). Meta de LDL conforme o risco: muito alto <50, alto <70, intermediário <100, baixo <130 mg/dL. Reforçar MEV. Estatina de intensidade adequada à meta; se não atingir, otimizar a dose ou associar. Afastar causas secundárias de dislipidemia. Reavaliar perfil lipídico em ___.'},
+ {chave:'hipotireo',cond:null,titulo:'Hipotireoidismo',
+  p:'Levotiroxina em jejum, dose conforme peso e idade (iniciar baixo no idoso ou cardiopata e titular). Reavaliar TSH em 6–8 semanas após início ou ajuste; depois anual quando estável. No idoso, evitar tratar TSH apenas levemente elevado com T4 normal e sem sintomas. Retorno com TSH em ___.'},
+ {chave:'dpoc',cond:'dpoc',titulo:'DPOC',
+  p:'Confirmar com espirometria (VEF1/CVF <0,70 pós-broncodilatador). A cessação do tabagismo é a medida que mais muda o prognóstico. Broncodilatador de longa ação conforme sintomas e exacerbações; avaliar associação. Vacinas (influenza, pneumocócica, COVID). Plano de ação para exacerbação. Reabilitação pulmonar se dispneia limitante. Retorno em ___.'},
+ {chave:'osteo',cond:'osteo',titulo:'Osteoporose',
+  p:'Garantir cálcio e vitamina D adequados; exercício com carga e exposição solar. Avaliar risco de queda e revisar medicações sedativas. Bifosfonato como 1ª linha quando indicado (densitometria, FRAX ou fratura por fragilidade). Assegurar ingestão proteica. Reavaliar em ___.'},
+ {chave:'obesidade',cond:null,titulo:'Obesidade / sobrepeso',
+  p:'Classificar por IMC e circunferência abdominal. Meta inicial de perda de 5–10% do peso. MEV estruturada (plano alimentar e atividade física, ao menos 150 min/semana). Rastrear comorbidades (DM, HAS, dislipidemia, apneia do sono, esteatose hepática). Farmacoterapia conforme indicação. Retorno em ___.'},
+ {chave:'drc',cond:'drc',titulo:'Doença renal crônica',
+  p:'Estadiar por TFG (CKD-EPI) e albuminúria. IECA ou BRA se albuminúria; considerar iSGLT2 pela nefroproteção. Manter PA e glicemia nas metas. Ajustar doses à função renal e evitar nefrotóxicos (AINE, contraste sem preparo). Rastrear anemia, distúrbio mineral-ósseo e acidose. Encaminhar ao nefrologista se TFG <30 ou progressão rápida. Retorno em ___.'}
+];
+function abrirProtocolos(){
+  const ativos=condicoesAtivas(problemas);
+  const rel=PROTOCOLOS.filter(x=>x.cond&&ativos[x.cond]);
+  const linha=x=>'<div class="mod-it"><div class="tx"><div class="tt">'+esc(x.titulo)+(x.cond&&ativos[x.cond]?' <span class="chip">condição ativa</span>':'')+'</div><div class="pv">'+esc(x.p.slice(0,150))+'…</div></div><button class="btn primary sm" data-proto="'+x.chave+'">Inserir no Plano</button></div>';
+  $('proto-lista').innerHTML=(rel.length?'<div class="muted" style="margin:0 0 6px;font-weight:600">Para as condições deste paciente</div>'+rel.map(linha).join(''):'')+
+    '<div class="muted" style="margin:10px 0 6px;font-weight:600">Todos os protocolos</div>'+PROTOCOLOS.map(linha).join('');
+  $('proto-lista').querySelectorAll('[data-proto]').forEach(b=>b.onclick=()=>{
+    const x=PROTOCOLOS.find(y=>y.chave===b.dataset.proto), e=$('f-p');
+    if(e&&x) e.value=e.value.trim()?e.value.replace(/\s+$/,'')+'\n'+x.p:x.p;
+    closeM('m-protocolos'); toast('Conduta de "'+x.titulo+'" inserida no Plano'); });
+  openM('m-protocolos');
+}
+
+// ---------- curvas de sinais vitais (PA, peso, IMC) ----------
+async function renderVitais(card){
+  const p=pacienteSel; if(!p) return; const id=p.id;
+  card.innerHTML='<div class="ch"><span>Sinais vitais — PA, peso e IMC</span></div>';
+  const body=el('div','cb'); card.appendChild(body);
+  const {data}=await sb.from('pep_atendimentos').select('data_atendimento,pa_sistolica,pa_diastolica,peso_kg,altura_cm').eq('paciente_id',p.id).order('data_atendimento',{ascending:true});
+  if(!pacienteSel||pacienteSel.id!==id||!card.isConnected) return;
+  const ats=data||[];
+  const altUlt=[...ats].reverse().find(a=>a.altura_cm);
+  const porData=(x,y)=>String(x.data_coleta).localeCompare(String(y.data_coleta));
+  const serie=campo=>ats.map(a=>{ const v=a[campo]; return (v!=null&&v!==''&&isFinite(v))?{data_coleta:a.data_atendimento,valor:Number(v)}:null; }).filter(Boolean).sort(porData);
+  const pas=serie('pa_sistolica'), peso=serie('peso_kg');
+  const imc=ats.map(a=>{ const h=a.altura_cm||(altUlt&&altUlt.altura_cm); if(!a.peso_kg||!h) return null; return {data_coleta:a.data_atendimento,valor:Number((a.peso_kg/Math.pow(h/100,2)).toFixed(1))}; }).filter(Boolean).sort(porData);
+  const blocos=[];
+  const add=(titulo,sr,unidade,casas)=>{ if(sr.length<2) return; const meta={chave:titulo,rotulo:titulo,unidade,casas}, ult=sr[sr.length-1];
+    blocos.push('<div class="evocard"><div class="evoh">'+esc(titulo)+(unidade?' <span>'+esc(unidade)+'</span>':'')+'</div>'+graficoEvolucao(sr,meta)+
+      '<div class="evof">último: '+fmtNum(ult.valor,casas)+' '+esc(unidade||'')+' em '+esc(dataBRsimples(ult.data_coleta))+' · '+sr.length+' medidas</div></div>'); };
+  add('PA sistólica',pas,'mmHg',0); add('Peso',peso,'kg',1); add('IMC',imc,'kg/m²',1);
+  const ultPA=ats.filter(a=>a.pa_sistolica).sort((x,y)=>String(y.data_atendimento).localeCompare(String(x.data_atendimento)))[0];
+  if(!blocos.length){ body.innerHTML=(ultPA?'<div class="muted">Última PA: <b>'+ultPA.pa_sistolica+'/'+(ultPA.pa_diastolica||'—')+' mmHg</b> em '+esc(dataBRsimples(ultPA.data_atendimento))+'. ':'')+'Ainda não há duas medidas de PA, peso ou altura nos atendimentos para traçar uma curva.</div>'; return; }
+  body.innerHTML=(ultPA?'<div class="muted" style="margin-bottom:8px">Última PA: <b>'+ultPA.pa_sistolica+'/'+(ultPA.pa_diastolica||'—')+' mmHg</b> em '+esc(dataBRsimples(ultPA.data_atendimento))+'</div>':'')+
+    '<div class="evo">'+blocos.join('')+'</div>';
+}
+
+// ---------- exportar prontuário completo em PDF ----------
+async function docProntuario(){
+  const p=pacienteSel; if(!p){ toast('Selecione um paciente',true); return null; }
+  const br=dataBRsimples, secoes=[];
+  secoes.push({t:'Identificação',txt:[p.sexo,p.data_nascimento?br(p.data_nascimento)+' ('+idade(p.data_nascimento)+')':'',p.cpf?'CPF '+p.cpf:'',p.cns?'CNS '+p.cns:'',p.telefone||''].filter(Boolean).join(' · ')||'—'});
+  const ativos=problemas.filter(x=>x.situacao!=='resolvido'), resolv=problemas.filter(x=>x.situacao==='resolvido');
+  secoes.push({t:'Problemas ativos',txt:ativos.length?ativos.map(x=>x.descricao+(x.cid10?' (CID-10 '+x.cid10+')':'')).join('\n'):'Nenhum registrado.'});
+  if(resolv.length) secoes.push({t:'Problemas resolvidos',txt:resolv.map(x=>x.descricao+(x.cid10?' (CID-10 '+x.cid10+')':'')).join('\n')});
+  secoes.push({t:'Alergias',txt:alergias.length?alergias.map(a=>a.substancia+(a.reacao?' — '+a.reacao:'')+(a.gravidade?' ('+a.gravidade+')':'')).join('\n'):'Nenhuma registrada.'});
+  const meds=await continuosAnteriores(null);
+  secoes.push({t:'Medicamentos de uso contínuo',txt:meds.length?meds.map(m=>m.medicamento+([m.dose,m.frequencia,m.via].filter(Boolean).length?' — '+[m.dose,m.frequencia,m.via].filter(Boolean).join(', '):'')).join('\n'):'Nenhum nas últimas consultas.'});
+  if((resultados||[]).length) secoes.push({t:'Resultados de exames (mais recentes)',txt:[...resultados].reverse().slice(0,40).map(r=>{ const meta=analitos.find(a=>a.chave===r.analito)||{casas:2}; const v=r.valor!=null?fmtNum(r.valor,meta.casas==null?2:meta.casas)+' '+(r.unidade||meta.unidade||''):(r.valor_texto||'—'); return br(r.data_coleta)+' · '+r.exame+': '+v; }).join('\n')});
+  if(escalasOK){ const {data:es}=await sb.from('pep_escalas').select('tipo,escore,maximo,interpretacao,data').eq('paciente_id',p.id).order('data',{ascending:false});
+    if(es&&es.length) secoes.push({t:'Escalas aplicadas',txt:es.map(e=>br(e.data)+' · '+((ESCALAS[e.tipo]&&ESCALAS[e.tipo].nome)||e.tipo)+': '+e.escore+(e.maximo?'/'+e.maximo:'')+(e.interpretacao?' ('+e.interpretacao+')':'')).join('\n')}); }
+  const {data:ats}=await sb.from('pep_atendimentos').select('*').eq('paciente_id',p.id).order('data_atendimento',{ascending:false});
+  (ats||[]).forEach(a=>{ const soap=[['S',a.subjetivo],['O',a.objetivo],['A',a.avaliacao],['P',a.plano]].filter(x=>x[1]&&String(x[1]).trim()).map(x=>x[0]+': '+x[1]).join('\n');
+    const sinais=[a.pa_sistolica?'PA '+a.pa_sistolica+'/'+(a.pa_diastolica||'—'):'',a.fc?'FC '+a.fc:'',a.peso_kg?'Peso '+a.peso_kg+' kg':'',a.glicemia_capilar?'Glicemia '+a.glicemia_capilar:''].filter(Boolean).join(' · ');
+    secoes.push({t:'Atendimento — '+br(a.data_atendimento),txt:(sinais?sinais+'\n':'')+(soap||'(sem registro SOAP)')}); });
+  return montarDoc('Prontuário — '+p.nome, [], [], null, null, {secoes});
+}
+
+// ---------- orientações ao paciente ----------
+const ORIENTACOES=[
+ {chave:'has',titulo:'Pressão alta (hipertensão)',cond:'has',secoes:[
+   ['O que é','A pressão alta quase não dá sintomas, mas com o tempo sobrecarrega o coração, o cérebro e os rins. Por isso o tratamento é contínuo, mesmo quando você se sente bem.'],
+   ['Cuidados no dia a dia','Tome os remédios todos os dias, no mesmo horário. Reduza o sal (evite temperos prontos, embutidos e enlatados). Faça atividade física, mantenha o peso, evite excesso de álcool e não fume. Meça a pressão quando orientado e anote os valores.'],
+   ['Sinais de alerta — procure atendimento','Dor no peito, falta de ar, fraqueza ou dormência de um lado do corpo, dificuldade para falar ou enxergar, dor de cabeça muito forte e repentina.']]},
+ {chave:'dm',titulo:'Diabetes',cond:'dm',secoes:[
+   ['O que é','No diabetes o açúcar no sangue fica alto. Mantê-lo controlado evita problemas nos olhos, rins, nervos e coração ao longo dos anos.'],
+   ['Cuidados no dia a dia','Tome a medicação corretamente, siga a alimentação orientada e faça atividade física. Cuide dos pés: olhe todos os dias, use calçado fechado e confortável e não ande descalço. Faça os exames e as consultas de acompanhamento.'],
+   ['Sinais de alerta — procure atendimento','Muita sede e urina, visão embaçada, confusão; tremor, suor e fome repentinos (hipoglicemia — se puder, coma açúcar); feridas no pé que não cicatrizam.']]},
+ {chave:'anticoag',titulo:'Uso de anticoagulante',cond:null,secoes:[
+   ['Por que usar','O anticoagulante evita a formação de coágulos (tromboses e AVC). Precisa ser tomado certinho e não deve ser suspenso por conta própria.'],
+   ['Cuidados','Tome sempre no mesmo horário. Avise todo profissional de saúde (inclusive o dentista) que você usa anticoagulante. Tenha cuidado com quedas e cortes. Não comece outros remédios, inclusive anti-inflamatórios, sem orientação.'],
+   ['Sinais de alerta — procure atendimento','Sangramento que não para, sangue na urina ou fezes pretas, hematomas grandes sem motivo, dor de cabeça forte após uma queda.']]},
+ {chave:'quedas',titulo:'Prevenção de quedas no idoso',cond:null,secoes:[
+   ['Por que importa','Quedas podem causar fraturas e perda de independência, mas a maioria pode ser evitada.'],
+   ['Cuidados em casa','Boa iluminação, retirar tapetes soltos e fios do chão, barras de apoio no banheiro, calçado fechado com solado firme. Revisar a visão. Levantar-se devagar. Manter atividade física para força e equilíbrio.'],
+   ['Converse com seu médico','Sobre remédios que causam sonolência ou tontura, e sobre vitamina D e a saúde dos ossos.']]},
+ {chave:'ivas',titulo:'Resfriado e gripe',cond:null,secoes:[
+   ['O que é','A maioria dos resfriados é causada por vírus e melhora sozinha em alguns dias. Antibiótico não trata vírus.'],
+   ['Cuidados','Repouso, bastante líquido e lavagem nasal com soro. Para dor ou febre, use o sintomático orientado. Lave as mãos com frequência e cubra a boca ao tossir.'],
+   ['Sinais de alerta — procure atendimento','Falta de ar, febre por mais de 3 dias ou muito alta, dor no peito, piora importante do estado geral, confusão.']]}
+];
+function abrirOrientacoes(){
+  const ativos=condicoesAtivas(problemas);
+  const rel=ORIENTACOES.filter(x=>x.cond&&ativos[x.cond]);
+  const linha=x=>'<div class="mod-it"><div class="tx"><div class="tt">'+esc(x.titulo)+(x.cond&&ativos[x.cond]?' <span class="chip">condição ativa</span>':'')+'</div><div class="pv">'+esc(x.secoes[0][1].slice(0,120))+'…</div></div><span style="display:flex;gap:6px"><button class="btn ghost sm" data-ori-imp="'+x.chave+'">Imprimir</button><button class="btn primary sm" data-ori-pdf="'+x.chave+'">PDF</button></span></div>';
+  $('ori-lista').innerHTML=(rel.length?'<div class="muted" style="margin:0 0 6px;font-weight:600">Para as condições deste paciente</div>'+rel.map(linha).join(''):'')+
+    '<div class="muted" style="margin:10px 0 6px;font-weight:600">Todas as orientações</div>'+ORIENTACOES.map(linha).join('');
+  const doc=ch=>{ const x=ORIENTACOES.find(y=>y.chave===ch); if(!x) return null; return montarDoc('Orientações — '+x.titulo, [], [], null, null, {secoes:x.secoes.map(s=>({t:s[0],txt:s[1]}))}); };
+  $('ori-lista').querySelectorAll('[data-ori-imp]').forEach(b=>b.onclick=()=>{ const d=doc(b.dataset.oriImp); if(d){ closeM('m-orienta'); imprimirDoc(d); } });
+  $('ori-lista').querySelectorAll('[data-ori-pdf]').forEach(b=>b.onclick=()=>{ const d=doc(b.dataset.oriPdf); if(d){ closeM('m-orienta'); baixarPDF(d); } });
+  openM('m-orienta');
+}
 
 // ---------- imunização (vacinas) ----------
 const VACINAS=[
