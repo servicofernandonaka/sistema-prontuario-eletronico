@@ -6,9 +6,9 @@
 //     sem internet, abre a última que foi guardada;
 //   • bibliotecas (versão fixa na URL) e ícones: guardados e servidos daqui;
 //   • Supabase: não passa por aqui.
-const VERSAO='2026-11-18.1';
+const VERSAO='2026-11-18.2';
 const CACHE='pep-'+VERSAO;
-const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 const LIBS=[
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',

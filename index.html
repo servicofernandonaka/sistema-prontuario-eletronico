@@ -7,7 +7,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0a6fbd">
 <link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PEP Clínico">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -405,6 +409,8 @@
       <input type="file" id="med-file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
       <div id="sigtap-status" class="muted" style="padding:0 4px"></div>
       <button class="btn ghost" id="btn-logout">Sair da conta</button>
+      <button class="btn ghost" id="btn-instalar" style="display:none">Instalar aplicativo</button>
+      <div class="muted" id="instalar-dica" style="display:none;padding:0 4px;font-size:11px;line-height:1.4"></div>
       <label class="offbox"><input type="checkbox" id="off-ligado"> <span>Uso offline neste aparelho</span></label>
       <div class="muted" id="off-status" style="padding:0 4px;font-size:11px;line-height:1.4"></div>
       <div class="muted" id="versao" style="padding:2px 4px;font-size:11px"></div>
@@ -1248,6 +1254,30 @@ const OFF=(()=>{
            marca:()=>{ loteAtual++; return contEnfileirados; }, enfileirouDesde:m=>contEnfileirados>m,
            pendentes:()=>estado.pendentes, apagarTudo, estado };
 })();
+
+// ---------- instalação como aplicativo (PWA) ----------
+let promptInstalar=null;
+function appInstalado(){ try{ return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true; }catch(e){ return false; } }
+function eIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
+function atualizarInstalar(){
+  const b=document.getElementById('btn-instalar'), d=document.getElementById('instalar-dica'); if(!b) return;
+  if(appInstalado()){ b.style.display='none'; if(d){ d.style.display='block'; d.textContent='Aplicativo instalado neste aparelho ✓'; } return; }
+  if(promptInstalar){ b.style.display=''; b.textContent='Instalar aplicativo'; if(d) d.style.display='none'; return; }
+  if(eIOS()){ b.style.display=''; b.textContent='Instalar no iPhone/iPad'; if(d) d.style.display='none'; return; }
+  b.style.display='none'; if(d) d.style.display='none';
+}
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); promptInstalar=e; atualizarInstalar(); });
+window.addEventListener('appinstalled',()=>{ promptInstalar=null; toast('Aplicativo instalado ✓'); atualizarInstalar(); });
+function ligarBotaoInstalar(){
+  const b=document.getElementById('btn-instalar'); if(!b) return;
+  b.onclick=async()=>{
+    if(promptInstalar){ promptInstalar.prompt(); try{ await promptInstalar.userChoice; }catch(e){} promptInstalar=null; atualizarInstalar(); return; }
+    if(eIOS()){ const d=document.getElementById('instalar-dica'); if(d){ d.style.display='block';
+      d.innerHTML='No iPhone/iPad, abra no Safari, toque em <b>Compartilhar</b> (o quadrado com a seta) e depois em <b>Adicionar à Tela de Início</b>.'; } return; }
+    toast('Para instalar, use o menu do navegador (⋮) e escolha “Instalar aplicativo” ou “Adicionar à tela inicial”.');
+  };
+  atualizarInstalar();
+}
 
 // ---------- boot/auth ----------
 function show(v){ $('view-login').classList.toggle('hidden', v!=='login'); $('view-app').classList.toggle('hidden', v!=='app'); }
@@ -2459,7 +2489,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.1 · pendências, protocolos, vitais';
+const VERSAO='2026-11-18.2 · app instalável';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -5580,6 +5610,8 @@ $('off-ligado').addEventListener('change',async e=>{
   const ok=await OFF.alternar(quer);
   if(ok) toast(quer?'Uso offline ligado — baixando os dados':'Uso offline desligado e dados locais apagados');
 });
+ligarBotaoInstalar();
+try{ window.matchMedia('(display-mode: standalone)').addEventListener('change',atualizarInstalar); }catch(e){}
 boot();
 </script>
 </body>
