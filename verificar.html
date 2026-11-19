@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificação de documento — PEP Clínico</title>
+<style>
+  :root{color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef3f9;color:#13293f;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5;padding:18px}
+  .card{max-width:520px;margin:18px auto;background:#fff;border:1px solid #d8e3ef;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(17,42,68,.10)}
+  .top{color:#fff;padding:18px 20px;font-weight:700;font-size:18px}
+  .bd{padding:18px 20px}
+  .row{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #eef3f9;font-size:15px}
+  .row:last-child{border-bottom:0}
+  .row .k{color:#5e7490;min-width:110px}
+  .row .v{font-weight:600}
+  pre{white-space:pre-wrap;font:inherit;background:#f4f8fc;border:1px solid #e4edf6;border-radius:10px;padding:12px;margin:10px 0 0}
+  .nota{font-size:12.5px;color:#5e7490;margin-top:14px;line-height:1.5}
+  .cod{font-size:12px;color:#5e7490;margin-top:10px}
+  a{color:#0a6fbd}
+  .rodape{font-size:12.5px;color:#5e7490;max-width:520px;margin:0 auto;text-align:center}
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="top" style="background:#5e7490">Verificando documento…</div>
+  <div class="bd">Aguarde um instante.</div>
+</div>
+<div class="rodape">PEP Clínico · verificação de autenticidade</div>
+<script>
+// A função só devolve dados (JSON). Esta página — servida pelo GitHub Pages — é que
+// monta o cartão, garantindo que o navegador do celular renderize como página.
+var FUNC = "https://joygodczajayygjxerno.supabase.co/functions/v1/verificar";
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+function brData(s){ var v=String(s==null?"":s), m=v.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?(m[3]+"/"+m[2]+"/"+m[1]):v; }
+function linha(k,v){ return v?('<div class="row"><span class="k">'+esc(k)+'</span><span class="v">'+esc(v)+'</span></div>'):""; }
+function render(topHtml, topBg, bdHtml){
+  document.getElementById('card').innerHTML =
+    '<div class="top" style="background:'+topBg+'">'+topHtml+'</div><div class="bd">'+bdHtml+'</div>';
+}
+function paramV(){ try{ return new URLSearchParams(location.search).get('v')||""; }catch(e){ return ""; } }
+function run(){
+  var v = paramV();
+  if(!v){ render("Verificação de documento","#c62828","Link inválido: falta o código do documento."); return; }
+  fetch(FUNC + "?v=" + encodeURIComponent(v), {headers:{accept:"application/json"}})
+    .then(function(resp){ return resp.json(); })
+    .then(function(r){
+      if(!r || r.ok===false){ render("Não foi possível verificar","#c62828","Houve um erro ao consultar. Tente novamente.<div class=\"cod\">Código: "+esc(v)+"</div>"); return; }
+      if(!r.found){ render("Documento não encontrado","#c62828","Não encontramos um documento com este código. Confira se o QR foi lido corretamente.<div class=\"cod\">Código: "+esc(v)+"</div>"); return; }
+      var assinado = r.assinado === true;
+      var nota = assinado
+        ? "Este documento foi emitido no PEP Clínico e <b>assinado digitalmente com certificado ICP-Brasil</b>, com validade jurídica equivalente à assinatura de próprio punho (MP 2.200-2/2001). Para conferir a assinatura criptográfica do arquivo PDF, valide em <a href=\"https://validar.iti.gov.br\" target=\"_blank\" rel=\"noopener\">validar.iti.gov.br</a>."
+        : "Este documento foi emitido no PEP Clínico. Os dados acima conferem com o registro do emitente no momento da emissão. <b>Este documento não recebeu assinatura digital ICP-Brasil</b> — sua autenticidade é atestada por este registro do emitente.";
+      var corpo =
+        linha("Tipo", r.tipo) +
+        linha("Emitido por", [r.medico, r.crm].filter(Boolean).join(" · ")) +
+        linha("Data", brData(r.data)) +
+        linha("Paciente", r.paciente) +
+        linha("Assinatura", assinado ? "Digital ICP-Brasil ✓" : "Sem assinatura digital") +
+        (r.conteudo ? '<div class="row" style="display:block"><div class="k" style="margin-bottom:4px">Conteúdo</div><pre>'+esc(r.conteudo)+'</pre></div>' : "") +
+        '<div class="nota">'+nota+'</div><div class="cod">Código: '+esc(v)+'</div>';
+      render("✓ Documento autêntico", "#157347", corpo);
+    })
+    .catch(function(){
+      render("Não foi possível verificar","#c62828","Sem conexão no momento. Verifique a internet e tente novamente.<div class=\"cod\">Código: "+esc(v)+"</div>");
+    });
+}
+run();
+</script>
+</body>
+</html>
