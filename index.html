@@ -369,7 +369,7 @@
     #print-area .pr-ci{font-size:9.5pt;color:#5e7490}
     #print-area .pr-ft{border-top:1px solid #d1dbe7;margin-top:8mm;padding-top:4px;text-align:center;font-size:8pt;color:#3f5570;line-height:1.35}
     #print-area .pr-emit{font-size:6.8pt;color:#8ea6c0;margin-top:2px}
-    #print-area .pr-qr{width:62px;height:62px;float:right;margin:-6px 0 0 8px}
+    #print-area .pr-qr{width:74px;height:74px;float:right;margin:0 0 4px 10px}
   }
   @media (max-width:760px){
     .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
@@ -2666,9 +2666,10 @@ async function gerarPDF(entrada){
       while(tam>6.5&&F.widthOfTextAtSize(t,tam)>R-L) tam-=0.25;
       centro(pg,t,ROD_Y0-k*10,F,tam,TINTA); });
     centro(pg,'Emitido em '+dataHoraBR(d.emitido)+'  ·  Página '+(i+1)+' de '+pgs.length,EMIT_Y-(d._rod.length?0:0),F,6.8,CLARO);
-    if(d._qrImg&&i===0){ const qs=38, qx=R-qs;
-      pg.drawImage(d._qrImg,{x:qx,y:4,width:qs,height:qs});
-      pg.drawText('autenticidade',{x:qx-1,y:qs+7,size:5,font:F,color:CLARO}); }
+    if(d._qrImg&&i===0){ const qs=48, qx=R-qs, qy=16;
+      pg.drawImage(d._qrImg,{x:qx,y:qy,width:qs,height:qs});
+      const cap='autenticidade', cw=F.widthOfTextAtSize(cap,5.5);
+      pg.drawText(cap,{x:qx-cw-4,y:qy+qs/2-2,size:5.5,font:F,color:CLARO}); }
   });
   return pdf.save();
 }
@@ -2721,11 +2722,20 @@ async function prepararVerificacao(d){
     if(error){ if(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))) toast('Para o QR de verificação, rode o verificacao_schema.sql no Supabase',true); return; }
     const url=VERIFICA_URL+(VERIFICA_URL.includes('?')?'&':'?')+'v='+token;
     d.qrDataUrl=await gerarQRpng(url);
+    d._verifToken=token;
   }catch(e){}
 }
 async function prepararVerificacoes(entrada){
   const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
   for(const x of docs) await prepararVerificacao(x);
+}
+// após assinar de fato o PDF, marca os registros de verificação como assinados
+async function marcarAssinado(entrada){
+  if(typeof VERIFICA_URL==='undefined'||!VERIFICA_URL||!navigator.onLine) return;
+  const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
+  const toks=docs.map(x=>x&&x._verifToken).filter(Boolean);
+  if(!toks.length) return;
+  try{ await sb.from('pep_verificacoes').update({assinado:true}).in('token',toks); }catch(e){}
 }
 
 async function baixarPDF(d){
@@ -2740,6 +2750,7 @@ async function baixarPDF(d){
       }
     }
   }
+  if(assinado) await marcarAssinado(d);
   const nome=assinado?nomeArquivo(d).replace(/\.pdf$/i,'')+'-assinado.pdf':nomeArquivo(d);
   const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
   const a=document.createElement('a'); a.href=url; a.download=nome; document.body.appendChild(a); a.click(); a.remove();
@@ -2831,7 +2842,7 @@ function docReceita(meds,quando,unidadeId,opc){
     // (telefone opcional) e CNES no serviço público; paciente por nome completo e CPF (sem CPF: "não possui");
     // 2 vias — a 1ª fica na farmácia ou drogaria, a 2ª com o paciente. Comprador e dispensação: a farmácia preenche ou carimba.
     for(const via of ['1ª via — retenção da farmácia ou drogaria','2ª via — paciente']){
-      const d=montarDoc('Receita de Controle Especial — '+via.split(' — ')[0], itens, [], quando, unidadeId, {grupos, controle:true});
+      const d=montarDoc('Receita de Controle Especial — '+via.split(' — ')[0], itens, [], quando, unidadeId, {grupos, controle:true, verificavel:true});
       if(!d) return null; d.subtitulo=via;
       const pr=d.prof, un=d.un||{}, p=pacienteSel||{};
       d.quadros=[
@@ -2849,7 +2860,7 @@ function docReceita(meds,quando,unidadeId,opc){
     if(!por[k]) continue;
     const {itens,grupos}=itensReceita(por[k],false);
     for(const via of ['1ª via — paciente','2ª via — retenção na farmácia']){
-      const d=montarDoc(tit+' · '+via.split(' — ')[0], itens, [['Validade',val]], quando, unidadeId, {grupos});
+      const d=montarDoc(tit+' · '+via.split(' — ')[0], itens, [['Validade',val]], quando, unidadeId, {grupos, verificavel:true});
       if(!d) return null;
       d.tituloPrinc=tit.split(' — ')[0]; d.subtitulo=tit.split(' — ')[1]+' · '+via;
       docs.push(d);
@@ -2950,7 +2961,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-19.3 · QR de verificação';
+const VERSAO='2026-11-19.6 · verificação reflete assinatura';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -2986,7 +2997,7 @@ function docsExames(exames,cab,quando,unidadeId){
   const docs=grupos.map(g=>montarDoc(
     grupos.length>1 ? 'Solicitação de exames — '+g.rotulo : 'Solicitação de exames',
     g.itens.map(e=>({n:e.no_procedimento, cod:rotuloTabela(e.co_procedimento)+' '+e.co_procedimento})),
-    obs, quando, unidadeId, {obsTitulo:'Indicação clínica'}));
+    obs, quando, unidadeId, {obsTitulo:'Indicação clínica', verificavel:true}));
   return docs.some(d=>!d) ? null : docs;
 }
 
@@ -3824,7 +3835,7 @@ function receitaRenova(){ const sel=medsRenovaSel(); if(!sel.length){ toast('Sel
 function docListaMedicamentos(meds,unidadeId){
   if(!meds||!meds.length){ toast('Selecione ao menos um medicamento',true); return null; }
   const {itens,grupos}=itensReceita(meds,false);
-  const d=montarDoc('Lista de medicamentos em uso', itens, [], new Date().toISOString().slice(0,10), unidadeId, {grupos});
+  const d=montarDoc('Lista de medicamentos em uso', itens, [], new Date().toISOString().slice(0,10), unidadeId, {grupos, verificavel:true});
   if(!d) return null;
   d.subtitulo='Para o paciente e o cuidador';
   d.obsTitulo='Orientações';
@@ -4131,7 +4142,7 @@ async function docProntuario(){
   (ats||[]).forEach(a=>{ const soap=[['S',a.subjetivo],['O',a.objetivo],['A',a.avaliacao],['P',a.plano]].filter(x=>x[1]&&String(x[1]).trim()).map(x=>x[0]+': '+x[1]).join('\n');
     const sinais=[a.pa_sistolica?'PA '+a.pa_sistolica+'/'+(a.pa_diastolica||'—'):'',a.fc?'FC '+a.fc:'',a.peso_kg?'Peso '+a.peso_kg+' kg':'',a.glicemia_capilar?'Glicemia '+a.glicemia_capilar:''].filter(Boolean).join(' · ');
     secoes.push({t:'Atendimento — '+br(a.data_atendimento),txt:(sinais?sinais+'\n':'')+(soap||'(sem registro SOAP)')}); });
-  return montarDoc('Prontuário — '+p.nome, [], [], null, null, {secoes});
+  return montarDoc('Prontuário — '+p.nome, [], [], null, null, {secoes, verificavel:true});
 }
 
 // ---------- orientações ao paciente ----------
@@ -4163,7 +4174,7 @@ function abrirOrientacoes(){
   const linha=x=>'<div class="mod-it"><div class="tx"><div class="tt">'+esc(x.titulo)+(x.cond&&ativos[x.cond]?' <span class="chip">condição ativa</span>':'')+'</div><div class="pv">'+esc(x.secoes[0][1].slice(0,120))+'…</div></div><span style="display:flex;gap:6px"><button class="btn ghost sm" data-ori-imp="'+x.chave+'">Imprimir</button><button class="btn primary sm" data-ori-pdf="'+x.chave+'">PDF</button></span></div>';
   $('ori-lista').innerHTML=(rel.length?'<div class="muted" style="margin:0 0 6px;font-weight:600">Para as condições deste paciente</div>'+rel.map(linha).join(''):'')+
     '<div class="muted" style="margin:10px 0 6px;font-weight:600">Todas as orientações</div>'+ORIENTACOES.map(linha).join('');
-  const doc=ch=>{ const x=ORIENTACOES.find(y=>y.chave===ch); if(!x) return null; return montarDoc('Orientações — '+x.titulo, [], [], null, null, {secoes:x.secoes.map(s=>({t:s[0],txt:s[1]}))}); };
+  const doc=ch=>{ const x=ORIENTACOES.find(y=>y.chave===ch); if(!x) return null; return montarDoc('Orientações — '+x.titulo, [], [], null, null, {secoes:x.secoes.map(s=>({t:s[0],txt:s[1]})), verificavel:true}); };
   $('ori-lista').querySelectorAll('[data-ori-imp]').forEach(b=>b.onclick=()=>{ const d=doc(b.dataset.oriImp); if(d){ closeM('m-orienta'); imprimirDoc(d); } });
   $('ori-lista').querySelectorAll('[data-ori-pdf]').forEach(b=>b.onclick=()=>{ const d=doc(b.dataset.oriPdf); if(d){ closeM('m-orienta'); baixarPDF(d); } });
   openM('m-orienta');
@@ -5141,7 +5152,7 @@ function docEncaminhamento(e,quando,unidadeId){
   if(t(e.exames)) secoes.push({t:'Exames realizados',txt:t(e.exames)});
   if(t(e.tratamento)) secoes.push({t:'Tratamento em curso',txt:t(e.tratamento)});
   if(t(e.pergunta)) secoes.push({t:'O que se espera do especialista',txt:t(e.pergunta)});
-  return montarDoc('Encaminhamento — '+e.especialidade, [], [], quando, unidadeId, {secoes, semNumero:true,
+  return montarDoc('Encaminhamento — '+e.especialidade, [], [], quando, unidadeId, {secoes, semNumero:true, verificavel:true,
     fecho:'Solicito a gentileza da contrarreferência para a continuidade do cuidado nesta unidade.',
     finais:[{t:'Contrarreferência — preenchimento pelo especialista',l:['Diagnóstico','Conduta','','Seguimento / retorno à UBS','Data, assinatura e carimbo']}]});
 }
@@ -5271,7 +5282,7 @@ async function docFolhaRosto(){
   if(cond.has) venc('Aferição de PA',pas.length?diasDesde(pas[0].data_atendimento):null,BA.pa);
   if(vacinasOK) pendenciasVacina(f.vacs,{idade:f.anos,has:cond.has,dm:cond.dm}).forEach(pv=>pend.push(pv.txt));
   if(pend.length) secoes.push({t:'Pendências',txt:pend.join('\n')});
-  return montarDoc('Folha de rosto — Resumo clínico em '+br(new Date().toISOString()), [], [], null, null, {secoes, semAssinatura:true});
+  return montarDoc('Folha de rosto — Resumo clínico em '+br(new Date().toISOString()), [], [], null, null, {secoes, semAssinatura:true, verificavel:true});
 }
 
 // ---------- integração com o CalcMed ----------
