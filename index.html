@@ -2666,6 +2666,13 @@ async function gerarPDF(entrada){
       while(tam>6.5&&F.widthOfTextAtSize(t,tam)>R-L) tam-=0.25;
       centro(pg,t,ROD_Y0-k*10,F,tam,TINTA); });
     centro(pg,'Emitido em '+dataHoraBR(d.emitido)+'  ·  Página '+(i+1)+' de '+pgs.length,EMIT_Y-(d._rod.length?0:0),F,6.8,CLARO);
+    // selo informativo de assinatura digital — só quando o PDF será de fato assinado
+    if(assinaturaArmada()&&ASS.auto){
+      const nm=(d.prof&&d.prof.nome)||'';
+      let selo='Assinado digitalmente por '+nm+' — valide o PDF em validar.iti.gov.br';
+      let ts=6.5; while(ts>5&&F.widthOfTextAtSize(limpar(selo),ts)>R-L-100) ts-=0.25;
+      centro(pg,selo,REGUA_Y+5,F,ts,CINZA);
+    }
     if(d._qrImg&&i===0){ const qs=48, qx=R-qs, qy=16;
       pg.drawImage(d._qrImg,{x:qx,y:qy,width:qs,height:qs});
       const cap='autenticidade', cw=F.widthOfTextAtSize(cap,5.5);
@@ -2961,7 +2968,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-19.7 · página de verificação no GitHub';
+const VERSAO='2026-11-19.8 · selo de assinatura no rodapé';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
