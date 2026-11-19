@@ -635,7 +635,7 @@
     <div id="as-info" style="font-size:13px;margin-bottom:8px"></div>
     <div class="muted" style="font-size:12px;line-height:1.5">O arquivo e a senha ficam <b>só na memória deste aparelho, nesta sessão</b> — não são salvos nem enviados. Ao sair da conta ou recarregar a página, carregue de novo. A assinatura é ICP-Brasil (PAdES) e vale como a de próprio punho (MP 2.200-2/2001).<br><br><b>Não tem certificado A1?</b> Gere o PDF normalmente e assine no aplicativo ou assinador do seu VIDaaS; a validade é a mesma. Receitas de controle especial ainda dependem do SNCR da Anvisa, à parte da assinatura.</div>
   </div>
-  <div class="mf"><button class="btn ghost" id="as-limpar" style="display:none">Esquecer certificado</button><button class="btn ghost" data-close>Fechar</button><button class="btn primary" id="as-carregar">Carregar certificado</button></div>
+  <div class="mf" style="flex-wrap:wrap;gap:6px"><button class="btn ghost" id="as-limpar" style="display:none">Esquecer certificado</button><button class="btn ghost" id="as-testar">Testar assinatura</button><button class="btn ghost" data-close>Fechar</button><button class="btn primary" id="as-carregar">Carregar certificado</button></div>
 </div></div>
 
 <div class="overlay" id="m-renova"><div class="modal" style="max-width:560px">
@@ -1624,6 +1624,20 @@ $('as-carregar').onclick=async()=>{
   finally{ $('as-carregar').disabled=false; }
 };
 $('as-auto').onchange=()=>{ ASS.auto=$('as-auto').checked; atualizarBotaoAssinatura(); };
+$('as-testar').onclick=async()=>{
+  if(!(ASS.pfx&&ASS.senha)){ $('as-info').innerHTML='<span style="color:#c62828">Carregue o certificado primeiro.</span>'; return; }
+  const info=$('as-info'); info.textContent='Testando a assinatura…'; $('as-testar').disabled=true;
+  try{
+    await carregarAssinador();
+    if(!window.PDFLib) throw new Error('biblioteca de PDF não carregada');
+    const doc=await window.PDFLib.PDFDocument.create(); doc.addPage([320,200]).drawText('teste de assinatura',{x:20,y:160,size:12});
+    const bytes=await doc.save();
+    const assinado=await window.PEPAssinador.assinar(bytes, ASS.pfx, ASS.senha, {name:ASS.nome||'', reason:'teste'});
+    if(assinado&&assinado.length>bytes.length) info.innerHTML='<span style="color:#17995c">✓ Assinatura funcionando neste aparelho. Os PDFs vão sair assinados.</span>';
+    else throw new Error('a assinatura não produziu um arquivo válido');
+  }catch(e){ info.innerHTML='<span style="color:#c62828"><b>A assinatura FALHOU:</b> '+esc(e&&(e.message||e.toString())||'erro desconhecido')+'</span>'; }
+  finally{ $('as-testar').disabled=false; }
+};
 $('as-limpar').onclick=()=>{ limparAssinatura(); $('as-estado').textContent='Certificado removido desta sessão.'; $('as-info').textContent=''; $('as-limpar').style.display='none'; toast('Certificado esquecido'); };
 async function assinarBytes(bytes){
   await carregarAssinador();
@@ -2664,7 +2678,11 @@ async function baixarPDF(d){
   let assinado=false;
   if(assinaturaArmada()&&ASS.auto){
     try{ bytes=await assinarBytes(bytes); assinado=true; }
-    catch(e){ toast('Não consegui assinar ('+(e.message||e)+') — baixando sem assinatura.',true); }
+    catch(e){
+      if(!confirm('NÃO consegui assinar este documento:\n\n'+(e.message||e)+'\n\nBaixar mesmo assim, SEM assinatura digital?')){
+        toast('Download cancelado — o documento não foi assinado.',true); return;
+      }
+    }
   }
   const nome=assinado?nomeArquivo(d).replace(/\.pdf$/i,'')+'-assinado.pdf':nomeArquivo(d);
   const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
@@ -2876,7 +2894,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-18.10 · Cal.com + vincular';
+const VERSAO='2026-11-19.1 · testar assinatura';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
