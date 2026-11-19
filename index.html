@@ -369,6 +369,7 @@
     #print-area .pr-ci{font-size:9.5pt;color:#5e7490}
     #print-area .pr-ft{border-top:1px solid #d1dbe7;margin-top:8mm;padding-top:4px;text-align:center;font-size:8pt;color:#3f5570;line-height:1.35}
     #print-area .pr-emit{font-size:6.8pt;color:#8ea6c0;margin-top:2px}
+    #print-area .pr-qr{width:62px;height:62px;float:right;margin:-6px 0 0 8px}
   }
   @media (max-width:760px){
     .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
@@ -884,6 +885,9 @@ const SUPABASE_ANON_KEY = "sb_publishable_kk6ty_YczpR02xLJouj8EA_-oRjTsT6";
 // Com o login por Google ligado, preencha com o seu e-mail para que só você entre:
 //   const EMAILS_AUTORIZADOS = ["servicofernandonaka@gmail.com"];
 const EMAILS_AUTORIZADOS = [];
+// Endereço da Edge Function 'verificar' (QR de autenticidade). Deixe "" para desligar o QR.
+// Ex.: const VERIFICA_URL = "https://SEU-REF.supabase.co/functions/v1/verificar";
+const VERIFICA_URL = "";
 // ==================================================
 
 const $ = id => document.getElementById(id);
@@ -1547,7 +1551,7 @@ function docRecibo(dados){
     'Recebi de '+pagador+(dados.cpf?' (CPF '+dados.cpf+')':'')+' a importância de '+valorFmt+' ('+valorExtenso(v)+'), referente a '+ref+(dados.pagamento?', paga em '+dados.pagamento:'')+'.',
     'Para clareza e comprovação, firmo o presente recibo.'
   ];
-  return montarDoc('Recibo', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true});
+  return montarDoc('Recibo', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true, verificavel:true});
 }
 function docComparecimento(dados){
   const p=pacienteSel||{};
@@ -1556,7 +1560,7 @@ function docComparecimento(dados){
     ' compareceu a consulta médica neste serviço no dia '+dataBRsimples(dados.data||new Date().toISOString().slice(0,10))+horario+'.'];
   if(dados.acompanhante) pars.push('Esteve acompanhado(a) por '+dados.acompanhante+'.');
   if(dados.finalidade) pars.push(dados.finalidade);
-  return montarDoc('Declaração de comparecimento', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true});
+  return montarDoc('Declaração de comparecimento', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true, verificavel:true});
 }
 function trocarTipoRecibo(){ const r=$('rb-tipo').value==='recibo';
   $('rb-campos-recibo').style.display=r?'':'none'; $('rb-campos-comp').style.display=r?'none':''; }
@@ -2430,16 +2434,17 @@ function umaGuiaHTML(d){
     d.obs.map(o=>'<div><b>'+esc(o[0])+':</b> '+esc(o[1])+'</div>').join('')+'</div>':'';
   const ass='<div class="pr-ass"><div class="pr-local">'+esc(d.local)+'</div><div class="pr-linha"></div>'+
     d.carimbo.map((l,i)=>'<div class="'+(i?'pr-ci':'pr-cn')+'">'+esc(l)+'</div>').join('')+'</div>'+finais;
-  const ft='<div class="pr-ft">'+rodapeLinhas(d).map(l=>'<div>'+esc(l)+'</div>').join('')+
+  const ft='<div class="pr-ft">'+(d.qrDataUrl?'<img class="pr-qr" src="'+d.qrDataUrl+'" alt="verificar">':'')+rodapeLinhas(d).map(l=>'<div>'+esc(l)+'</div>').join('')+
     '<div class="pr-emit">Emitido em '+esc(dataHoraBR(d.emitido))+'</div></div>';
   return cab+'<div class="pr-tit"><h1>'+esc(d.tituloPrinc)+'</h1>'+(d.subtitulo?'<div class="pr-sub">'+esc(d.subtitulo)+'</div>':'')+'</div>'+
     pac+'<div class="pr-corpo">'+corpo+'</div>'+obs+'<div class="pr-fim">'+(d.semAssinatura?'':(d.fecho?'<p class="pr-par pr-fecho">'+esc(d.fecho)+'</p>':'')+ass)+ft+'</div>';
 }
 // Aceita uma guia ou uma lista delas; cada guia sai numa folha.
-function imprimirDoc(d){
+async function imprimirDoc(d){
   if(!d) return;
   const docs=Array.isArray(d)?d.filter(Boolean):[d];
   if(!docs.length) return;
+  await prepararVerificacoes(docs);
   $('print-area').innerHTML=docs.map((x,i)=>
     '<div class="pr-folha"'+(i<docs.length-1?' style="page-break-after:always"':'')+'>'+umaGuiaHTML(x)+'</div>').join('');
   window.print();
@@ -2650,6 +2655,7 @@ async function gerarPDF(entrada){
     }
   }
 
+  for(const d of docs){ if(d.qrDataUrl){ try{ d._qrImg=await pdf.embedPng(d.qrDataUrl); }catch(e){ d._qrImg=null; } } }
   // rodapé em todas as páginas, numerado por documento
   const porDoc=new Map(); paginas.forEach(x=>{ if(!porDoc.has(x.d)) porDoc.set(x.d,[]); porDoc.get(x.d).push(x.pg); });
   const CLARO=rgb(0.557,0.651,0.753);
@@ -2660,6 +2666,9 @@ async function gerarPDF(entrada){
       while(tam>6.5&&F.widthOfTextAtSize(t,tam)>R-L) tam-=0.25;
       centro(pg,t,ROD_Y0-k*10,F,tam,TINTA); });
     centro(pg,'Emitido em '+dataHoraBR(d.emitido)+'  ·  Página '+(i+1)+' de '+pgs.length,EMIT_Y-(d._rod.length?0:0),F,6.8,CLARO);
+    if(d._qrImg&&i===0){ const qs=38, qx=R-qs;
+      pg.drawImage(d._qrImg,{x:qx,y:4,width:qs,height:qs});
+      pg.drawText('autenticidade',{x:qx-1,y:qs+7,size:5,font:F,color:CLARO}); }
   });
   return pdf.save();
 }
@@ -2673,7 +2682,54 @@ function nomeArquivo(entrada){
   return [titulo, sluga(pacienteSel&&pacienteSel.nome||'paciente'),
           dataBRsimples(d.quando).replace(/\//g,'-')].filter(Boolean).join('-')+'.pdf';
 }
+// ---------- verificação pública por QR (receita, atestado, relatório, recibo, declaração) ----------
+let qrLibLoad=null;
+function carregarQRLib(){
+  if(window.qrcode) return Promise.resolve();
+  if(qrLibLoad) return qrLibLoad;
+  qrLibLoad=new Promise((ok,ko)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+    s.onload=()=>window.qrcode?ok():ko(new Error('qr')); s.onerror=()=>ko(new Error('qr')); document.head.appendChild(s); });
+  return qrLibLoad;
+}
+async function gerarQRpng(texto){
+  await carregarQRLib();
+  const qr=window.qrcode(0,'M'); qr.addData(texto); qr.make();
+  const n=qr.getModuleCount(), quiet=4, lado=n+quiet*2, escala=Math.max(3,Math.floor(320/lado));
+  const cv=document.createElement('canvas'); cv.width=cv.height=lado*escala;
+  const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.fillStyle='#000';
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(qr.isDark(r,c)) ctx.fillRect((c+quiet)*escala,(r+quiet)*escala,escala,escala);
+  return cv.toDataURL('image/png');
+}
+function tokenVerif(){ const a=new Uint8Array(20); crypto.getRandomValues(a); return [...a].map(b=>('0'+b.toString(16)).slice(-2)).join('').slice(0,30); }
+function resumoDoc(d){
+  let t='';
+  if(d.grupos&&d.grupos.length) t=d.grupos.flatMap(g=>(g.itens||[]).map(it=>it.n+(it.q?' — '+it.q:'')+(it.d?' ('+it.d+')':''))).join('\n');
+  else if(d.paragrafos&&d.paragrafos.length) t=d.paragrafos.join('\n\n');
+  else if(d.secoes&&d.secoes.length) t=d.secoes.map(s=>(s.t?s.t+': ':'')+s.txt).join('\n');
+  return t.slice(0,1500);
+}
+async function prepararVerificacao(d){
+  if(typeof VERIFICA_URL==='undefined'||!VERIFICA_URL||!d||!d.verificavel||d.qrDataUrl||!navigator.onLine) return;
+  const pr=dadosProf()||{}, p=pacienteSel||{};
+  const token=tokenVerif();
+  const reg={ token, tipo:d.tituloPrinc||d.titulo||'Documento', paciente:p.nome||null, medico:pr.nome||null,
+    crm: pr.crm?('CRM'+(pr.uf_crm?'-'+pr.uf_crm:'')+' '+pr.crm):null,
+    data:(d.quando?String(d.quando).slice(0,10):new Date().toISOString().slice(0,10)), conteudo:resumoDoc(d) };
+  try{
+    const {error}=await sb.from('pep_verificacoes').insert(reg);
+    if(error){ if(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))) toast('Para o QR de verificação, rode o verificacao_schema.sql no Supabase',true); return; }
+    const url=VERIFICA_URL+(VERIFICA_URL.includes('?')?'&':'?')+'v='+token;
+    d.qrDataUrl=await gerarQRpng(url);
+  }catch(e){}
+}
+async function prepararVerificacoes(entrada){
+  const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada];
+  for(const x of docs) await prepararVerificacao(x);
+}
+
 async function baixarPDF(d){
+  await prepararVerificacoes(d);
   let bytes=await gerarPDF(d); if(!bytes) return;
   let assinado=false;
   if(assinaturaArmada()&&ASS.auto){
@@ -2768,7 +2824,7 @@ function docReceita(meds,quando,unidadeId,opc){
   const fora=Object.keys(BLOQ).flatMap(k=>(por[k]||[]).map(m=>m.medicamento+' ('+BLOQ[k]+')'));
   if(fora.length) toast('Não saem nesta receita: '+fora.join('; '),true);
   const docs=[];
-  if(por.comum){ const {itens,grupos}=itensReceita(por.comum,false); docs.push(montarDoc('Receituário', itens, [], quando, unidadeId, {grupos})); }
+  if(por.comum){ const {itens,grupos}=itensReceita(por.comum,false); docs.push(montarDoc('Receituário', itens, [], quando, unidadeId, {grupos, verificavel:true})); }
   for(const lote of (por.controle?(separar?por.controle.map(m=>[m]):[por.controle]):[])){
     const {itens,grupos}=itensReceita(lote,true);
     // Portaria 344/98, art. 85, com a redação da RDC 1.000/2025: emitente com conselho/UF, endereço do local de atendimento
@@ -2830,7 +2886,7 @@ function docRelatorio(r,quando,unidadeId){
     if(t(r.texto)) secoes.push({t:t(r.diagnosticos)?'Relato':'',txt:t(r.texto)});
   }
   if(!secoes.length){ toast('O relatório está vazio',true); return null; }
-  return montarDoc(titulo, [], [], quando, unidadeId, {secoes, semNumero:true,
+  return montarDoc(titulo, [], [], quando, unidadeId, {secoes, semNumero:true, verificavel:true,
     fecho:'Coloco-me à disposição para esclarecimentos adicionais.'});
 }
 
@@ -2855,7 +2911,7 @@ function docAtestado(at,quando,unidadeId){
     corpo='Atesto, para os devidos fins, que o(a) paciente acima foi avaliado(a) e encontra-se apto(a) para a prática de atividade física.';
   const pars=[corpo]; if(at.texto) pars.push(at.texto);
   const obs=at.cid10?[['CID-10',at.cid10]]:[];
-  return montarDoc(rot[at.tipo]||'Atestado', [], obs, quando, unidadeId, {paragrafos:pars, semNumero:true});
+  return montarDoc(rot[at.tipo]||'Atestado', [], obs, quando, unidadeId, {paragrafos:pars, semNumero:true, verificavel:true});
 }
 // Os dois primeiros dígitos do código SIGTAP são o grupo e os dois seguintes o
 // subgrupo. É o subgrupo que diz a que serviço o exame pertence — e por isso
@@ -2894,7 +2950,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-19.2 · assinatura A1 corrigida';
+const VERSAO='2026-11-19.3 · QR de verificação';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
