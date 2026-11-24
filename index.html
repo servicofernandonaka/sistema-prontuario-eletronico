@@ -12,10 +12,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="PEP Clínico">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="./vendor/supabase.js"></script>
+<script src="./vendor/jszip.min.js"></script>
+<script src="./vendor/pdf-lib.min.js"></script>
+<script src="./vendor/xlsx.full.min.js"></script>
 <style>
   /* Paleta clara derivada das cores do e-SUS APS PEC — azul #0a5c9e e o
      azul-marinho #092f4f do cabeçalho —, levantada um tom e com os blocos do
@@ -892,9 +892,19 @@ const VERIFICA_URL = "https://servicofernandonaka.github.io/sistema-prontuario-e
 
 const $ = id => document.getElementById(id);
 const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
-const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-const toast=(m,err=false)=>{const t=$('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2800);};
-function idade(d){ if(!d) return ''; const b=new Date(d), n=new Date(); let a=n.getFullYear()-b.getFullYear(); const mm=n.getMonth()-b.getMonth(); if(mm<0||(mm===0&&n.getDate()<b.getDate()))a--; return a+' anos'; }
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+// Datas "de hoje" usam o calendário LOCAL. toISOString() devolve a data em UTC, que no Brasil já é o dia seguinte depois das 21h.
+const isoLocal=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const hojeISO=()=>isoLocal(new Date());
+const dataISOde=q=>/^\d{4}-\d{2}-\d{2}$/.test(String(q))?String(q):isoLocal(new Date(q));
+let toastT;
+const toast=(m,err=false)=>{const t=$('toast');t.textContent=m;t.className='toast show'+(err?' err':'');clearTimeout(toastT);toastT=setTimeout(()=>t.className='toast',err?(String(m).length>90?12000:6000):2800);};
+function anosCompletos(nasc){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(nasc||''); if(!m) return null; const n=new Date(), mes=n.getMonth()+1; let a=n.getFullYear()-+m[1]; if(mes<+m[2]||(mes===+m[2]&&n.getDate()<+m[3])) a--; return a; }
+// idade a partir de "AAAA-MM-DD" sem new Date(d) (que lê a data como UTC e erra um dia no fuso do Brasil); abaixo de 2 anos, em meses
+function idade(d){ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(d||''); if(!m) return ''; const n=new Date(), Y=+m[1], M=+m[2], D=+m[3], mes=n.getMonth()+1;
+  let a=n.getFullYear()-Y; if(mes<M||(mes===M&&n.getDate()<D)) a--;
+  if(a<2){ let ms=(n.getFullYear()-Y)*12+(mes-M); if(n.getDate()<D) ms--; return ms<1?'menos de 1 mês':ms+(ms===1?' mês':' meses'); }
+  return a+' anos'; }
 function dataBR(s){ if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
 
 let sb=null, pacientes=[], pacienteSel=null, atendAtual=null;
@@ -1237,7 +1247,7 @@ const OFF=(()=>{
   const palavras=t=>semAcentoOff(t).replace(/\./g,'').trim().split(/\s+/).filter(Boolean);
   const temTodas=(alvo,ws)=>{ const a=semAcentoOff(alvo).replace(/\./g,''); return ws.every(w=>a.includes(w)); };
   async function buscaExames(a){
-    const ws=palavras(a.p_termo), lim=a.p_limite||20, hoje=new Date().toISOString().slice(0,10);
+    const ws=palavras(a.p_termo), lim=a.p_limite||20, hoje=hojeISO();
     const ini=semAcentoOff(a.p_termo).trim();
     let fonte=[...(await tabela('tuss_procedimento')).values()], tuss=true;
     if(!fonte.length){ fonte=[...(await tabela('sigtap_procedimento')).values()]; tuss=false; }
@@ -1366,7 +1376,7 @@ const OFF=(()=>{
        (estado.persistente===false?' · o navegador pode apagar estes dados se faltar espaço':'')+
        (estado.sw===false?' · arquivo sw.js não encontrado: o app não abre sem internet':'');
   }
-  const escOff=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const escOff=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   // ---------------- início ----------------
   async function iniciar(){
@@ -1400,28 +1410,28 @@ const OFF=(()=>{
 })();
 
 // ---------- agenda de consultas (agenda interna) ----------
-let agendaData=new Date().toISOString().slice(0,10);
+let agendaData=hojeISO();
 let agConsultaPac=null;
 const STATUS_AG={marcada:{rot:'Marcada',cor:'#5e7490',bg:'#eef2f7'},confirmada:{rot:'Confirmada',cor:'#0a6fbd',bg:'#e6f1fb'},
   atendida:{rot:'Atendida',cor:'#17995c',bg:'#e6f7ef'},faltou:{rot:'Faltou',cor:'#c62828',bg:'#fdecec'},cancelada:{rot:'Cancelada',cor:'#8a8a8a',bg:'#eef0f2'}};
-function addDiasISO(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function addDiasISO(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return isoLocal(d); }
 function nomeDaConsulta(a){ if(a.paciente_id){ const pc=(pacientes||[]).find(x=>x.id===a.paciente_id); return (pc&&pc.nome)||'(paciente cadastrado)'; } return a.nome||'(sem nome)'; }
 function linhaConsulta(a){
   const st=STATUS_AG[a.status]||STATUS_AG.marcada, nm=nomeDaConsulta(a), vinc=!!a.paciente_id, cancel=a.status==='cancelada';
   return '<div class="ag-row'+(cancel?' cancel':'')+'">'+
     '<div class="ag-hora">'+esc(a.hora||'--:--')+'<small>'+(a.duracao_min||30)+' min</small></div>'+
-    '<div class="ag-nm">'+(vinc?'<button class="ba-nome" data-abrir="'+a.paciente_id+'">'+esc(nm)+'</button>':'<b>'+esc(nm)+'</b>')+
+    '<div class="ag-nm">'+(vinc?'<button class="ba-nome" data-abrir="'+esc(a.paciente_id)+'">'+esc(nm)+'</button>':'<b>'+esc(nm)+'</b>')+
       (a.tipo?' <span class="chip">'+esc(a.tipo)+'</span>':'')+
       (a.origem&&a.origem!=='manual'?' <span class="chip" style="background:#e9f6ff">via '+esc(a.origem)+'</span>':'')+
       (a.telefone?'<div class="muted" style="font-size:12px">'+esc(a.telefone)+'</div>':'')+
       (a.observacao?'<div class="muted" style="font-size:12px">'+esc(a.observacao)+'</div>':'')+'</div>'+
     '<div class="ag-badge" style="color:'+st.cor+';background:'+st.bg+'">'+st.rot+'</div>'+
     '<div class="ag-ac">'+
-      (vinc&&!cancel?'<button class="btn ghost sm" data-atend="'+a.paciente_id+'">Atender</button>':'')+
-      (!vinc&&!cancel?'<button class="btn ghost sm" data-vinc="'+a.id+'">Vincular</button>':'')+
-      '<select class="f ag-status" data-st="'+a.id+'" style="width:auto;padding:5px 8px;font-size:12px">'+
+      (vinc&&!cancel?'<button class="btn ghost sm" data-atend="'+esc(a.paciente_id)+'">Atender</button>':'')+
+      (!vinc&&!cancel?'<button class="btn ghost sm" data-vinc="'+esc(a.id)+'">Vincular</button>':'')+
+      '<select class="f ag-status" data-st="'+esc(a.id)+'" style="width:auto;padding:5px 8px;font-size:12px">'+
         Object.keys(STATUS_AG).map(k=>'<option value="'+k+'"'+(k===a.status?' selected':'')+'>'+STATUS_AG[k].rot+'</option>').join('')+'</select>'+
-      '<button class="btn ghost sm" data-del="'+a.id+'" title="Remover da agenda">✕</button>'+
+      '<button class="btn ghost sm" data-del="'+esc(a.id)+'" title="Remover da agenda">✕</button>'+
     '</div></div>';
 }
 async function renderAgendaConsultas(c){
@@ -1436,7 +1446,7 @@ async function renderAgendaConsultas(c){
   $('ag-data').value=agendaData;
   $('ag-ant').onclick=()=>{ agendaData=addDiasISO(agendaData,-1); renderMain(); };
   $('ag-prox').onclick=()=>{ agendaData=addDiasISO(agendaData,1); renderMain(); };
-  $('ag-hoje').onclick=()=>{ agendaData=new Date().toISOString().slice(0,10); renderMain(); };
+  $('ag-hoje').onclick=()=>{ agendaData=hojeISO(); renderMain(); };
   $('ag-data').onchange=()=>{ if($('ag-data').value){ agendaData=$('ag-data').value; renderMain(); } };
   $('ag-nova').onclick=abrirNovaConsulta;
   const diaTxt=new Date(agendaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
@@ -1490,7 +1500,7 @@ function wireBuscaConsulta(){
   $('ag-busca').addEventListener('input',()=>{ clearTimeout(agBuscaT); agBuscaT=setTimeout(async()=>{
     const q=$('ag-busca').value.trim(); if(q.length<2){ $('ag-resultados').innerHTML=''; return; }
     const {data}=await sb.from('pep_pacientes').select('id,nome,data_nascimento,cpf').ilike('nome','%'+q+'%').order('nome').limit(12);
-    $('ag-resultados').innerHTML=(data||[]).map(p=>'<button class="ag-opt" data-pac="'+p.id+'" data-nome="'+esc(p.nome).replace(/"/g,'&quot;')+'">'+esc(p.nome)+(p.data_nascimento?' <span class="muted">· '+idade(p.data_nascimento)+'</span>':'')+'</button>').join('')||'<div class="muted" style="padding:4px">Nenhum paciente encontrado.</div>';
+    $('ag-resultados').innerHTML=(data||[]).map(p=>'<button class="ag-opt" data-pac="'+esc(p.id)+'" data-nome="'+esc(p.nome).replace(/"/g,'&quot;')+'">'+esc(p.nome)+(p.data_nascimento?' <span class="muted">· '+idade(p.data_nascimento)+'</span>':'')+'</button>').join('')||'<div class="muted" style="padding:4px">Nenhum paciente encontrado.</div>';
     $('ag-resultados').querySelectorAll('[data-pac]').forEach(b=>b.onclick=()=>{
       agConsultaPac={id:b.dataset.pac,nome:b.dataset.nome};
       $('ag-selecionado').innerHTML='Selecionado: <b>'+esc(agConsultaPac.nome)+'</b> <button class="btn ghost sm" id="ag-limpar-sel">trocar</button>';
@@ -1508,7 +1518,7 @@ function wireBuscaVincular(){
   $('av-busca').addEventListener('input',()=>{ clearTimeout(avBuscaT); avBuscaT=setTimeout(async()=>{
     const q=$('av-busca').value.trim(); if(q.length<2){ $('av-resultados').innerHTML=''; return; }
     const {data}=await sb.from('pep_pacientes').select('id,nome,data_nascimento').ilike('nome','%'+q+'%').order('nome').limit(12);
-    $('av-resultados').innerHTML=(data||[]).map(x=>'<button class="ag-opt" data-pv="'+x.id+'">'+esc(x.nome)+(x.data_nascimento?' <span class="muted">· '+idade(x.data_nascimento)+'</span>':'')+'</button>').join('')||'<div class="muted" style="padding:4px">Nenhum paciente encontrado.</div>';
+    $('av-resultados').innerHTML=(data||[]).map(x=>'<button class="ag-opt" data-pv="'+esc(x.id)+'">'+esc(x.nome)+(x.data_nascimento?' <span class="muted">· '+idade(x.data_nascimento)+'</span>':'')+'</button>').join('')||'<div class="muted" style="padding:4px">Nenhum paciente encontrado.</div>';
     $('av-resultados').querySelectorAll('[data-pv]').forEach(b=>b.onclick=async()=>{
       const {error}=await sb.from('pep_agenda').update({paciente_id:b.dataset.pv, nome:null}).eq('id',agVincId);
       if(error){ toast('Não consegui vincular: '+error.message,true); return; }
@@ -1557,7 +1567,7 @@ function docComparecimento(dados){
   const p=pacienteSel||{};
   const horario=(dados.de&&dados.ate)?', no período das '+dados.de+' às '+dados.ate:(dados.de?', a partir das '+dados.de:'');
   const pars=['Declaro, para os devidos fins, que '+(p.nome||'o(a) paciente')+(p.cpf?' (CPF '+p.cpf+')':'')+
-    ' compareceu a consulta médica neste serviço no dia '+dataBRsimples(dados.data||new Date().toISOString().slice(0,10))+horario+'.'];
+    ' compareceu a consulta médica neste serviço no dia '+dataBRsimples(dados.data||hojeISO())+horario+'.'];
   if(dados.acompanhante) pars.push('Esteve acompanhado(a) por '+dados.acompanhante+'.');
   if(dados.finalidade) pars.push(dados.finalidade);
   return montarDoc('Declaração de comparecimento', [], [], dados.data||null, null, {paragrafos:pars, semNumero:true, verificavel:true});
@@ -1566,7 +1576,7 @@ function trocarTipoRecibo(){ const r=$('rb-tipo').value==='recibo';
   $('rb-campos-recibo').style.display=r?'':'none'; $('rb-campos-comp').style.display=r?'none':''; }
 function abrirRecibo(){
   if(!pacienteSel){ toast('Selecione um paciente',true); return; }
-  const hoje=new Date().toISOString().slice(0,10);
+  const hoje=hojeISO();
   $('rb-data').value=hoje; $('rb-datac').value=hoje;
   ['rb-valor','rb-pagamento','rb-pagador','rb-cpf','rb-de','rb-ate','rb-acomp','rb-final'].forEach(i=>$(i).value='');
   $('rb-ref').value='consulta médica particular'; $('rb-tipo').value='recibo'; trocarTipoRecibo();
@@ -1747,10 +1757,12 @@ $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({e
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
 if($('li-google')) $('li-google').onclick=entrarComGoogle;
 $('btn-logout').onclick=async()=>{
+  if(atendimentoSujo()&&!confirm('Há um atendimento em andamento que ainda não foi salvo. Sair apaga esse rascunho.\n\nSair mesmo assim?')) return;
   const n=OFF.pendentes();
   if(n&&!confirm('Há '+n+' registro(s) aguardando envio.\n\nSe você sair, eles continuam guardados neste aparelho, mas só sobem quando você entrar de novo AQUI. Sair mesmo assim?')) return;
   try{ await sb.auth.signOut(); }catch(e){}
   limparAssinatura();    // o certificado não sobrevive ao logout
+  limparTodosRascunhos(); // nem o texto de atendimentos não salvos
   aplicarSessao(null);   // volta para o login mesmo se a rede falhar
 };
 
@@ -1773,11 +1785,34 @@ async function sondarColunas(){
   enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error; agendaOK=!agd.error;
   try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK,ag:agendaOK}));}catch(e){}
 }
+// A busca roda sobre a lista completa (guardada por 1 min): acha por nome sem acento, por CPF, CNS ou telefone
+// (com ou sem pontos), e a lista lateral mostra quantos há além dos 200 exibidos.
+let pacCache=null, pacCacheEm=0, pacientesTotal=0;
+async function todosPacientes(forcar){
+  if(!forcar&&pacCache&&Date.now()-pacCacheEm<60000) return pacCache;
+  const l=await todos('pep_pacientes','*'); l.sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+  pacCache=l; pacCacheEm=Date.now(); return l;
+}
+const soDigitos=v=>String(v==null?'':v).replace(/\D/g,'');
+const cpfOk=v=>{ v=soDigitos(v); if(v.length!==11||/^(\d)\1+$/.test(v)) return false;
+  const c=n=>{ let s=0; for(let i=0;i<n;i++) s+=+v[i]*(n+1-i); const r=(s*10)%11; return r===10?0:r; }; return c(9)===+v[9]&&c(10)===+v[10]; };
+const cnsOk=v=>{ v=soDigitos(v); if(v.length!==15) return false;
+  if(/^[12]/.test(v)){ const pis=v.slice(0,11); let s=0; for(let i=0;i<11;i++) s+=+pis[i]*(15-i); let r=s%11, d=r===0?0:11-r;
+    if(d===10){ s+=2; r=s%11; d=11-r; return v===pis+'001'+d; } return v===pis+'000'+d; }
+  if(/^[789]/.test(v)){ let s=0; for(let i=0;i<15;i++) s+=+v[i]*(15-i); return s%11===0; }
+  return false; };
 async function carregarPacientes(q){
-  let query = sb.from('pep_pacientes').select('*').order('nome',{ascending:true}).limit(200);
-  if(q) query = query.ilike('nome','%'+q+'%');
-  const {data,error}=await query;
-  if(error){ toast('Erro ao carregar pacientes: '+error.message,true); pacientes=[]; } else pacientes=data||[];
+  let lista=[];
+  try{
+    lista=await todosPacientes(!q);
+    const t=semAc(q||'').trim(), qd=soDigitos(q);
+    if(t){
+      const soNum=/^[\d\s.\-()\/]+$/.test(q.trim());
+      lista=lista.filter(p=>{ const num=qd.length>=3&&[p.cpf,p.cns,p.telefone].some(v=>soDigitos(v).includes(qd));
+        return soNum?num:(semAc(p.nome).includes(t)||num); });
+    }
+  }catch(error){ toast('Erro ao carregar pacientes: '+(error.message||error),true); lista=[]; }
+  pacientesTotal=lista.length; pacientes=lista.slice(0,200);
   renderSideList();
 }
 function renderSideList(){
@@ -1790,6 +1825,7 @@ function renderSideList(){
       await carregarProblemasAlergias(); await carregarResultados(); renderMain(); };
     box.appendChild(b);
   });
+  if(pacientesTotal>pacientes.length) box.appendChild(el('div','muted','<div style="padding:8px 10px;font-size:12px">Mostrando '+pacientes.length+' de '+pacientesTotal+' — digite para refinar a busca.</div>'));
 }
 let searchTimer;
 $('pac-search').addEventListener('input',e=>{ clearTimeout(searchTimer); searchTimer=setTimeout(()=>carregarPacientes(e.target.value.trim()),250); });
@@ -1817,6 +1853,17 @@ const salvoMsg=(mk,padrao)=>OFF.enfileirouDesde(mk)
 $('np-save').onclick=async()=>{
   const mk=OFF.marca();
   const nome=$('np-nome').value.trim(); if(!nome){ toast('Informe o nome',true); return; }
+  // conferências do cadastro: data impossível barra; CPF/CNS inválido ou repetido pede confirmação (dado fictício/antigo pode ser)
+  const nasc0=$('np-nasc').value;
+  if(nasc0&&(nasc0>hojeISO()||nasc0<'1900-01-01')){ toast('Data de nascimento inválida (futura ou anterior a 1900)',true); return; }
+  try{
+    const outros=(await todosPacientes()).filter(x=>!pacEditando||x.id!==pacEditando.id);
+    const cpfD=soDigitos($('np-cpf').value), cnsD=soDigitos($('np-cns').value);
+    const rep=outros.find(x=>(cpfD&&soDigitos(x.cpf)===cpfD)||(cnsD&&soDigitos(x.cns)===cnsD));
+    if(rep&&!confirm('Já existe um paciente com este CPF/CNS: '+rep.nome+'.\n\nSalvar mesmo assim?')) return;
+    if(cpfD&&!cpfOk(cpfD)&&!confirm('CPF com dígitos verificadores inválidos.\n\nSalvar mesmo assim? (só aceitável para dados fictícios)')) return;
+    if(cnsD&&!cnsOk(cnsD)&&!confirm('CNS inválido (15 dígitos com dígito verificador).\n\nSalvar mesmo assim?')) return;
+  }catch(e){ /* sem a lista (offline sem espelho): segue sem a checagem de duplicidade */ }
   const rec={ nome, cpf:$('np-cpf').value.trim()||null, cns:$('np-cns').value.trim()||null,
     data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null,
     nome_mae:$('np-mae').value.trim()||null, telefone:$('np-tel').value.trim()||null };
@@ -1958,7 +2005,7 @@ function abrirResultado(pre){
   sel.innerHTML='<option value="">— sem evolução —</option>'+
     analitos.map(a=>'<option value="'+esc(a.chave)+'">'+esc(a.rotulo)+(a.unidade?' ('+esc(a.unidade)+')':'')+'</option>').join('');
   $('rs-exame').value=pre.exame||'';
-  $('rs-data').value=(pre.data||new Date().toISOString().slice(0,10));
+  $('rs-data').value=(pre.data||hojeISO());
   ['rs-valor','rs-unidade','rs-texto','rs-refmin','rs-refmax','rs-obs'].forEach(i=>$(i).value='');
   $('rs-exame').dataset.co=pre.co_procedimento||'';
   $('rs-exame').dataset.atend=pre.atendimento_id||'';
@@ -2035,6 +2082,7 @@ async function resolverProblema(pb){
 let tela=null;   // telas sem paciente: 'busca' | 'backup'
 function abrirTela(t){ tela=t; pacienteSel=null; atendAtual=null; $('sidebar').classList.remove('open'); renderSideList(); renderMain(); }
 function renderMain(){
+  salvarRascunho();
   const c=$('main-content'); c.innerHTML='';
   if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
   if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
@@ -2155,7 +2203,7 @@ async function renderFichaPaciente(c){
         const ref=(r.ref_min!=null||r.ref_max!=null)?[r.ref_min,r.ref_max].filter(v=>v!=null).join(' – '):(r.ref_texto||'—');
         return '<tr><td>'+esc(dataBRsimples(r.data_coleta))+'</td><td>'+esc(r.exame)+'</td><td'+(fora?' class="fora"':'')+'>'+
                esc(val)+(fora?' <span class="tagc tagr">fora da referência</span>':'')+'</td><td class="muted">'+esc(ref)+
-               '</td><td><button class="rm" data-rr="'+r.id+'" title="Remover">✕</button></td></tr>'; }).join('')+'</tbody></table>';
+               '</td><td><button class="rm" data-rr="'+esc(r.id)+'" title="Remover">✕</button></td></tr>'; }).join('')+'</tbody></table>';
     bodyR.appendChild(tb);
     tb.querySelectorAll('[data-rr]').forEach(b=>b.onclick=async()=>{
       if(!confirm('Remover este resultado do prontuário?')) return;
@@ -2235,7 +2283,7 @@ function renderSeletorUnidade(){
   const sel=$('unid-ativa'); if(!sel) return;
   if(unidades.length<1){ sel.classList.add('hidden'); return; }
   const at=unidadeAtiva();
-  sel.innerHTML=unidades.map(u=>'<option value="'+u.id+'"'+(at&&u.id===at.id?' selected':'')+'>'+esc(u.nome)+'</option>').join('');
+  sel.innerHTML=unidades.map(u=>'<option value="'+esc(u.id)+'"'+(at&&u.id===at.id?' selected':'')+'>'+esc(u.nome)+'</option>').join('');
   sel.classList.toggle('hidden',unidades.length<2);      // com uma unidade só, não há o que trocar
 }
 async function definirUnidadeAtiva(id){
@@ -2254,12 +2302,12 @@ function renderUnidadesModal(){
   if(!unidades.length){ box.innerHTML='<div class="muted" style="padding:6px 0 8px">Nenhuma unidade cadastrada ainda.</div>'; return; }
   const at=unidadeAtiva();
   box.innerHTML=unidades.map(u=>'<div class="unid-card'+(at&&u.id===at.id?' ativa':'')+'">'+
-    '<div class="lg">'+(u.logo?'<img src="'+u.logo+'" alt="">':'sem logo')+'</div>'+
+    '<div class="lg">'+(u.logo?'<img src="'+esc(u.logo)+'" alt="">':'sem logo')+'</div>'+
     '<div class="tx"><b>'+esc(u.nome)+'</b><span>'+
       esc([u.cnes?'CNES '+u.cnes:'CNES não informado', [u.municipio,u.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '))+'</span></div>'+
-    '<div class="ac">'+(at&&u.id===at.id?'<span class="tagc">ativa</span>':'<button class="btn ghost sm" data-ativar="'+u.id+'">Usar hoje</button>')+
-      '<button class="btn ghost sm" data-editar="'+u.id+'">Editar</button>'+
-      '<button class="x" data-remover="'+u.id+'" title="Remover">✕</button></div></div>').join('');
+    '<div class="ac">'+(at&&u.id===at.id?'<span class="tagc">ativa</span>':'<button class="btn ghost sm" data-ativar="'+esc(u.id)+'">Usar hoje</button>')+
+      '<button class="btn ghost sm" data-editar="'+esc(u.id)+'">Editar</button>'+
+      '<button class="x" data-remover="'+esc(u.id)+'" title="Remover">✕</button></div></div>').join('');
   box.querySelectorAll('[data-ativar]').forEach(b=>b.onclick=async()=>{ if(await definirUnidadeAtiva(b.dataset.ativar)) renderUnidadesModal(); });
   box.querySelectorAll('[data-editar]').forEach(b=>b.onclick=()=>abrirUnidade(unidades.find(u=>u.id===b.dataset.editar)));
   box.querySelectorAll('[data-remover]').forEach(b=>b.onclick=async()=>{
@@ -2286,8 +2334,8 @@ function abrirUnidade(u){
   mostrarLogo(u&&u.logo);
   openM('m-unid');
 }
-function mostrarLogo(src){ $('un-logo-prev').innerHTML=src?'<img src="'+src+'" alt="">':'sem logotipo'; }
-function mostrarLogo2(src){ $('un-logo2-prev').innerHTML=src?'<img src="'+src+'" alt="">':'sem logotipo'; }
+function mostrarLogo(src){ $('un-logo-prev').innerHTML=src?'<img src="'+esc(src)+'" alt="">':'sem logotipo'; }
+function mostrarLogo2(src){ $('un-logo2-prev').innerHTML=src?'<img src="'+esc(src)+'" alt="">':'sem logotipo'; }
 // reduz a imagem antes de guardar: um logotipo de 3 MB vira algumas dezenas de KB
 async function reduzirImagem(file){
   const url=await new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=()=>ko(r.error); r.readAsDataURL(file); });
@@ -2412,9 +2460,9 @@ function montarDoc(titulo,itens,obs,quando,unidadeId,extra){
 function umaGuiaHTML(d){
   const un=d.un;
   const cab=un?'<div class="pr-hd">'+
-      '<div class="pr-logo">'+(un.logo?'<img src="'+un.logo+'" alt="">':'')+'</div>'+
+      '<div class="pr-logo">'+(un.logo?'<img src="'+esc(un.logo)+'" alt="">':'')+'</div>'+
       '<div class="pr-un">'+blocoCabecalho(un).map(x=>'<div class="pr-'+x.k+'">'+esc(x.t)+'</div>').join('')+'</div>'+
-      '<div class="pr-logo dir">'+(un.logo2?'<img src="'+un.logo2+'" alt="">':'')+'</div></div>'
+      '<div class="pr-logo dir">'+(un.logo2?'<img src="'+esc(un.logo2)+'" alt="">':'')+'</div></div>'
     :'<div class="pr-hd vazio"></div>';
   const grade=c=>'<div class="pr-pac">'+c.map(x=>'<div class="c s'+(x[2]||1)+'"><span>'+esc(x[0])+'</span><b>'+(x[1]?esc(x[1]):'<i class="pr-branco"></i>')+'</b></div>').join('')+'</div>';
   const pac=(d.quadros||[{t:'',c:d.pac}]).map(q=>(q.t?'<div class="pr-qt">'+esc(q.t)+'</div>':'')+grade(q.c)).join('');
@@ -2440,17 +2488,19 @@ function umaGuiaHTML(d){
     pac+'<div class="pr-corpo">'+corpo+'</div>'+obs+'<div class="pr-fim">'+(d.semAssinatura?'':(d.fecho?'<p class="pr-par pr-fecho">'+esc(d.fecho)+'</p>':'')+ass)+ft+'</div>';
 }
 // Aceita uma guia ou uma lista delas; cada guia sai numa folha.
+function auditarDoc(d){ const l=Array.isArray(d)?d.filter(Boolean):[d]; if(l[0]) registrarAcesso('documento',pacienteSel&&pacienteSel.id,String(l[0].titulo||'').slice(0,80)+(l.length>1?' (+'+(l.length-1)+')':'')); }
 async function imprimirDoc(d){
   if(!d) return;
   const docs=Array.isArray(d)?d.filter(Boolean):[d];
   if(!docs.length) return;
+  auditarDoc(docs);
   await prepararVerificacoes(docs);
   $('print-area').innerHTML=docs.map((x,i)=>
     '<div class="pr-folha"'+(i<docs.length-1?' style="page-break-after:always"':'')+'>'+umaGuiaHTML(x)+'</div>').join('');
   window.print();
 }
 // ---------- PDF (arquivo de verdade; é o que pode ser assinado digitalmente) ----------
-const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...','≥':'>=','≤':'<=','₂':'2','→':'->','←':'<-','↑':'^','↓':'v','✓':'ok',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:'?');};
+const WIN=c=>{const m={'—':'-','–':'-','‘':"'",'’':"'",'“':'"','”':'"','…':'...','≥':'>=','≤':'<=','₂':'2','→':'->','←':'<-','↑':'^','↓':'v','✓':'ok','μ':'µ','≈':'~','≠':'!=','•':'-','‑':'-','∙':'.',' ':' '}; return m[c]!==undefined?m[c]:(c.charCodeAt(0)<256?c:(window.__perdaGlifo=(window.__perdaGlifo||0)+1,'?'));};
 const limpar=t=>String(t==null?'':t).split('').map(WIN).join('');
 async function gerarPDF(entrada){
   if(!entrada) return null;
@@ -2458,6 +2508,7 @@ async function gerarPDF(entrada){
   if(!docs.length) return null;
   if(!window.PDFLib){ toast('Biblioteca de PDF não carregou; recarregue a página',true); return null; }
   const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  window.__perdaGlifo=0;
   const pdf=await PDFDocument.create();
   pdf.setTitle(limpar(docs[0].titulo)); pdf.setCreator('PEP Clínico'); pdf.setProducer('PEP Clínico');
   const F=await pdf.embedFont(StandardFonts.Helvetica), FB=await pdf.embedFont(StandardFonts.HelveticaBold),
@@ -2678,6 +2729,7 @@ async function gerarPDF(entrada){
       const cap='autenticidade', cw=F.widthOfTextAtSize(cap,5.5);
       pg.drawText(cap,{x:qx-cw-4,y:qy+qs/2-2,size:5.5,font:F,color:CLARO}); }
   });
+  if(window.__perdaGlifo){ toast('Atenção: '+window.__perdaGlifo+' caractere(s) especial(is) não existem na fonte do PDF e saíram como "?". Confira o documento antes de entregar.',true); window.__perdaGlifo=0; }
   return pdf.save();
 }
 
@@ -2696,7 +2748,7 @@ function carregarQRLib(){
   if(window.qrcode) return Promise.resolve();
   if(qrLibLoad) return qrLibLoad;
   qrLibLoad=new Promise((ok,ko)=>{ const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+    s.src='./vendor/qrcode.js';
     s.onload=()=>window.qrcode?ok():ko(new Error('qr')); s.onerror=()=>ko(new Error('qr')); document.head.appendChild(s); });
   return qrLibLoad;
 }
@@ -2715,7 +2767,7 @@ function resumoDoc(d){
   if(d.grupos&&d.grupos.length) t=d.grupos.flatMap(g=>(g.itens||[]).map(it=>it.n+(it.q?' — '+it.q:'')+(it.d?' ('+it.d+')':''))).join('\n');
   else if(d.paragrafos&&d.paragrafos.length) t=d.paragrafos.join('\n\n');
   else if(d.secoes&&d.secoes.length) t=d.secoes.map(s=>(s.t?s.t+': ':'')+s.txt).join('\n');
-  return t.slice(0,1500);
+  return t.length>1500?t.slice(0,1470)+' […resumo; o documento impresso tem o texto completo]':t;
 }
 async function prepararVerificacao(d){
   if(typeof VERIFICA_URL==='undefined'||!VERIFICA_URL||!d||!d.verificavel||d.qrDataUrl||!navigator.onLine) return;
@@ -2723,7 +2775,7 @@ async function prepararVerificacao(d){
   const token=tokenVerif();
   const reg={ token, tipo:d.tituloPrinc||d.titulo||'Documento', paciente:p.nome||null, medico:pr.nome||null,
     crm: pr.crm?('CRM'+(pr.uf_crm?'-'+pr.uf_crm:'')+' '+pr.crm):null,
-    data:(d.quando?String(d.quando).slice(0,10):new Date().toISOString().slice(0,10)), conteudo:resumoDoc(d) };
+    data:dataISOde(d.quando||new Date()), conteudo:resumoDoc(d) };
   try{
     const {error}=await sb.from('pep_verificacoes').insert(reg);
     if(error){ if(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))) toast('Para o QR de verificação, rode o verificacao_schema.sql no Supabase',true); return; }
@@ -2746,6 +2798,8 @@ async function marcarAssinado(entrada){
 }
 
 async function baixarPDF(d){
+  if(!d) return;
+  auditarDoc(d);
   await prepararVerificacoes(d);
   let bytes=await gerarPDF(d); if(!bytes) return;
   let assinado=false;
@@ -2823,7 +2877,7 @@ function porExtenso(n,fem){
 }
 // unidades femininas: "uma cápsula", "duas ampolas", "duzentas gotas"
 const FEMININOS=/^(capsula|caneta|ampola|gota|unidade|drageia|pastilha|bisnaga|seringa|caixa|cartela|bolsa|dose|lata|flaconete)/;
-const qtdExtenso=q=>{ const m=String(q||'').match(/^\s*(\d{1,4})\b\s*(.*)$/); if(!m||/\(/.test(q)) return q||'';
+const qtdExtenso=q=>{ const m=String(q||'').match(/^\s*(\d{1,4})(?![\d.,])\s*(.*)$/); if(!m||/\(/.test(q)) return q||'';
   return m[1]+' ('+porExtenso(+m[1],FEMININOS.test(semAc(m[2])))+')'+(m[2]?' '+m[2]:''); };
 
 function itensReceita(meds,extenso){
@@ -2968,7 +3022,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-19.8 · selo de assinatura no rodapé';
+const VERSAO='2026-11-24.1 · correções da auditoria';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3145,7 +3199,8 @@ async function repetirUltima(){
   const n=prescItens.length, m=examItens.length;
   if(!n&&!m){ toast('O atendimento anterior não tinha receita nem exames',true); return; }
   renderMain();
-  toast('Trazido de '+dataBR(ats[0].data_atendimento)+': '+n+' medicamento(s), '+m+' exame(s)');
+  const cfl=prescItens.filter(x=>avisosPara(x.medicamento).some(a=>a.t==='alergia'));
+  toast(cfl.length?'⚠ Alergia registrada coincide com: '+cfl.map(x=>x.medicamento).join('; ')+' — revise a prescrição':'Trazido de '+dataBR(ats[0].data_atendimento)+': '+n+' medicamento(s), '+m+' exame(s)',cfl.length>0);
 }
 
 function renderAtendimento(c){
@@ -3165,7 +3220,7 @@ function renderAtendimento(c){
   const bMod=el('button','btn ghost','Modelos de texto'); bMod.onclick=abrirModelos; head.appendChild(bMod);
   const bProto=el('button','btn ghost','Protocolos'); bProto.title='Condutas por condição que preenchem o Plano'; bProto.onclick=abrirProtocolos; head.appendChild(bProto);
   if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
-  const bVolta=el('button','btn ghost','← Voltar'); bVolta.onclick=()=>{ atendAtual=null; renderMain(); }; head.appendChild(bVolta);
+  const bVolta=el('button','btn ghost','← Voltar'); bVolta.title='Sai guardando o que foi digitado como rascunho'; bVolta.onclick=voltarDoAtendimento; head.appendChild(bVolta);
   c.appendChild(head);
   if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
 
@@ -3198,9 +3253,9 @@ function renderAtendimento(c){
       <div class="field"><textarea id="f-a" class="f" placeholder="Avaliação / raciocínio clínico…"></textarea></div>
       <label style="margin-bottom:6px">Problemas avaliados nesta consulta</label>
       <div id="f-probs">`+
-        (ativos.length ? ativos.map(pb=>'<div class="chkp"><input type="checkbox" value="'+pb.id+'"><span>'+esc(pb.descricao)+
+        (ativos.length ? ativos.map(pb=>'<div class="chkp"><input type="checkbox" value="'+esc(pb.id)+'"><span>'+esc(pb.descricao)+
             (pb.cid10?' <span class="tagc">'+esc(pb.cid10)+'</span>':'')+'</span>'+
-            '<button class="x" data-rm="'+pb.id+'" data-desc="'+esc(pb.descricao)+'" title="Remover da lista do paciente">✕</button></div>').join('')
+            '<button class="x" data-rm="'+esc(pb.id)+'" data-desc="'+esc(pb.descricao)+'" title="Remover da lista do paciente">✕</button></div>').join('')
           : '<div class="muted">Nenhum problema ativo. Use o botão abaixo para registrar.</div>')+`
       </div>
       <div class="muted" style="margin-top:4px">Marque os que você está tratando hoje. O ✕ apaga o problema da lista do paciente.</div>
@@ -3321,13 +3376,13 @@ function renderAtendimento(c){
   $('open-exam').onclick=()=>{ renderExChips(); exDiag(''); openM('m-exam'); };
   $('open-presc').onclick=()=> openM('m-presc');
   $('f-addprob').onclick=()=> openM('m-problema');
-  $('btn-cancelar').onclick=()=>{ atendAtual=null; renderMain(); };
+  $('btn-cancelar').onclick=cancelarAtendimento;
   $('btn-finalizar').onclick=finalizar;
   c.querySelectorAll('#f-probs input').forEach(cb=>{
     cb.checked=probSel.has(cb.value);
     cb.onchange=()=>{ cb.checked?probSel.add(cb.value):probSel.delete(cb.value); };
   });
-  if(exameCab){ $('ex-cid').value=exameCab.cid10||''; $('ex-just').value=exameCab.justificativa||''; }
+  $('ex-cid').value=exameCab?(exameCab.cid10||''):''; $('ex-just').value=exameCab?(exameCab.justificativa||''):'';
   if(atestado){ $('at-tipo').value=atestado.tipo||''; $('at-dias').value=atestado.dias||''; $('at-cid').value=atestado.cid10||''; $('at-obs').value=atestado.texto||''; }
   if(relatorio) Object.entries(REL_CAMPOS).forEach(([id,k])=>{ if(relatorio[k]!=null) $(id).value=relatorio[k]; });
   $('rl-tipo').onchange=rlVisivel; rlVisivel();
@@ -3338,7 +3393,7 @@ function renderAtendimento(c){
   renderEncTable();
   // retorno
   if(!retornoOK){ $('rt-semcoluna').classList.remove('hidden'); ['rt-prazo','rt-data','rt-motivo'].forEach(i=>$(i).disabled=true); }
-  $('rt-prazo').onchange=()=>{ const v=$('rt-prazo').value; if(/^\d+$/.test(v)){ const d=new Date(); d.setDate(d.getDate()+(+v)); $('rt-data').value=d.toISOString().slice(0,10); } else if(!v) $('rt-data').value=''; };
+  $('rt-prazo').onchange=()=>{ const v=$('rt-prazo').value; if(/^\d+$/.test(v)){ const d=new Date(); d.setDate(d.getDate()+(+v)); $('rt-data').value=isoLocal(d); } else if(!v) $('rt-data').value=''; };
   $('rt-data').onchange=()=>{ $('rt-prazo').value=$('rt-data').value?'data':''; };
   if(atendAtual&&atendAtual.dados&&atendAtual.dados.retorno_previsto){ $('rt-prazo').value='data'; $('rt-data').value=atendAtual.dados.retorno_previsto; $('rt-motivo').value=atendAtual.dados.retorno_motivo||''; }
   carregarRegimeAnterior();
@@ -3360,6 +3415,7 @@ function renderAtendimento(c){
     if(await removerProblema(b.dataset.rm,b.dataset.desc)) renderMain(); });
   preencherCreatinina();
   renderExTable(); renderRxTable(); renderClCr(); renderAvisosRx();
+  iniciarRascunho();
 }
 
 // ---------- busca de exames (SIGTAP via RPC) ----------
@@ -3423,7 +3479,7 @@ function calcClCr(){
   const p=pacienteSel||{};
   const cr=parseFloat(String(($('f-creat')||{}).value||'').replace(',','.'));
   const peso=parseFloat(String(($('f-peso')||{}).value||'').replace(',','.'));
-  const anos=p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null;
+  const anos=p.data_nascimento?anosCompletos(p.data_nascimento):null;
   if(!(cr>0)||!(peso>0)||!(anos>0)) return null;
   const fem=/^f/i.test(p.sexo||'');
   const v=((140-anos)*peso)/(72*cr)*(fem?0.85:1);
@@ -3450,14 +3506,37 @@ function renderClCr(){
 // Confere o nome do medicamento contra as alergias registradas e contra a
 // tabela de alertas. É casamento por trecho do NOME — não conhece princípio
 // ativo nem reatividade cruzada. Serve de lembrete, não de barreira.
+// Alergia: o texto livre da substância vira palavras-chave (palavras de 3+ letras, sem as de enchimento) e,
+// para as famílias mais comuns, a lista de fármacos da classe (alergia a "penicilina" avisa em amoxicilina).
+// Continua sendo um lembrete por NOME, não uma barreira: não cobre toda reatividade cruzada.
+const STOPAL=new Set('alergia alergias alergico alergica reacao reacoes historia paciente referida refere relata relato grave leve moderada moderado urticaria angioedema anafilaxia anafilatico rash edema choque dispneia prurido cutanea cutaneo exantema nenhuma nenhum conhecida conhecidas desconhecida para com sem que por uso medicamento medicamentos droga drogas remedio remedios apos tomar tomou usar depois quando aos das dos nas nos ate ele ela'.split(' '));
+const CLASSES_AL=[
+ ['penicilinas',/penicilin|amoxicilin|ampicilin|oxacilin|piperacilin|beta-?lact/,['amoxicilina','ampicilina','penicilina','benzilpenicilina','oxacilina','piperacilina','clavulanato']],
+ ['dipirona',/dipiron|metamizol|novalgina/,['dipirona','metamizol','novalgina']],
+ ['AAS/salicilatos',/\baas\b|aspirin|acetilsalicil/,['aas','aspirina','acetilsalicilico']],
+ ['sulfas',/sulfa|sulfonamid|bactrim/,['sulfametoxazol','sulfadiazina','trimetoprima','sulfa']],
+ ['AINEs',/\bain(e|es|s)?\b|anti-?inflamat|diclofen|ibuprofen|naproxen|cetoprofen|nimesulid|meloxicam|piroxicam/,['diclofenaco','ibuprofeno','naproxeno','cetoprofeno','nimesulida','meloxicam','piroxicam','aas','acetilsalicilico']],
+ ['cefalosporinas',/cefalospor|cefale|ceftriax|cefepim|cefalotin|cefazol|cefuroxim/,['cefalexina','ceftriaxona','cefepime','cefalotina','cefazolina','cefuroxima']],
+ ['macrolídeos',/macrol|azitromicin|claritromicin|eritromicin/,['azitromicina','claritromicina','eritromicina']],
+ ['quinolonas',/quinolon|ciprofloxacin|levofloxacin|norfloxacin/,['ciprofloxacino','levofloxacino','norfloxacino','ofloxacino']]];
+const reEscAl=t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function conflitoAlergia(med,substancia){
+  const m=semAc(med), a=semAc(substancia), achou=new Set();
+  if(!a.trim()||/^\s*(nenhum|sem\s+alerg|nega|nao\s+(ha|tem|refere|possui))/.test(a)) return [];
+  for(const w of a.split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!STOPAL.has(w)))
+    if(new RegExp('(^|[^a-z0-9])'+reEscAl(w)).test(m)) achou.add(w);
+  for(const [nome,re,lista] of CLASSES_AL)
+    if(re.test(a)&&lista.some(x=>new RegExp('(^|[^a-z0-9])'+reEscAl(x)).test(m))) achou.add(nome);
+  return [...achou];
+}
 function avisosPara(nome){
   const n=semAc(nome), out=[];
-  (alergias||[]).forEach(a=>{ const sub=semAc(a.substancia);
-    if(sub && sub.length>3 && (n.includes(sub)||sub.includes(n)))
-      out.push({t:'alergia', m:'ALERGIA registrada: '+a.substancia+(a.reacao?' ('+a.reacao+')':'')}); });
+  (alergias||[]).forEach(a=>{ const sub=semAc(a.substancia), hit=conflitoAlergia(nome,a.substancia);
+    if(hit.length || (sub && sub.length>3 && (n.includes(sub)||sub.includes(n))))
+      out.push({t:'alergia', m:'ALERGIA registrada: '+a.substancia+(a.reacao?' ('+a.reacao+')':'')+(hit.length?' — coincide com: '+hit.join(', '):'')}); });
   const c=calcClCr();
   const p=pacienteSel||{};
-  const anos=p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null;
+  const anos=p.data_nascimento?anosCompletos(p.data_nascimento):null;
   alertasMed.forEach(al=>{
     if(!n.includes(semAc(al.padrao))) return;
     if(al.tipo==='idoso'){ if(anos!=null && anos>=(al.idade_min||65)) out.push({t:'idoso', m:al.mensagem}); }
@@ -3485,7 +3564,7 @@ function renderAvisosRx(){
   // Sem aviso: em vez de ficar mudo, diz por quê. Silêncio ambíguo é pior
   // que aviso nenhum — não dá para saber se é "tudo certo" ou "não funciona".
   const p=pacienteSel||{};
-  const anos=p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null;
+  const anos=p.data_nascimento?anosCompletos(p.data_nascimento):null;
   const c=calcClCr();
   const faltas=[];
   if(alertasErro) faltas.push('a tabela de alertas não carregou ('+alertasErro+') — falta rodar o apoio_prescricao_schema.sql');
@@ -3548,9 +3627,9 @@ $('pr-add').onclick=()=>{
 
 // ---------- leitura em lote (o Supabase devolve no máximo 1000 linhas por vez) ----------
 async function todos(tab,cols){
-  const out=[];
+  const out=[], pk=tab==='pep_profissional'?'user_id':'id';
   for(let i=0;;i+=1000){
-    const {data,error}=await sb.from(tab).select(cols||'*').range(i,i+999);
+    const {data,error}=await sb.from(tab).select(cols||'*').order(pk,{ascending:true}).range(i,i+999);
     if(error) throw error;
     out.push(...(data||[])); if(!data||data.length<1000) break;
   }
@@ -3584,7 +3663,7 @@ async function dadosBusca(){
   for(const v of vacs){ const r=idx.get(v.paciente_id); if(r) r.vac.push({imuno:v.imuno,data:v.data}); }
   const linhas=[];
   for(const r of idx.values()){
-    const anos=r.p.data_nascimento?Math.floor(diasDesde(r.p.data_nascimento)/365.25):null;
+    const anos=r.p.data_nascimento?anosCompletos(r.p.data_nascimento):null;
     r.idoso=anos!=null&&anos>=BA.idade_idoso;
     if(!r.has&&!r.dm&&!r.idoso) continue;
     const pend=[], dc=diasDesde(r.ultCons);
@@ -3593,7 +3672,7 @@ async function dadosBusca(){
     else venc('Consulta',dc,BA.consulta_idoso);
     if(r.has){ venc('PA',diasDesde(r.ultPA),BA.pa);
       if(r.pa&&(r.pa[0]>=140||r.pa[1]>=90)) pend.push({t:'Última PA '+r.pa[0]+'/'+r.pa[1],d:0}); }
-    if(r.retorno&&r.retorno<new Date().toISOString().slice(0,10)) pend.push({t:'Retorno atrasado desde '+dataBRsimples(r.retorno),d:diasDesde(r.retorno)});
+    if(r.retorno&&r.retorno<hojeISO()) pend.push({t:'Retorno atrasado desde '+dataBRsimples(r.retorno),d:diasDesde(r.retorno)});
     if(r.dm){ venc('HbA1c',diasDesde(r.ex.hba1c),BA.hba1c); venc('Microalbuminúria',diasDesde(r.ex.microalb),BA.microalb); }
     if(r.has||r.dm) venc('Creatinina',diasDesde(r.ex.creatinina),BA.creatinina);
     if(vacinasOK){ const pv=pendenciasVacina(r.vac,{idade:anos,has:r.has,dm:r.dm}).find(x=>x.imuno==='influenza');
@@ -3612,7 +3691,7 @@ async function dadosPainel(){
   let vacs=[]; if(vacinasOK){ try{ vacs=await todos('pep_vacinas','paciente_id,imuno,data'); }catch(e){ vacs=[]; } }
   if(!analitos.length) await carregarAnalitos();
   const idx=new Map(pacs.map(p=>[p.id,{p,has:false,dm:false,idoso:false,ultPA:null,pa:null,ex:{},hba1c:null,ultAt:null,retorno:null,vac:[]}]));
-  pacs.forEach(p=>{ const r=idx.get(p.id); r.anos=p.data_nascimento?Math.floor(diasDesde(p.data_nascimento)/365.25):null; r.idoso=r.anos!=null&&r.anos>=BA.idade_idoso; });
+  pacs.forEach(p=>{ const r=idx.get(p.id); r.anos=p.data_nascimento?anosCompletos(p.data_nascimento):null; r.idoso=r.anos!=null&&r.anos>=BA.idade_idoso; });
   for(const pb of probs){ const r=idx.get(pb.paciente_id); if(!r||pb.situacao!=='ativo') continue;
     const cid=String(pb.cid10||'').toUpperCase(), d=semAc(pb.descricao);
     if(/^I1[0-5]/.test(cid)||/hipertens|\bhas\b/.test(d)) r.has=true;
@@ -3623,7 +3702,7 @@ async function dadosPainel(){
   for(const x of res){ const r=idx.get(x.paciente_id); if(!r) continue; const k=x.analito||analitoDe(x.exame||''); if(!k) continue;
     if(!r.ex[k]||x.data_coleta>r.ex[k]){ r.ex[k]=x.data_coleta; if(k==='hba1c'&&x.valor!=null) r.hba1c=Number(x.valor); } }
   for(const v of vacs){ const r=idx.get(v.paciente_id); if(r) r.vac.push({imuno:v.imuno,data:v.data}); }
-  const L=[...idx.values()], hoje=new Date().toISOString().slice(0,10);
+  const L=[...idx.values()], hoje=hojeISO();
   const has=L.filter(r=>r.has), dm=L.filter(r=>r.dm), idoso=L.filter(r=>r.idoso), cron=L.filter(r=>r.has||r.dm);
   const pct=(a,b)=>b?Math.round(a/b*100):0;
   const paOk=has.filter(r=>r.pa&&r.pa[0]<140&&r.pa[1]<90).length;
@@ -3703,7 +3782,7 @@ async function renderBuscaAtiva(c){
   const tabela=()=>filtrar().map(x=>[x.p.nome,x.anos??'',x.p.telefone||'',[x.has?'HAS':'',x.dm?'DM':'',x.idoso?'idoso':''].filter(Boolean).join(' '),
     x.pend.map(pp=>pp.t).join('; ')||'em dia',x.ultCons?dataBRsimples(x.ultCons):'nunca']);
   $('ba-csv').onclick=()=>baixarTexto(paraCSV([['Paciente','Idade','Telefone','Grupos','Pendências','Última consulta'],...tabela()]),
-    'busca-ativa-'+new Date().toISOString().slice(0,10)+'.csv','text/csv');
+    'busca-ativa-'+hojeISO()+'.csv','text/csv');
   $('ba-imp').onclick=()=>{ const t=tabela();
     $('print-area').innerHTML='<div style="font:10pt Inter,Arial,sans-serif;color:#13293f"><h2 style="margin:0 0 4px">Busca ativa</h2><div style="color:#5e7490;margin-bottom:10px">'+
       esc(dataExtenso(new Date().toISOString()))+' · '+t.length+' paciente(s)</div><table style="width:100%;border-collapse:collapse;font-size:9pt">'+
@@ -3714,7 +3793,7 @@ async function renderBuscaAtiva(c){
 
 // ---------- arquivos ----------
 function paraCSV(linhas){
-  const q=v=>{ const t=v==null?'':typeof v==='object'?JSON.stringify(v):String(v); return /[;"\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t; };
+  const q=v=>{ let t=v==null?'':typeof v==='object'?JSON.stringify(v):String(v); if(typeof v==='string'&&/^[=+\-@\t\r]/.test(t)) t="'"+t; return /[;"\n\r]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t; };
   return '﻿'+linhas.map(l=>l.map(q).join(';')).join('\r\n');   // ; e BOM: abre certo no Excel em português
 }
 function baixarBlob(blob,nome){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=nome;
@@ -3837,12 +3916,16 @@ async function abrirRenovaReceita(){
   openM('m-renova');
 }
 function medsRenovaSel(){ return [...document.querySelectorAll('#rn-lista input[type=checkbox]:checked')].map(c=>renovaMeds[+c.dataset.i]).filter(Boolean); }
+function confirmaAlergia(meds){ const cf=meds.filter(m=>avisosPara(m.medicamento).some(a=>a.t==='alergia'));
+  return !cf.length||confirm('ATENÇÃO — possível conflito com alergia registrada em:\n• '+cf.map(m=>m.medicamento).join('\n• ')+'\n\nEmitir mesmo assim?'); }
 function receitaRenova(){ const sel=medsRenovaSel(); if(!sel.length){ toast('Selecione ao menos um medicamento',true); return null; }
-  return docReceita(sel, new Date().toISOString().slice(0,10), renovaUnid, {separar:$('rn-sep').checked}); }
+  if(!confirmaAlergia(sel)) return null;
+  return docReceita(sel, hojeISO(), renovaUnid, {separar:$('rn-sep').checked}); }
 function docListaMedicamentos(meds,unidadeId){
   if(!meds||!meds.length){ toast('Selecione ao menos um medicamento',true); return null; }
+  if(!confirmaAlergia(meds)) return null;
   const {itens,grupos}=itensReceita(meds,false);
-  const d=montarDoc('Lista de medicamentos em uso', itens, [], new Date().toISOString().slice(0,10), unidadeId, {grupos, verificavel:true});
+  const d=montarDoc('Lista de medicamentos em uso', itens, [], hojeISO(), unidadeId, {grupos, verificavel:true});
   if(!d) return null;
   d.subtitulo='Para o paciente e o cuidador';
   d.obsTitulo='Orientações';
@@ -4018,7 +4101,7 @@ async function renderRastreamentos(card){
 function abrirRegistroRast(chave,item){
   if(!rastreamentosOK){ toast('Rode o rastreamentos_schema.sql no Supabase',true); return; }
   $('rs-tit').textContent=item?item.nome:chave; $('rs-chave').value=chave;
-  $('rs-data').value=new Date().toISOString().slice(0,10); $('rs-res').value=''; $('rs-obs').value='';
+  $('rs-data').value=hojeISO(); $('rs-res').value=''; $('rs-obs').value='';
   openM('m-rast');
 }
 $('rs-save').onclick=async()=>{
@@ -4040,7 +4123,7 @@ $('rn-lista-pdf').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),ren
 // ========== melhorias 17.11 — pendências, protocolos, vitais, prontuário PDF, orientações ==========
 // ---------- pendências deste paciente ----------
 function pendenciasClinicas(f,rasts,anos,fem){
-  const out=[], br=dataBRsimples, hoje=new Date().toISOString().slice(0,10);
+  const out=[], br=dataBRsimples, hoje=hojeISO();
   const add=(grau,txt)=>out.push({grau,txt});
   const ult=f.ats&&f.ats[0];
   if(ult&&ult.retorno_previsto&&ult.retorno_previsto<hoje) add('alto','Retorno atrasado — previsto para '+br(ult.retorno_previsto)+(ult.retorno_motivo?' ('+ult.retorno_motivo+')':''));
@@ -4223,7 +4306,7 @@ function pendenciasVacina(regs,ctx){
 let vacEditandoPac=null;
 function abrirVacina(){
   $('va-imuno').innerHTML=VACINAS.map(v=>'<option value="'+v.chave+'">'+esc(v.nome)+'</option>').join('');
-  $('va-data').value=new Date().toISOString().slice(0,10);
+  $('va-data').value=hojeISO();
   ['va-dose','va-lote','va-obs','va-outra'].forEach(i=>$(i).value='');
   $('va-outra-wrap').style.display='none';
   openM('m-vacina');
@@ -4259,7 +4342,7 @@ async function renderVacinas(card){
   else html+='<table><tbody>'+regs.map(v=>'<tr><td><b>'+esc(VAC_NOME[v.imuno]||v.imuno)+'</b>'+
     (v.dose?' · '+esc(v.dose):'')+'<div class="muted" style="font-size:12px">'+esc(dataBRsimples(v.data))+
     [v.lote?'lote '+v.lote:'',v.observacao||''].filter(Boolean).map(x=>' · '+esc(x)).join('')+'</div></td>'+
-    '<td style="text-align:right"><button class="x" data-rv="'+v.id+'" title="Remover">✕</button></td></tr>').join('')+'</tbody></table>';
+    '<td style="text-align:right"><button class="x" data-rv="'+esc(v.id)+'" title="Remover">✕</button></td></tr>').join('')+'</tbody></table>';
   html+='<div class="muted" style="font-size:11.5px;margin-top:8px">Apoio ao calendário do PNI — confira as indicações por condição e a campanha vigente.</div>';
   box.innerHTML=html;
   box.querySelectorAll('[data-rv]').forEach(b=>b.onclick=async()=>{
@@ -4289,8 +4372,8 @@ function dataURLparaBlob(u){
   return new Blob([arr],{type:mime});
 }
 // ---- leitura de resultados de laudos em PDF (texto), local, sem enviar nada ----
-const PDFJS_SRC='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const PDFJS_WORKER='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_SRC='./vendor/pdf.min.js';
+const PDFJS_WORKER='./vendor/pdf.worker.min.js';
 let pdfjsPronto=null;
 function carregarPdfjs(){
   if(pdfjsPronto) return pdfjsPronto;
@@ -4306,7 +4389,7 @@ function carregarPdfjs(){
 function dataURLparaBytes(u){ const i=u.indexOf(','), bin=atob(u.slice(i+1)), a=new Uint8Array(bin.length); for(let j=0;j<bin.length;j++) a[j]=bin.charCodeAt(j); return a; }
 async function extrairTextoPDF(dataURL){
   const lib=await carregarPdfjs();
-  const pdf=await lib.getDocument({data:dataURLparaBytes(dataURL)}).promise;
+  const pdf=await lib.getDocument({data:dataURLparaBytes(dataURL),isEvalSupported:false,enableXfa:false}).promise;
   const linhas=[];
   for(let pg=1;pg<=pdf.numPages;pg++){
     const page=await pdf.getPage(pg), tc=await page.getTextContent(), porY=new Map();
@@ -4350,7 +4433,7 @@ let exContexto={atendimentoId:null}, exAchados=[];
 function abrirRevisaoLaudo(linhas,nomeArquivo,atendimentoId,viaOCR){
   const achados=casarResultadosLaudo(linhas);
   exContexto={atendimentoId:atendimentoId||null};
-  $('ex-data').value=acharDataLaudo(linhas)||new Date().toISOString().slice(0,10);
+  $('ex-data').value=acharDataLaudo(linhas)||hojeISO();
   $('ex-info').innerHTML=(viaOCR?'<b style="color:#8a6414">Leitura por OCR (foto) — confira com atenção redobrada, pode errar mais.</b> ':'')+
     'Confira os valores contra o laudo'+(nomeArquivo?' "'+esc(nomeArquivo)+'"':'')+'. '+achados.length+' valor(es) reconhecido(s).';
   const tb=$('ex-tbody'); tb.innerHTML=achados.map((r,i)=>'<tr>'+
@@ -4455,10 +4538,10 @@ function renderAnexos(card,opc){
       const img=/^image\//i.test(x.mime||'')||/\.(jpe?g|png|webp|gif)$/i.test(x.nome_arquivo||'');
       return '<tr><td style="width:30px">'+(pdf?'📄':'🖼️')+'</td><td><b>'+esc(TIPOS_ANEXO[x.tipo]||x.tipo)+'</b>'+
         '<div class="muted" style="font-size:12px">'+esc(x.nome_arquivo)+' · '+Math.max(1,Math.round((x.tamanho||0)/1024))+' KB · '+esc(dataHoraBR(x.criado_em))+'</div></td>'+
-        '<td style="white-space:nowrap;text-align:right">'+(pdf?'<button class="btn ghost sm" data-ex="'+x.id+'" title="Ler os valores do laudo (PDF com texto)">Ler exames</button> ':'')+
-        (img?'<button class="btn ghost sm" data-ocr="'+x.id+'" title="Ler os valores da foto do laudo (OCR, no aparelho)">Ler exames (OCR)</button> ':'')+
-        '<button class="btn ghost sm" data-ver="'+x.id+'">Ver</button> '+
-        '<button class="btn ghost sm" data-bx="'+x.id+'">Baixar</button> <button class="btn ghost sm" data-rx="'+x.id+'">Excluir</button></td></tr>';
+        '<td style="white-space:nowrap;text-align:right">'+(pdf?'<button class="btn ghost sm" data-ex="'+esc(x.id)+'" title="Ler os valores do laudo (PDF com texto)">Ler exames</button> ':'')+
+        (img?'<button class="btn ghost sm" data-ocr="'+esc(x.id)+'" title="Ler os valores da foto do laudo (OCR, no aparelho)">Ler exames (OCR)</button> ':'')+
+        '<button class="btn ghost sm" data-ver="'+esc(x.id)+'">Ver</button> '+
+        '<button class="btn ghost sm" data-bx="'+esc(x.id)+'">Baixar</button> <button class="btn ghost sm" data-rx="'+esc(x.id)+'">Excluir</button></td></tr>';
     }).join('')+'</tbody></table>';
     corpo.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>lerExamesAnexo(b.dataset.ex,atId));
     corpo.querySelectorAll('[data-ocr]').forEach(b=>b.onclick=()=>lerExamesImagem(b.dataset.ocr,atId,b));
@@ -4656,7 +4739,7 @@ $('es-salvar').onclick=async()=>{
   const d=ESCALAS[esTipo], escore=calcularEscala(esTipo,esResp);
   const interp=interpretarEscala(esTipo,escore,{escolaridade:esEscol});
   const reg={paciente_id:pacienteSel.id, atendimento_id:esCtx.atendimentoId||null, tipo:esTipo, escore,
-    maximo:d.max||null, interpretacao:interp.texto, data:new Date().toISOString().slice(0,10),
+    maximo:d.max||null, interpretacao:interp.texto, data:hojeISO(),
     detalhe:{respostas:esResp, escolaridade:esEscol||null, corte:interp.corte!=null?interp.corte:null, sigla:d.sigla}};
   const btn=$('es-salvar'); btn.disabled=true;
   const {error}=await sb.from('pep_escalas').insert(reg);
@@ -4738,7 +4821,7 @@ async function desbloquear(){
 if($('lock-ok')){
   $('lock-ok').onclick=desbloquear;
   $('lock-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') desbloquear(); });
-  $('lock-sair').onclick=async()=>{ try{ await sb.auth.signOut(); }catch(e){} bloqueado=false; $('lock-screen').classList.add('hidden'); aplicarSessao(null); };
+  $('lock-sair').onclick=async()=>{ try{ await sb.auth.signOut(); }catch(e){} limparAssinatura(); limparTodosRascunhos(); bloqueado=false; $('lock-screen').classList.add('hidden'); aplicarSessao(null); };
   $('lock-google').onclick=async()=>{
     // refaz o login pedindo a conta de novo — assim a tela protege mesmo numa máquina compartilhada
     try{ const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:urlRetorno(),queryParams:{prompt:'select_account'}}});
@@ -4782,7 +4865,7 @@ async function renderSeguranca(c){
   $('sg-atual').onclick=carregar;
   $('sg-csv').onclick=()=>{ if(!linhas.length){ toast('Nada para exportar',true); return; }
     baixarTexto(paraCSV([['Quando','Ação','Paciente','Detalhe'],...linhas.map(x=>[dataHoraBR(x.em),ACAO_ROT[x.acao]||x.acao,(x.pep_pacientes&&x.pep_pacientes.nome)||'',x.detalhe||''])]),
-      'acessos-'+new Date().toISOString().slice(0,10)+'.csv','text/csv'); };
+      'acessos-'+hojeISO()+'.csv','text/csv'); };
   carregar();
 }
 
@@ -5086,7 +5169,7 @@ async function carregarRegimeAnterior(){
   try{ const meds=await continuosAnteriores(ex); if(pacienteSel&&pacienteSel.id===id) regimeAnterior={pac:id,meds}; }catch(e){ regimeAnterior={pac:id,meds:[]}; }
   renderRevisao();
 }
-function anosPaciente(){ const p=pacienteSel||{}; return p.data_nascimento?Math.floor((Date.now()-new Date(p.data_nascimento))/31557600000):null; }
+function anosPaciente(){ const p=pacienteSel||{}; return p.data_nascimento?anosCompletos(p.data_nascimento):null; }
 function renderRevisao(){
   const box=$('rx-revisao'); if(!box) return;
   const hoje=prescItens.map(m=>Object.assign({},m,{origem:'hoje'}));
@@ -5174,8 +5257,8 @@ async function renderEncFicha(card){
     '<div class="muted" style="font-size:12px">'+esc(dataBRsimples(e.criado_em))+(e.motivo?' · '+esc(e.motivo):'')+
     (e.data_agendada?' · agendado para '+esc(dataBRsimples(e.data_agendada)):'')+'</div>'+
     (e.contrarreferencia?'<div style="font-size:12.5px;margin-top:3px"><b>Contrarreferência'+(e.data_contrarref?' ('+esc(dataBRsimples(e.data_contrarref))+')':'')+':</b> '+esc(e.contrarreferencia)+'</div>':'')+'</td>'+
-    '<td style="text-align:right;vertical-align:top"><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center"><select class="f enc-st" style="width:auto;min-width:0" data-st="'+e.id+'">'+Object.entries(STATUS_ENC).map(([k,v])=>'<option value="'+k+'"'+(k===e.status?' selected':'')+'>'+v+'</option>').join('')+'</select> '+
-    '<button class="btn ghost sm" data-cr="'+e.id+'">Contrarreferência</button> <button class="btn ghost sm" data-pe="'+e.id+'">PDF</button></div></td></tr>').join('')+'</tbody></table>';
+    '<td style="text-align:right;vertical-align:top"><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center"><select class="f enc-st" style="width:auto;min-width:0" data-st="'+esc(e.id)+'">'+Object.entries(STATUS_ENC).map(([k,v])=>'<option value="'+k+'"'+(k===e.status?' selected':'')+'>'+v+'</option>').join('')+'</select> '+
+    '<button class="btn ghost sm" data-cr="'+esc(e.id)+'">Contrarreferência</button> <button class="btn ghost sm" data-pe="'+esc(e.id)+'">PDF</button></div></td></tr>').join('')+'</tbody></table>';
   const salvar=async(id,campos)=>{ const {data:x,error:er}=await sb.from('pep_encaminhamentos').update(campos).eq('id',id).select('id');
     if(er||!x||!x.length){ toast('Não consegui salvar'+(er?': '+er.message:''),true); return false; } return true; };
   box.querySelectorAll('[data-st]').forEach(s=>s.onchange=async()=>{
@@ -5184,7 +5267,7 @@ async function renderEncFicha(card){
     if(await salvar(s.dataset.st,campos)){ toast('Situação atualizada'); renderEncFicha(card); } });
   box.querySelectorAll('[data-cr]').forEach(b=>b.onclick=async()=>{ const e=lista.find(x=>x.id===b.dataset.cr);
     const txt=prompt('Contrarreferência de '+e.especialidade+' (diagnóstico, conduta, seguimento):',e.contrarreferencia||''); if(txt===null) return;
-    if(await salvar(e.id,{contrarreferencia:txt.trim()||null,data_contrarref:txt.trim()?new Date().toISOString().slice(0,10):null,status:txt.trim()?'realizado':e.status})){ toast('Contrarreferência registrada'); renderEncFicha(card); } });
+    if(await salvar(e.id,{contrarreferencia:txt.trim()||null,data_contrarref:txt.trim()?hojeISO():null,status:txt.trim()?'realizado':e.status})){ toast('Contrarreferência registrada'); renderEncFicha(card); } });
   box.querySelectorAll('[data-pe]').forEach(b=>b.onclick=async()=>{ const e=lista.find(x=>x.id===b.dataset.pe);
     const {data:a}=await sb.from('pep_atendimentos').select('data_atendimento,unidade_id').eq('id',e.atendimento_id).maybeSingle();
     baixarPDF(docEncaminhamento(e,a&&a.data_atendimento,a&&a.unidade_id)); });
@@ -5206,10 +5289,10 @@ async function renderAgenda(c){
   if(!retornoOK){ $('ag-corpo').innerHTML='<div class="empty">Para usar a agenda de retornos, rode o plano_cuidado_schema.sql no Supabase.</div>'; return; }
   let l; try{ l=await dadosAgenda(); }catch(err){ $('ag-corpo').innerHTML='<div class="empty">Não consegui carregar: '+esc(err.message||err)+'</div>'; return; }
   if(tela!=='agenda'||pacienteSel) return;
-  const hoje=new Date().toISOString().slice(0,10), mais=n=>{ const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+  const hoje=hojeISO(), mais=n=>{ const d=new Date(); d.setDate(d.getDate()+n); return isoLocal(d); };
   const grupos=[['Atrasados',x=>x.data<hoje,'atraso'],['Hoje',x=>x.data===hoje,''],['Próximos 7 dias',x=>x.data>hoje&&x.data<=mais(7),''],
     ['Próximos 30 dias',x=>x.data>mais(7)&&x.data<=mais(30),''],['Depois',x=>x.data>mais(30),'']];
-  const linha=x=>'<tr><td><button class="ba-nome" data-id="'+x.p.id+'">'+esc(x.p.nome)+'</button><div class="muted" style="font-size:12px">'+
+  const linha=x=>'<tr><td><button class="ba-nome" data-id="'+esc(x.p.id)+'">'+esc(x.p.nome)+'</button><div class="muted" style="font-size:12px">'+
     [idade(x.p.data_nascimento),x.p.telefone||''].filter(Boolean).map(esc).join(' · ')+'</div></td><td>'+esc(dataBRsimples(x.data))+
     (x.data<hoje?' <span class="chip chip-red">'+esc(haQuanto(diasDesde(x.data)).replace('há ',''))+' de atraso</span>':'')+'</td><td>'+esc(x.motivo||'—')+'</td><td>'+esc(dataBRsimples(x.ult))+'</td></tr>';
   $('ag-corpo').innerHTML=l.length?grupos.map(([t,f,cl])=>{ const g=l.filter(f); return g.length?'<div class="ag-sec '+cl+'">'+t+' · '+g.length+'</div><div class="card"><table><thead><tr><th>Paciente</th><th>Retorno previsto</th><th>Motivo</th><th>Última consulta</th></tr></thead><tbody>'+g.map(linha).join('')+'</tbody></table></div>':''; }).join('')
@@ -5280,7 +5363,7 @@ async function docFolhaRosto(){
   if(f.rev.itens.length) secoes.push({t:'Revisão de medicação',txt:f.rev.itens.map(x=>'['+NIVEL_REV[x.nivel].rot+' · '+TIPO_REV[x.tipo]+'] '+x.titulo+(x.envolvidos.length?' ('+[...new Set(x.envolvidos)].join(', ')+')':'')+' — '+x.texto).join('\n')});
   const pend=[];
   const ult=f.ats[0];
-  if(ult&&ult.retorno_previsto) pend.push('Retorno previsto para '+br(ult.retorno_previsto)+(ult.retorno_motivo?' — '+ult.retorno_motivo:'')+(ult.retorno_previsto<new Date().toISOString().slice(0,10)?' (atrasado)':''));
+  if(ult&&ult.retorno_previsto) pend.push('Retorno previsto para '+br(ult.retorno_previsto)+(ult.retorno_motivo?' — '+ult.retorno_motivo:'')+(ult.retorno_previsto<hojeISO()?' (atrasado)':''));
   f.encs.forEach(e=>pend.push('Encaminhamento para '+e.especialidade+': '+(STATUS_ENC[e.status]||e.status).toLowerCase()+' desde '+br(e.criado_em)+(e.data_agendada?' (agendado para '+br(e.data_agendada)+')':'')));
   const cond=f.rev.cond, ex=k=>{ const r=resultados.filter(x=>x.analito===k).sort((a,b)=>String(b.data_coleta).localeCompare(String(a.data_coleta)))[0]; return r?diasDesde(r.data_coleta):null; };
   const venc=(rot,d,lim)=>{ if(d==null||d>lim) pend.push(rot+': '+(d==null?'sem registro':'último '+haQuanto(d))); };
@@ -5429,8 +5512,119 @@ async function puxarRelatorio(){
   finally{ btn.disabled=false; }
 }
 
+// ---------- rascunho do atendimento ----------
+// O que está sendo digitado é guardado neste aparelho a cada 3 s (e ao sair da página). "Voltar", trocar de paciente,
+// recarregar ou fechar a aba não perdem mais o texto; só "Cancelar" (com confirmação) ou salvar o atendimento o apagam.
+const CAMPOS_RASC_EXTRA=['ex-cid','ex-just'];   // ficam no diálogo de exames, fora do formulário
+let rascChave=null, rascBase='', rascUlt='', rascTimer=null;
+const formAtendAberto=()=>!!document.getElementById('f-s')&&!!document.querySelector('#main-content .soap');
+function coletarRascunho(){
+  const f={};
+  document.querySelectorAll('#main-content .soap input[id],#main-content .soap textarea[id],#main-content .soap select[id]').forEach(e=>{
+    if(e.type==='file'||e.type==='button') return; f[e.id]=e.type==='checkbox'?e.checked:e.value; });
+  CAMPOS_RASC_EXTRA.forEach(id=>{ const e=$(id); if(e) f[id]=e.value; });
+  return {f,ex:examItens.map(x=>Object.assign({},x)),rx:prescItens.map(x=>Object.assign({},x)),en:encItens.map(x=>Object.assign({},x)),er:[...encRemovidos],pr:[...probSel]};
+}
+const textoRasc=o=>JSON.stringify(o);
+function atendimentoSujo(){ return !!rascChave&&formAtendAberto()&&textoRasc(coletarRascunho())!==rascBase; }
+function salvarRascunho(){
+  if(!rascChave||!formAtendAberto()) return;
+  try{
+    const atual=textoRasc(coletarRascunho());
+    if(atual===rascBase){ localStorage.removeItem(rascChave); rascUlt=atual; return; }
+    if(atual!==rascUlt){ localStorage.setItem(rascChave,JSON.stringify({em:Date.now(),d:coletarRascunho()})); rascUlt=atual; }
+  }catch(e){}
+}
+function limparRascunho(){
+  clearInterval(rascTimer); rascTimer=null;
+  try{ if(rascChave) localStorage.removeItem(rascChave); }catch(e){}
+  rascChave=null; rascBase=''; rascUlt='';
+}
+function limparTodosRascunhos(){ try{ Object.keys(localStorage).filter(k=>k.startsWith('pep_rascunho:')).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
+function aplicarRascunho(d){
+  for(const [id,v] of Object.entries(d.f||{})){ const e=document.getElementById(id); if(!e) continue; if(e.type==='checkbox') e.checked=!!v; else e.value=v; }
+  examItens.length=0; examItens.push(...(d.ex||[])); prescItens.length=0; prescItens.push(...(d.rx||[]));
+  encItens=(d.en||[]).map(x=>Object.assign({},x)); encRemovidos=[...(d.er||[])]; probSel=new Set(d.pr||[]);
+  document.querySelectorAll('#f-probs input[type=checkbox]').forEach(cb=>{ cb.checked=probSel.has(cb.value); });
+  renderExTable(); renderRxTable(); renderEncTable(); rlVisivel(); renderClCr(); renderAvisosRx();
+}
+function iniciarRascunho(){
+  clearInterval(rascTimer); rascTimer=null;   // só para o relógio: NÃO apaga o rascunho guardado (é dele que se restaura)
+  rascChave='pep_rascunho:'+(usuarioAtual||'')+':'+(pacienteSel&&pacienteSel.id)+':'+((atendAtual&&atendAtual.id)||'novo');
+  rascBase=textoRasc(coletarRascunho()); rascUlt=rascBase;
+  try{
+    const bruto=localStorage.getItem(rascChave);
+    if(bruto){ const r=JSON.parse(bruto);
+      if(r&&r.d&&textoRasc(r.d)!==rascBase){ aplicarRascunho(r.d); rascUlt=textoRasc(coletarRascunho());
+        toast('Rascunho de '+dataBR(new Date(r.em).toISOString())+' recuperado — revise antes de salvar'); } }
+  }catch(e){}
+  rascTimer=setInterval(()=>{ if(!formAtendAberto()){ clearInterval(rascTimer); rascTimer=null; return; } salvarRascunho(); },3000);
+}
+// "Voltar": sai guardando o rascunho. "Cancelar": descarta (com confirmação, se houver algo digitado).
+function voltarDoAtendimento(){ salvarRascunho(); const guardou=atendimentoSujo(); atendAtual=null; renderMain(); if(guardou) toast('Atendimento em andamento guardado como rascunho neste aparelho'); }
+function cancelarAtendimento(){
+  if(atendimentoSujo()&&!confirm('Descartar este atendimento?\n\nO que foi digitado será apagado.')) return;
+  limparRascunho(); atendAtual=null; renderMain();
+}
+addEventListener('pagehide',()=>{ salvarRascunho(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') salvarRascunho(); });
+addEventListener('beforeunload',e=>{ salvarRascunho(); if(atendimentoSujo()||OFF.pendentes()){ e.preventDefault(); e.returnValue=''; } });
+
 // ---------- finalizar: grava tudo no Supabase ----------
+const semTabelaErro=e=>/does not exist|schema cache|PGRST205|42P01/i.test(((e&&e.message)||'')+' '+((e&&e.code)||''));
+// Editar um atendimento = apagar a versão anterior dos filhos (exames, receita, atestado, relatório, problemas) e gravar a nova.
+// Para que uma falha no meio NUNCA deixe o prontuário sem a receita antiga, tira-se antes uma cópia do que existe e,
+// se algo falhar, o que a tentativa criou é removido e a cópia volta.
+async function fotografarFilhos(id){
+  const ler=async(t,col,val)=>{ const q=sb.from(t).select('*'); const {data,error}=await (Array.isArray(val)?q.in(col,val):q.eq(col,val));
+    if(error&&!semTabelaErro(error)) throw error; return data||[]; };
+  const sols=await ler('pep_solicitacoes_exames','atendimento_id',id);
+  const itens=sols.length?await ler('pep_solicitacao_itens','solicitacao_id',sols.map(x=>x.id)):[];
+  const recs=await ler('pep_prescricoes','atendimento_id',id);
+  const pitens=recs.length?await ler('pep_prescricao_itens','prescricao_id',recs.map(x=>x.id)):[];
+  return {sols,itens,recs,pitens,ats:await ler('pep_atestados','atendimento_id',id),rels:await ler('pep_relatorios','atendimento_id',id),
+          probs:await ler('pep_atendimento_problemas','atendimento_id',id)};
+}
+// A estratégia é "gravar o novo primeiro, apagar o antigo depois": a versão anterior só é removida quando TUDO da nova
+// já está gravado. Assim, mesmo que o desfazer falhe, a receita e os exames antigos continuam lá.
+const FILHOS_CHAVE=[['pep_solicitacoes_exames','sols'],['pep_prescricoes','recs'],['pep_atestados','ats'],['pep_relatorios','rels'],['pep_atendimento_problemas','probs']];
+async function removerVersaoAnterior(snap){
+  for(const [t,k] of FILHOS_CHAVE){
+    const ids=(snap[k]||[]).map(x=>x.id); if(!ids.length) continue;
+    const {data,error}=await sb.from(t).delete().in('id',ids).select('id');
+    if(error){ if(semTabelaErro(error)) continue; throw error; }
+    // exclusão barrada pelo banco devolve 0 linhas sem erro: sem esta conferência a versão antiga ficaria somada à nova
+    if((data||[]).length<ids.length) throw new Error('o banco não deixou apagar a versão anterior de "'+t.replace(/^pep_/,'')+'" (permissão de exclusão)');
+  }
+}
+// desfaz o que a tentativa criou (os itens saem junto com o pai) e devolve os campos do atendimento
+async function desfazerNovos(novos,id,antes,campos){
+  const falhas=[];
+  for(const [t,k] of FILHOS_CHAVE){
+    const ids=novos[k]||[]; if(!ids.length) continue;
+    const {data,error}=await sb.from(t).delete().in('id',ids).select('id');
+    if((error&&!semTabelaErro(error))||(!error&&(data||[]).length<ids.length)) falhas.push(t.replace(/^pep_/,''));
+  }
+  if(antes){ const volta={}; Object.keys(campos).forEach(k=>{ if(k in antes) volta[k]=antes[k]; });
+    const {error}=await sb.from('pep_atendimentos').update(volta).eq('id',id); if(error) falhas.push('atendimentos'); }
+  return falhas;
+}
+// Confere antes de gravar: valores implausíveis (erro de digitação vira ClCr, risco e busca ativa errados), alergia na receita, atendimento vazio.
+function conferirAntesDeSalvar(){
+  const v=id=>{ const e=$(id); const x=e&&String(e.value).replace(',','.').trim(); return (x===''||x==null||isNaN(+x))?null:+x; };
+  const av=[], faixa=(rot,id,min,max,un)=>{ const x=v(id); if(x!=null&&(x<min||x>max)) av.push(rot+' '+x+(un?' '+un:'')+' (esperado entre '+min+' e '+max+')'); };
+  faixa('PA sistólica','f-pas',50,300,'mmHg'); faixa('PA diastólica','f-pad',30,200,'mmHg'); faixa('FC','f-fc',20,250,'bpm');
+  faixa('Peso','f-peso',0.3,400,'kg'); faixa('Altura','f-alt',30,250,'cm'); faixa('Glicemia','f-gli',10,1500,'mg/dL'); faixa('Creatinina','f-creat',0.1,20,'mg/dL');
+  if(v('f-pas')!=null&&v('f-pad')!=null&&v('f-pad')>v('f-pas')) av.push('PA diastólica maior que a sistólica ('+v('f-pas')+'/'+v('f-pad')+')');
+  const msgs=[];
+  if(av.length) msgs.push('Valores fora do esperado — confira se não é erro de digitação:\n• '+av.join('\n• '));
+  const conf=prescItens.filter(m=>avisosPara(m.medicamento).some(a=>a.t==='alergia'));
+  if(conf.length) msgs.push('ATENÇÃO — possível conflito com alergia registrada em:\n• '+conf.map(m=>m.medicamento).join('\n• '));
+  if(!['f-s','f-o','f-a','f-p'].some(i=>($(i).value||'').trim())&&!examItens.length&&!prescItens.length) msgs.push('O atendimento está sem texto (S/O/A/P) e sem exames ou receita.');
+  return msgs.length?msgs.join('\n\n')+'\n\nSalvar mesmo assim?':null;
+}
 async function finalizar(){
+  const aviso=conferirAntesDeSalvar(); if(aviso&&!confirm(aviso)) return;
   const mk=OFF.marca();
   const btn=$('btn-finalizar'); const edit=!!(atendAtual&&atendAtual.editando);
   btn.disabled=true; btn.textContent='Salvando…';
@@ -5438,32 +5632,26 @@ async function finalizar(){
   const rel=lerRelatorio();
   // encaminhamento preenchido e não adicionado: entra assim mesmo
   if($('en-esp')&&$('en-esp').value.trim()&&$('en-mot').value.trim()) adicionarEncaminhamento(true);
+  let at=null, snap=null, antes=null, campos=null, mexeu=false, encNovosIds=[];
+  const novos={sols:[],recs:[],ats:[],rels:[],probs:[]};   // ids criados nesta tentativa
   try{
     if(encItens.some(e=>!e.id)&&!encOK) throw new Error('a tabela de encaminhamentos não existe — rode o plano_cuidado_schema.sql no Supabase');
     // sem a tabela, o atendimento seria salvo pela metade: confere antes
     if(rel){
       const {error:eR}=await sb.from('pep_relatorios').select('id').limit(1);
-      if(eR&&/does not exist|schema cache|PGRST205|42P01/i.test((eR.message||'')+' '+(eR.code||'')))
-        throw new Error('a tabela de relatórios não existe — rode o relatorios_schema.sql no Supabase');
+      if(eR&&semTabelaErro(eR)) throw new Error('a tabela de relatórios não existe — rode o relatorios_schema.sql no Supabase');
     }
-    const campos={ tipo_atendimento:$('f-tipo').value,
+    campos={ tipo_atendimento:$('f-tipo').value,
       subjetivo:$('f-s').value||null, objetivo:$('f-o').value||null, avaliacao:$('f-a').value||null, plano:$('f-p').value||null,
       pa_sistolica:num('f-pas'), pa_diastolica:num('f-pad'), fc:num('f-fc'), peso_kg:num('f-peso'),
       altura_cm:num('f-alt'), glicemia_capilar:num('f-gli'), creatinina:num('f-creat'), status:'finalizado' };
     if(retornoOK){ campos.retorno_previsto=$('rt-data').value||null; campos.retorno_motivo=$('rt-data').value?($('rt-motivo').value.trim()||null):null; }
     if(!edit&&unidadesOK&&unidadeAtiva()) campos.unidade_id=unidadeAtiva().id;
-    let at;
     if(edit){
+      antes=atendAtual.dados||{};
+      snap=await fotografarFilhos(atendAtual.id);          // se isto falhar, nada foi alterado
       const {data,error}=await sb.from('pep_atendimentos').update(campos).eq('id',atendAtual.id).select().single();
-      if(error) throw error; at=data;
-      // substitui os filhos para não duplicar
-      const {data:sols}=await sb.from('pep_solicitacoes_exames').select('id').eq('atendimento_id',at.id);
-      if(sols&&sols.length) await sb.from('pep_solicitacoes_exames').delete().eq('atendimento_id',at.id);
-      const {data:recs}=await sb.from('pep_prescricoes').select('id').eq('atendimento_id',at.id);
-      if(recs&&recs.length) await sb.from('pep_prescricoes').delete().eq('atendimento_id',at.id);
-      await sb.from('pep_atestados').delete().eq('atendimento_id',at.id);
-      await sb.from('pep_relatorios').delete().eq('atendimento_id',at.id);   // sem a tabela, só devolve erro
-      await sb.from('pep_atendimento_problemas').delete().eq('atendimento_id',at.id);
+      if(error) throw error; at=data; mexeu=true;
     } else {
       const {data,error}=await sb.from('pep_atendimentos').insert(Object.assign({paciente_id:pacienteSel.id},campos)).select().single();
       if(error) throw error; at=data;
@@ -5472,7 +5660,7 @@ async function finalizar(){
     if(examItens.length){
       const {data:sol,error:e2}=await sb.from('pep_solicitacoes_exames')
         .insert({atendimento_id:at.id,tipo:'comum',cid10:$('ex-cid').value||null,justificativa:$('ex-just').value||null}).select().single();
-      if(e2) throw e2;
+      if(e2) throw e2; novos.sols.push(sol.id);
       const {error:e3}=await sb.from('pep_solicitacao_itens')
         .insert(examItens.map(e=>({solicitacao_id:sol.id,co_procedimento:e.co_procedimento,
           no_procedimento:e.no_procedimento, tabela:String(e.co_procedimento||'').length===10?'sigtap':'tuss'})));
@@ -5480,7 +5668,7 @@ async function finalizar(){
     }
     if(prescItens.length){
       const {data:rec,error:e4}=await sb.from('pep_prescricoes').insert({atendimento_id:at.id,tipo_receita:'comum'}).select().single();
-      if(e4) throw e4;
+      if(e4) throw e4; novos.recs.push(rec.id);
       const {error:e5}=await sb.from('pep_prescricao_itens').insert(prescItens.map((m,i)=>{
         const r={prescricao_id:rec.id,...m,ordem:i+1}; if(!r.tipo_receita) delete r.tipo_receita; return r; }));
       if(e5) throw e5;
@@ -5488,29 +5676,52 @@ async function finalizar(){
     const tipoAt=$('at-tipo')?$('at-tipo').value:'';
     if(tipoAt){
       const dias=$('at-dias').value.trim();
-      const {error:e6}=await sb.from('pep_atestados').insert({atendimento_id:at.id,tipo:tipoAt,
-        dias:dias===''?null:Number(dias), cid10:$('at-cid').value.trim()||null, texto:$('at-obs').value.trim()||null});
-      if(e6) throw e6;
+      const {data:ne6,error:e6}=await sb.from('pep_atestados').insert({atendimento_id:at.id,tipo:tipoAt,
+        dias:dias===''?null:Number(dias), cid10:$('at-cid').value.trim()||null, texto:$('at-obs').value.trim()||null}).select('id');
+      if(e6) throw e6; novos.ats.push(...(ne6||[]).map(x=>x.id));
     }
     if(rel){
-      const {error:e8}=await sb.from('pep_relatorios').insert(Object.assign({atendimento_id:at.id},rel));
-      if(e8) throw e8;
-    }
-    if(edit&&encRemovidos.length) await sb.from('pep_encaminhamentos').delete().in('id',encRemovidos);
-    const encNovos=encItens.filter(e=>!e.id);
-    if(encNovos.length){
-      const {error:e9}=await sb.from('pep_encaminhamentos').insert(encNovos.map(e=>Object.assign({atendimento_id:at.id,paciente_id:pacienteSel.id},e)));
-      if(e9) throw e9;
+      const {data:ne8,error:e8}=await sb.from('pep_relatorios').insert(Object.assign({atendimento_id:at.id},rel)).select('id');
+      if(e8) throw e8; novos.rels.push(...(ne8||[]).map(x=>x.id));
     }
     if(probSel.size){
       const sel=problemas.filter(x=>probSel.has(x.id));
-      const {error:e7}=await sb.from('pep_atendimento_problemas').insert(sel.map(x=>({atendimento_id:at.id,
-        descricao:x.descricao, ciap2:x.ciap2||null, cid10:x.cid10||null, situacao:x.situacao})));
-      if(e7) throw e7;
+      const {data:ne7,error:e7}=await sb.from('pep_atendimento_problemas').insert(sel.map(x=>({atendimento_id:at.id,
+        descricao:x.descricao, ciap2:x.ciap2||null, cid10:x.cid10||null, situacao:x.situacao}))).select('id');
+      if(e7) throw e7; novos.probs.push(...(ne7||[]).map(x=>x.id));
     }
+    if(edit) await removerVersaoAnterior(snap);   // só agora a versão antiga sai
+    // encaminhamentos por último: são os únicos que não são apagados e recriados
+    const encNovos=encItens.filter(e=>!e.id);
+    if(encNovos.length){
+      const {data:ne,error:e9}=await sb.from('pep_encaminhamentos').insert(encNovos.map(e=>Object.assign({atendimento_id:at.id,paciente_id:pacienteSel.id},e))).select('id');
+      if(e9) throw e9; encNovosIds=(ne||[]).map(x=>x.id);
+    }
+    if(edit&&encRemovidos.length){
+      const {error:e10}=await sb.from('pep_encaminhamentos').delete().in('id',encRemovidos); if(e10) throw e10;
+    }
+    limparRascunho();
     toast(salvoMsg(mk,edit?'Alterações salvas ✓':'Atendimento salvo ✓'));
     atendAtual={id:at.id}; encItens=[]; encRemovidos=[]; renderMain();
-  }catch(err){ toast('Erro ao salvar: '+(err.message||err),true); }
+  }catch(err){
+    let msg='Erro ao salvar: '+(err.message||err);
+    try{
+      if(encNovosIds.length) await sb.from('pep_encaminhamentos').delete().in('id',encNovosIds);
+      if(edit&&mexeu){
+        const f=await desfazerNovos(novos,atendAtual.id,antes,campos);
+        msg+=f.length?'. ATENÇÃO: não consegui remover tudo o que esta tentativa gravou ('+f.join(', ')+') — a versão anterior continua no prontuário; confira se não ficou item repetido.'
+                     :'. O atendimento continua como estava antes; o que você digitou permanece na tela.';
+      } else if(!edit&&at){
+        const {data:d1,error:e1}=await sb.from('pep_atendimentos').delete().eq('id',at.id).select('id');
+        if(!e1&&d1&&d1.length) msg+='. Nada ficou salvo pela metade; o que você digitou continua na tela — toque em Salvar de novo.';
+        else { atendAtual={id:at.id,editando:true,dados:at}; msg+='. O atendimento ficou criado, mas incompleto: toque em Salvar de novo para completar (não será duplicado).'; }
+      }
+    }catch(e2){
+      msg+='. ATENÇÃO: não consegui desfazer a gravação parcial ('+(e2.message||e2)+').';
+      if(snap){ try{ baixarTexto(JSON.stringify({atendimento:antes,filhos:snap},null,2),'pep-copia-atendimento-'+((antes&&antes.id)||'')+'.json','application/json'); msg+=' Baixei uma cópia do que existia antes.'; }catch(e3){} }
+    }
+    toast(msg,true);
+  }
   finally{ btn.disabled=false; btn.textContent=edit?'Salvar alterações':'Finalizar e salvar atendimento'; }
 }
 

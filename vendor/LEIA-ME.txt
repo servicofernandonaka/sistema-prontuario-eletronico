@@ -1,0 +1,9 @@
+Bibliotecas de terceiros servidas daqui (e não de CDN), nas versões exatas abaixo, sem alteração:
+  supabase-js 2.45.4   (MIT)         supabase.js
+  jszip 3.10.1         (MIT/GPL)     jszip.min.js
+  pdf-lib 1.17.1       (MIT)         pdf-lib.min.js
+  qrcode-generator 1.4.4 (MIT)       qrcode.js
+  pdf.js 3.11.174      (Apache-2.0)  pdf.min.js, pdf.worker.min.js
+  SheetJS xlsx 0.18.5  (Apache-2.0)  xlsx.full.min.js
+Origem: pacotes oficiais do npm. Licenças em vendor/licenses/.
+Tesseract.js (OCR de foto de laudo) continua carregado de CDN sob demanda.
