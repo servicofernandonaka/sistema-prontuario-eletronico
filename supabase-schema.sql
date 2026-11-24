@@ -36,3 +36,9 @@ create policy "exames_update" on storage.objects for update to authenticated
   using (bucket_id = 'exames' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "exames_delete" on storage.objects for delete to authenticated
   using (bucket_id = 'exames' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Anexos de exames: só PDF e imagens raster, até 15 MB (o app também valida; isto vale no servidor)
+update storage.buckets
+   set file_size_limit = 15728640,
+       allowed_mime_types = array['application/pdf','image/png','image/jpeg','image/webp']
+ where id = 'exames';
