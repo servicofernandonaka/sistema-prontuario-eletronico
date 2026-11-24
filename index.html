@@ -372,8 +372,8 @@
     #print-area .pr-qr{width:74px;height:74px;float:right;margin:0 0 4px 10px}
   }
   @media (max-width:760px){
-    .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5)}
-    .sidebar.open{transform:none}
+    .sidebar{position:fixed;z-index:30;transform:translateX(-100%);transition:transform .2s}
+    .sidebar.open{transform:none;box-shadow:0 0 40px rgba(0,0,0,.5)}
     .menu-btn{display:inline-flex!important}
   }
   .li-ou{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:12px}
@@ -481,7 +481,8 @@
       <button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button>
       <span class="badge-proto">Protótipo · dados fictícios · não usar com pacientes reais</span>
       <span class="tb-dir"><select id="unid-ativa" class="unid-sel hidden" title="Unidade onde você está atendendo hoje"></select>
-      <span class="who" id="who"></span></span>
+      <span class="who" id="who"></span>
+      <button class="btn ghost sm" id="btn-sair-topo" type="button" title="Sair desta conta">Sair</button></span>
     </div>
     <div class="content"><div class="maxw" id="main-content"></div></div>
   </main>
@@ -1714,7 +1715,8 @@ function aplicarSessao(s){
 const urlRetorno=()=> location.origin+location.pathname;
 async function entrarComGoogle(){
   try{
-    const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:urlRetorno()}});
+    // prompt:'select_account' — depois de sair, o Google deixa escolher outra conta em vez de entrar direto na mesma
+    const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:urlRetorno(),queryParams:{prompt:'select_account'}}});
     if(error) toast('Não consegui iniciar o login com Google: '+error.message,true);
   }catch(e){ toast('Falha ao abrir o login do Google',true); }
 }
@@ -1756,7 +1758,7 @@ $('li-btn').onclick=async()=>{ const {error}=await sb.auth.signInWithPassword({e
     ?'Sem conexão — entrar exige internet. Depois de entrar, o uso offline funciona.':error.message,true); };
 $('li-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('li-btn').click(); });
 if($('li-google')) $('li-google').onclick=entrarComGoogle;
-$('btn-logout').onclick=async()=>{
+const sairDaConta=async()=>{
   if(atendimentoSujo()&&!confirm('Há um atendimento em andamento que ainda não foi salvo. Sair apaga esse rascunho.\n\nSair mesmo assim?')) return;
   const n=OFF.pendentes();
   if(n&&!confirm('Há '+n+' registro(s) aguardando envio.\n\nSe você sair, eles continuam guardados neste aparelho, mas só sobem quando você entrar de novo AQUI. Sair mesmo assim?')) return;
@@ -1765,6 +1767,8 @@ $('btn-logout').onclick=async()=>{
   limparTodosRascunhos(); // nem o texto de atendimentos não salvos
   aplicarSessao(null);   // volta para o login mesmo se a rede falhar
 };
+$('btn-logout').onclick=sairDaConta;
+$('btn-sair-topo').onclick=sairDaConta;
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
