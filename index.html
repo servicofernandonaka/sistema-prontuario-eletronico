@@ -1886,7 +1886,7 @@ function abrirModalPaciente(p){
   $('np-titulo').textContent=p?'Editar paciente':'Novo paciente';
   $('np-nome').value=p?(p.nome||''):''; $('np-cpf').value=p?(p.cpf||''):''; $('np-cns').value=p?(p.cns||''):'';
   $('np-nasc').value=p?(p.data_nascimento||''):''; $('np-sexo').value=p?(p.sexo||''):'';
-  $('np-mae').value=p?(p.nome_mae||''):''; $('np-tel').value=p?(p.telefone||''):'';
+  $('np-mae').value=p?(p.nome_mae||''):''; $('np-tel').value=p?formatarTel(p.telefone):'';
   $('np-end').value=p?(p.endereco||''):''; document.querySelector('.np-end').classList.toggle('hidden',!enderecoOK);
   $('np-email').value=p?(p.email||''):''; document.querySelector('.np-mail').classList.toggle('hidden',!emailOK);
   openM('m-pac');
@@ -2896,7 +2896,7 @@ async function abrirEnviar(entrada){
   const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada]; if(!docs.length) return;
   const ok=$('sd-ok'); ok.checked=false;
   ['sd-share','sd-wa-btn','sd-mail-btn','sd-auto-btn'].forEach(i=>$(i).disabled=true);
-  $('sd-tel').value=pacienteSel.telefone||''; $('sd-mail').value=pacienteSel.email||'';
+  $('sd-tel').value=formatarTel(pacienteSel.telefone); $('sd-mail').value=pacienteSel.email||'';
   $('sd-doc').textContent='Preparando o PDF de “'+(docs[0].tituloPrinc||docs[0].titulo)+'”'+(docs.length>1?' (+'+(docs.length-1)+' guia(s))':'')+'…';
   $('sd-dica').textContent='';
   envioAtual={entrada,arquivo:null,link:null}; $('sd-lk-info').textContent=''; openM('m-enviar');
@@ -2924,6 +2924,16 @@ function atualizarBotoesEnvio(){
   $('sd-mail-btn').disabled=!mailOk; $('sd-auto-btn').disabled=!mailOk||navigator.onLine===false;
   if(typeof atualizarBotoesLink==='function') atualizarBotoesLink(pronto,ok,mailOk);
 }
+// Máscara de telefone: (11) 91234-5678 (celular) ou (11) 1234-5678 (fixo). Aceita colar com +55, espaços, pontos etc.
+function formatarTel(v){
+  let d=String(v||'').replace(/\D/g,''); if(d.length>11&&d.startsWith('55')) d=d.slice(2); d=d.slice(0,11);
+  if(!d) return ''; if(d.length<=2) return '('+d;
+  const ddd='('+d.slice(0,2)+') ', r=d.slice(2);
+  return r.length<=4?ddd+r : d.length<=10 ? ddd+r.slice(0,4)+'-'+r.slice(4) : ddd+r.slice(0,5)+'-'+r.slice(5);
+}
+function mascararTel(id){ const e=$(id); if(!e) return; e.setAttribute('inputmode','tel'); e.setAttribute('maxlength','16');
+  e.addEventListener('input',()=>{ const f=formatarTel(e.value); if(f!==e.value) e.value=f; }); }
+['sd-tel','np-tel','ag-tel','un-tel'].forEach(mascararTel);
 ['sd-ok','sd-tel','sd-mail'].forEach(i=>{ $(i).addEventListener('input',atualizarBotoesEnvio); $(i).addEventListener('change',atualizarBotoesEnvio); });
 function registrarEnvio(canal){ const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
   registrarAcesso('documento',pacienteSel&&pacienteSel.id,'enviado por '+canal+': '+String((x&&x.titulo)||'').slice(0,60)); }
