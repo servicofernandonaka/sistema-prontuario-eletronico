@@ -840,6 +840,29 @@ body.com-modal .bnav{display:none}
 .tlp-vazio{padding:26px;text-align:center;color:var(--muted)}
 @media(max-width:640px){.tlp{padding:2px 12px 12px}.tlm{margin-left:44px}.tle .cab time{margin-left:0;flex:1 0 100%;order:-1}}
 
+
+/* ===================== DITADO POR VOZ ===================== */
+.voz-wrap{position:relative;display:block}
+.voz-wrap>textarea{padding-right:52px}
+.voz-btn{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--fg);display:grid;place-items:center;
+  font-size:17px;line-height:1;z-index:2;box-shadow:var(--sh1);transition:transform .25s var(--spring),background .2s,box-shadow .25s,color .2s;-webkit-tap-highlight-color:transparent}
+.voz-btn:hover{transform:scale(1.1);box-shadow:var(--sh2)}
+.voz-btn:active{transform:scale(.9)}
+.voz-btn .bars{display:none;gap:2px;align-items:center;height:16px}
+.voz-btn .bars i{display:block;width:3px;border-radius:2px;background:#fff;height:5px;animation:onda 0.9s ease-in-out infinite}
+.voz-btn .bars i:nth-child(2){animation-delay:.15s}.voz-btn .bars i:nth-child(3){animation-delay:.3s}.voz-btn .bars i:nth-child(4){animation-delay:.45s}
+@keyframes onda{0%,100%{height:4px}50%{height:15px}}
+.voz-btn.on{background:var(--err);border-color:var(--err);color:#fff;animation:voz-pulso 1.5s ease-out infinite}
+.voz-btn.on .mic{display:none}.voz-btn.on .bars{display:flex}
+@keyframes voz-pulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--err) 55%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+.voz-live{display:none;margin:6px 2px 0;padding:8px 12px;border-radius:12px;font-size:12.5px;color:var(--muted);background:color-mix(in srgb,var(--err) 8%,var(--panel-2));
+  border:1px dashed color-mix(in srgb,var(--err) 40%,var(--line));line-height:1.45}
+.voz-live.on{display:block;animation:sobe .35s var(--ease) both}
+.voz-live b{color:var(--err)}
+.voz-live em{color:var(--fg);font-style:normal;opacity:.75}
+.voz-live small{display:block;margin-top:3px;opacity:.8}
+textarea.voz-ouvindo{border-color:var(--err)!important;box-shadow:0 0 0 4px color-mix(in srgb,var(--err) 16%,transparent)!important}
+
 @media print{body::before{display:none}}
 </style>
 <script>try{if(localStorage.getItem("pep_tema")==="escuro")document.documentElement.setAttribute("data-tema","escuro")}catch(e){}</script>
@@ -3683,7 +3706,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-25.8 · linha do tempo';
+const VERSAO='2026-11-25.9 · ditado por voz';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -7397,6 +7420,111 @@ window.montarLinhaTempo=function(card,chAt,bw,lista,p){
 // aplica a animação nos gráficos que forem aparecendo
 const mc=document.getElementById('main-content');
 if(mc&&window.MutationObserver){ new MutationObserver(()=>observarGV(mc)).observe(mc,{childList:true,subtree:true}); observarGV(mc); }
+})();
+</script>
+<script>
+// ===================== DITADO POR VOZ (reconhecimento de voz do navegador) =====================
+(function(){
+'use strict';
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR) return;   // Firefox etc.: sem botões
+const safe=f=>{ try{ return f(); }catch(e){ return undefined; } };
+const SEM_BOTAO=new Set(['un-rodape']);
+let ativo=null;   // {ta,btn,live,rec,fim,pos}
+
+// ---------- comandos de pontuação ditados ("vírgula", "ponto", "novo parágrafo"…) ----------
+const CMDS=[
+  [/\bponto de interrogaç[aã]o\b/gi,'§?§'],[/\bponto de exclamaç[aã]o\b/gi,'§!§'],[/\bdois pontos\b/gi,'§:§'],
+  [/\bponto e v[ií]rgula\b/gi,'§;§'],[/\bponto final\b/gi,'§.§'],[/\bponto\b/gi,'§.§'],[/\bv[ií]rgula\b/gi,'§,§'],
+  [/\bnovo par[aá]grafo\b/gi,'§¶¶§'],[/\b(nova linha|pr[oó]xima linha)\b/gi,'§¶§'],
+  [/\babre par[eê]nteses\b/gi,'§(§'],[/\bfecha par[eê]nteses\b/gi,'§)§']];
+function processar(t){
+  let s=' '+String(t||'').trim()+' ';
+  CMDS.forEach(([re,r])=>{ s=s.replace(re,r); });
+  s=s.replace(/\s*§/g,'§').replace(/§\s*/g,'§');                 // cola o sinal na palavra anterior
+  s=s.replace(/§\(§/g,' (').replace(/§\)§/g,') ');
+  s=s.replace(/§([.,;:!?])§?/g,(m,p)=>p+' ').replace(/§(¶+)§?/g,(m,n)=>'\n'.repeat(n.length)).replace(/§/g,' ');
+  s=s.replace(/\( +/g,'(').replace(/ +\)/g,')');
+  return s.replace(/[ \t]{2,}/g,' ').replace(/ ([.,;:!?])/g,'$1').replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n').replace(/^[ \t]+|[ \t]+$/g,'');
+}
+function capitalizarSeNecessario(antes,txt){
+  const ult=antes.replace(/[ \t]+$/,'').slice(-1);
+  if(!antes.trim()||/[.!?\n]/.test(ult)) return txt.replace(/^(\W*)(\p{L})/u,(m,a,b)=>a+b.toUpperCase());
+  return txt;
+}
+function inserir(ta,txt){
+  if(!txt) return;
+  const v=ta.value, pos=(ativo&&ativo.pos!=null)?ativo.pos:v.length, antes=v.slice(0,pos), depois=v.slice(pos);
+  let t=capitalizarSeNecessario(antes,processar(txt)); if(!t) return;
+  t=t.replace(/([.!?]\s+|\n)(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+  const precisaEspaco=antes.length&&!/[\s(]$/.test(antes)&&!/^[.,;:!?)\n]/.test(t);
+  t=(precisaEspaco?' ':'')+t;
+  ta.value=antes+t+depois; const np=(antes+t).length; if(ativo) ativo.pos=np;
+  safe(()=>ta.setSelectionRange(np,np));
+  ta.dispatchEvent(new Event('input',{bubbles:true}));
+}
+
+// ---------- ligar / desligar ----------
+function parar(motivo){
+  if(!ativo) return; const a=ativo; ativo=null; a.fim=true;
+  safe(()=>a.rec.stop()); a.btn.classList.remove('on'); a.btn.setAttribute('aria-pressed','false'); a.btn.title='Ditar (Alt+D)';
+  a.ta.classList.remove('voz-ouvindo'); a.live.classList.remove('on'); if(motivo) safe(()=>toast(motivo,true));
+}
+function consentido(){
+  if(safe(()=>localStorage.getItem('pep_voz_ok'))==='1') return true;
+  const ok=confirm('Ditado por voz\n\nO navegador envia o áudio para os servidores do fornecedor dele (Google, no Chrome e no Edge; Apple, no Safari) para transformar a fala em texto. O PEP Clínico não guarda o áudio.\n\nEvite ditar o nome completo, CPF ou telefone do paciente. Dite só o conteúdo clínico.\n\nContinuar?');
+  if(ok) safe(()=>localStorage.setItem('pep_voz_ok','1')); return ok;
+}
+function iniciar(ta,btn,live){
+  if(ativo){ const mesmo=ativo.ta===ta; parar(); if(mesmo) return; }
+  if(!consentido()) return;
+  const rec=new SR(); rec.lang='pt-BR'; rec.continuous=true; rec.interimResults=true; rec.maxAlternatives=1;
+  const a={ta,btn,live,rec,fim:false,pos:ta.selectionStart!=null&&document.activeElement===ta?ta.selectionEnd:ta.value.length};
+  ativo=a;
+  rec.onresult=e=>{
+    let parcial='';
+    for(let i=e.resultIndex;i<e.results.length;i++){ const r=e.results[i], t=r[0].transcript;
+      if(r.isFinal) inserir(ta,t); else parcial+=t; }
+    live.innerHTML='<b>● Ouvindo…</b> '+(parcial?'<em>'+esc(parcial)+'</em>':'fale normalmente')+'<small>Diga “vírgula”, “ponto”, “dois pontos”, “novo parágrafo”. Toque no microfone para parar.</small>';
+  };
+  rec.onerror=e=>{
+    const er=e&&e.error;
+    if(er==='not-allowed'||er==='service-not-allowed') parar('Permita o uso do microfone neste site para ditar.');
+    else if(er==='audio-capture') parar('Não encontrei um microfone.');
+    else if(er==='network') parar('Sem conexão com o serviço de voz do navegador.');
+  };
+  rec.onend=()=>{ if(a.fim||ativo!==a) return;
+    if(!ta.isConnected){ parar(); return; }
+    safe(()=>rec.start());   // o navegador encerra sozinho após silêncios; reinicia enquanto estiver ligado
+  };
+  try{ rec.start(); }catch(e){ ativo=null; toast('Não consegui iniciar o ditado',true); return; }
+  btn.classList.add('on'); btn.setAttribute('aria-pressed','true'); btn.title='Parar ditado'; ta.classList.add('voz-ouvindo');
+  live.classList.add('on'); live.innerHTML='<b>● Ouvindo…</b> fale normalmente';
+  a.pos=(document.activeElement===ta)?ta.selectionEnd:ta.value.length;
+}
+
+// ---------- coloca um microfone em cada campo de texto longo ----------
+function equipar(ta){
+  if(ta.dataset.voz||SEM_BOTAO.has(ta.id)||ta.closest('.voz-wrap')) return; ta.dataset.voz='1';
+  const w=document.createElement('span'); w.className='voz-wrap'; ta.parentNode.insertBefore(w,ta); w.appendChild(ta);
+  const b=document.createElement('button'); b.type='button'; b.className='voz-btn'; b.title='Ditar (Alt+D)'; b.setAttribute('aria-label','Ditar por voz'); b.setAttribute('aria-pressed','false');
+  b.innerHTML='<span class="mic" aria-hidden="true">🎙️</span><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>';
+  const live=document.createElement('div'); live.className='voz-live'; live.setAttribute('role','status'); live.setAttribute('aria-live','polite');
+  w.appendChild(b); w.after(live);
+  b.addEventListener('mousedown',e=>e.preventDefault());           // não tira o cursor do campo
+  b.addEventListener('click',()=>{ if(!ativo||ativo.ta!==ta) safe(()=>{ if(document.activeElement!==ta) ta.focus(); }); iniciar(ta,b,live); });
+}
+function varrer(raiz){ (raiz||document).querySelectorAll('textarea.f').forEach(equipar); }
+const mc=document.getElementById('view-app');
+if(mc&&window.MutationObserver){ new MutationObserver(()=>varrer(document)).observe(document.body,{childList:true,subtree:true}); }
+varrer(document);
+// atalho: Alt+D no campo em foco; Esc também interrompe
+document.addEventListener('keydown',e=>{
+  if(e.altKey&&!e.ctrlKey&&!e.metaKey&&e.key.toLowerCase()==='d'){ const ta=document.activeElement;
+    if(ta&&ta.tagName==='TEXTAREA'){ e.preventDefault(); equipar(ta); const w=ta.closest('.voz-wrap'); if(w){ iniciar(ta,w.querySelector('.voz-btn'),w.nextElementSibling); } } }
+  else if(e.key==='Escape'&&ativo){ parar(); }
+});
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) parar(); });
+window.addEventListener('pagehide',()=>parar());
 })();
 </script>
 </body>
