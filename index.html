@@ -666,6 +666,17 @@
     <div class="field"><label>E-mail do paciente</label><input id="sd-mail" class="f" type="email" placeholder="paciente@exemplo.com"></div>
     <label style="display:flex;gap:8px;align-items:flex-start;color:var(--fg);font-weight:500;margin-top:6px"><input type="checkbox" id="sd-ok" style="width:auto;margin-top:3px">
       <span>O paciente pediu ou autorizou receber este documento por este canal, neste número ou e-mail.</span></label>
+    <div id="sd-lk" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">
+      <div style="font-weight:700;margin-bottom:4px">Link seguro <span class="chip">recomendado</span></div>
+      <div class="muted" id="sd-lk-exp" style="font-size:12.5px;line-height:1.45;margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn primary sm" id="sd-lk-wa" disabled>Link por WhatsApp</button>
+        <button class="btn ghost sm" id="sd-lk-mail" disabled>Link por e-mail</button>
+        <button class="btn ghost sm" id="sd-lk-sms" disabled hidden>Link por SMS</button>
+        <button class="btn ghost sm" id="sd-lk-copy" disabled>Copiar link</button>
+      </div>
+      <div class="muted" id="sd-lk-info" style="font-size:12.5px;margin-top:8px;line-height:1.45"></div>
+    </div>
     <div class="muted" id="sd-dica" style="margin-top:10px;line-height:1.5"></div>
   </div>
   <div class="mf" style="flex-wrap:wrap;gap:6px">
@@ -915,6 +926,10 @@ const ENVIO_EMAIL_AUTOMATICO = false;
 // Para TESTAR só neste aparelho: abra o app com ?envio_auto=1 no endereço (e ?envio_auto=0 para desligar).
 try{ const q=new URLSearchParams(location.search).get('envio_auto'); if(q==='1'||q==='0') localStorage.setItem('pep_envio_auto',q); }catch(e){}
 const envioAutoLigado=()=>{ try{ return ENVIO_EMAIL_AUTOMATICO||localStorage.getItem('pep_envio_auto')==='1'; }catch(e){ return ENVIO_EMAIL_AUTOMATICO; } };
+// Link seguro (PDF guardado em bucket privado + página baixar.html com confirmação). Precisa da função "link-documento" publicada.
+const LINK_SEGURO_ATIVO = true;
+// SMS do link (Brevo SMS: exige créditos e remetente). Deixe false até contratar.
+const SMS_LINK_ATIVO = false;
 const VERIFICA_URL = "https://servicofernandonaka.github.io/sistema-prontuario-eletronico/verificar.html";
 // ==================================================
 
@@ -2883,7 +2898,7 @@ async function abrirEnviar(entrada){
   $('sd-tel').value=pacienteSel.telefone||''; $('sd-mail').value=pacienteSel.email||'';
   $('sd-doc').textContent='Preparando o PDF de “'+(docs[0].tituloPrinc||docs[0].titulo)+'”'+(docs.length>1?' (+'+(docs.length-1)+' guia(s))':'')+'…';
   $('sd-dica').textContent='';
-  envioAtual={entrada,arquivo:null}; openM('m-enviar');
+  envioAtual={entrada,arquivo:null,link:null}; $('sd-lk-info').textContent=''; openM('m-enviar');
   auditarDoc(entrada);
   const r=await gerarArquivoPDF(entrada,'Enviar');
   if(!envioAtual||envioAtual.entrada!==entrada) return;       // fechou/trocou enquanto gerava
@@ -2897,6 +2912,7 @@ async function abrirEnviar(entrada){
     (r.assinado?'':'<br><span style="color:var(--err)">Antimicrobianos e controle especial costumam exigir assinatura digital para valer fora do papel: ligue a assinatura (A1) no menu antes de enviar.</span>');
   $('sd-share').hidden=!podeCompartilhar;
   $('sd-auto-btn').hidden=!envioAutoLigado();
+  $('sd-lk').hidden=!LINK_SEGURO_ATIVO; $('sd-lk-sms').hidden=!SMS_LINK_ATIVO; prepararSecaoLink();
   atualizarBotoesEnvio();
 }
 function atualizarBotoesEnvio(){
@@ -2905,6 +2921,7 @@ function atualizarBotoesEnvio(){
   $('sd-wa-btn').disabled=!(pronto&&ok&&telWhats($('sd-tel').value));
   const mailOk=pronto&&ok&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('sd-mail').value.trim());
   $('sd-mail-btn').disabled=!mailOk; $('sd-auto-btn').disabled=!mailOk||navigator.onLine===false;
+  if(typeof atualizarBotoesLink==='function') atualizarBotoesLink(pronto,ok,mailOk);
 }
 ['sd-ok','sd-tel','sd-mail'].forEach(i=>{ $(i).addEventListener('input',atualizarBotoesEnvio); $(i).addEventListener('change',atualizarBotoesEnvio); });
 function registrarEnvio(canal){ const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
@@ -2921,6 +2938,70 @@ $('sd-wa-btn').onclick=()=>{
   window.open('https://wa.me/'+n+'?text='+encodeURIComponent(textoEnvio(envioAtual.entrada).corpo),'_blank','noopener');
   registrarEnvio('whatsapp'); toast('PDF baixado — anexe-o na conversa do WhatsApp que abriu');
 };
+// ---- Link seguro: o PDF vai para um bucket privado (função "link-documento") e o paciente recebe só o link.
+// Na página baixar.html ele confirma os 4 últimos dígitos do CPF (ou a data de nascimento, se não houver CPF) e baixa o PDF por 14 dias.
+function verificacaoDoPaciente(){
+  const p=pacienteSel||{}, cpf=soDigitos(p.cpf);
+  if(cpf.length===11) return {tipo:'cpf4',resposta:cpf.slice(-4),rotulo:'os 4 últimos dígitos do CPF'};
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(p.data_nascimento||'');
+  if(m) return {tipo:'nasc',resposta:m[3]+m[2]+m[1],rotulo:'a data de nascimento'};
+  return null;
+}
+const baseLink=()=>location.origin+location.pathname.replace(/[^/]*$/,'')+'baixar.html';
+function prepararSecaoLink(){
+  const v=verificacaoDoPaciente();
+  $('sd-lk-exp').textContent=v?'O paciente recebe só um link. Para abrir, confirma '+v.rotulo+' e baixa o PDF em até 14 dias (5 downloads). Nada clínico vai no texto da mensagem.'
+                              :'Para usar o link seguro, o cadastro precisa ter o CPF ou a data de nascimento do paciente (é com isso que ele confirma a identidade).';
+}
+function atualizarBotoesLink(pronto,ok,mailOk){
+  const v=!!verificacaoDoPaciente(), base=pronto&&ok&&v&&navigator.onLine!==false, tel=!!telWhats($('sd-tel').value);
+  $('sd-lk-wa').disabled=!(base&&tel); $('sd-lk-sms').disabled=!(base&&tel); $('sd-lk-mail').disabled=!(base&&mailOk); $('sd-lk-copy').disabled=!base;
+}
+function msgErroLink(error,det){
+  const st=error&&error.context&&error.context.status;
+  if(st===404||(error&&error.name==='FunctionsFetchError')) return 'o link seguro ainda não está instalado no Supabase (ou sem internet).';
+  if(det==='nao_configurado') return 'falta configurar o segredo LINK_PEPPER na função.';
+  if(det==='limite_por_hora') return 'limite de links por hora atingido. Tente mais tarde.';
+  if(det==='pdf_grande') return 'o PDF passa de 5 MB.';
+  return det||'falha ao criar o link';
+}
+async function criarLinkSeguro(smsPara){
+  const r=envioAtual&&envioAtual.arquivo, v=verificacaoDoPaciente(); if(!r||!v) return null;
+  if(!smsPara&&envioAtual.link) return envioAtual.link;
+  if(r.bytes.length>5*1024*1024) throw new Error('o PDF passa de 5 MB.');
+  const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
+  const {data,error}=await sb.functions.invoke('link-documento',{body:{acao:'criar',pdf_base64:bytesParaB64(r.bytes),nome_arquivo:r.nome,
+    titulo:String((x&&x.tituloPrinc)||(x&&x.titulo)||'Documento'),verificacao:{tipo:v.tipo,resposta:v.resposta},validade_dias:14,base_url:baseLink(),
+    remetente_nome:dadosProf().nome||undefined,...(smsPara?{sms_para:smsPara}:{})}});
+  if(error){ let det=''; try{ det=(await error.context.json()).erro||''; }catch(e){} throw new Error(msgErroLink(error,det)); }
+  if(!data||!data.ok||!data.token) throw new Error('resposta inesperada da função');
+  const link={id:data.id,url:data.url||(baseLink()+'#'+data.token),expira:data.expira_em,rotulo:v.rotulo,sms:data.sms};
+  envioAtual.link=link; return link;
+}
+function textoLink(l){
+  const p=pacienteSel||{}, prim=String(p.nome||'').trim().split(/\s+/)[0]||'', prof=dadosProf();
+  return 'Olá'+(prim?', '+prim:'')+'. '+(prof.nome?prof.nome+' enviou':'Foi enviado')+' o seu documento médico. Para abrir, acesse o link abaixo e confirme '+l.rotulo+':\n'+l.url+
+    '\nO link vale até '+new Date(l.expira).toLocaleDateString('pt-BR')+'.';
+}
+async function acaoLink(botao,canal,executar){
+  const rot=botao.textContent; botao.disabled=true; botao.textContent='Criando link…'; const info=$('sd-lk-info');
+  try{ const l=await executar(); if(!l) return;
+    info.innerHTML='Link criado (válido até '+esc(new Date(l.expira).toLocaleDateString('pt-BR'))+'). <a href="#" id="sd-lk-rev">Revogar este link</a>';
+    $('sd-lk-rev').onclick=async ev=>{ ev.preventDefault();
+      const {error}=await sb.functions.invoke('link-documento',{body:{acao:'revogar',id:l.id}});
+      if(error){ toast('Não consegui revogar: tente de novo',true); return; }
+      envioAtual.link=null; info.textContent='Link revogado: ele não abre mais.'; toast('Link revogado'); };
+    registrarEnvio('link '+canal);
+  }catch(e){ toast('Não criei o link: '+(e.message||e),true); }
+  finally{ botao.textContent=rot; atualizarBotoesEnvio(); }
+}
+$('sd-lk-wa').onclick=()=>acaoLink($('sd-lk-wa'),'whatsapp',async()=>{ const n=telWhats($('sd-tel').value); const l=await criarLinkSeguro(); if(l&&n){ window.open('https://wa.me/'+n+'?text='+encodeURIComponent(textoLink(l)),'_blank','noopener'); } return l; });
+$('sd-lk-mail').onclick=()=>acaoLink($('sd-lk-mail'),'e-mail',async()=>{ const l=await criarLinkSeguro(); if(l){ const a=document.createElement('a');
+  a.href='mailto:'+encodeURIComponent($('sd-mail').value.trim()).replace(/%40/g,'@')+'?subject='+encodeURIComponent('Seu documento médico')+'&body='+encodeURIComponent(textoLink(l)); document.body.appendChild(a); a.click(); a.remove(); } return l; });
+$('sd-lk-copy').onclick=()=>acaoLink($('sd-lk-copy'),'copiado',async()=>{ const l=await criarLinkSeguro(); if(l){ try{ await navigator.clipboard.writeText(textoLink(l)); toast('Mensagem com o link copiada ✓'); }catch(e){ toast('Não consegui copiar; selecione o texto manualmente',true); } } return l; });
+$('sd-lk-sms').onclick=()=>acaoLink($('sd-lk-sms'),'sms',async()=>{ const l=await criarLinkSeguro(soDigitos($('sd-tel').value));
+  if(l){ if(l.sms&&l.sms.enviado) toast('SMS enviado ✓'); else toast('Link criado, mas o SMS não saiu ('+((l.sms&&l.sms.erro)||'erro')+'). Use WhatsApp ou copie o link.',true); } return l; });
+
 // Envio automático por e-mail: o PDF vai para a função "enviar-documento" (Supabase), que o entrega como anexo.
 const bytesParaB64=u8=>{ let s='', n=0x8000; for(let i=0;i<u8.length;i+=n) s+=String.fromCharCode.apply(null,u8.subarray(i,i+n)); return btoa(s); };
 $('sd-auto-btn').onclick=async()=>{

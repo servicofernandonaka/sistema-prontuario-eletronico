@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Seu documento — PEP Clínico</title>
+<style>
+  :root{color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef3f9;color:#13293f;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.5;padding:18px}
+  .card{max-width:440px;margin:24px auto;background:#fff;border:1px solid #d8e3ef;border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(17,42,68,.10)}
+  .top{background:#0a6fbd;color:#fff;padding:16px 20px;font-weight:700;font-size:18px}
+  .top.err{background:#c62828}.top.ok{background:#157347}
+  .bd{padding:20px}
+  label{display:block;font-weight:600;margin-bottom:8px}
+  input{width:100%;font-size:22px;letter-spacing:.12em;text-align:center;padding:12px;border:1px solid #b9c9db;border-radius:10px}
+  input:focus{outline:2px solid #0a6fbd;border-color:transparent}
+  button,a.btn{display:block;width:100%;margin-top:14px;padding:13px;font-size:16px;font-weight:700;border:0;border-radius:10px;background:#0a6fbd;color:#fff;text-align:center;text-decoration:none;cursor:pointer}
+  button[disabled]{opacity:.6}
+  .msg{margin-top:12px;font-size:14px}.msg.err{color:#c62828}
+  .nota{font-size:12.5px;color:#5e7490;margin-top:14px}
+  .rodape{font-size:12.5px;color:#5e7490;max-width:440px;margin:0 auto;text-align:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top" id="top">Seu documento</div>
+  <div class="bd" id="bd">Aguarde um instante…</div>
+</div>
+<div class="rodape">PEP Clínico · link seguro e pessoal</div>
+<script>
+// Página pública de download. Nada de dados clínicos passa por aqui: só o token (que vem depois do #, e portanto não é
+// enviado a nenhum servidor na abertura da página) e a confirmação que o paciente digita.
+var FUNC = "https://joygodczajayygjxerno.supabase.co/functions/v1/link-documento";
+var token = (location.hash || "").replace(/^#/, "");
+try { history.replaceState(null, "", location.pathname); } catch (e) {}   // tira o token da barra de endereço
+
+var top_ = document.getElementById("top"), bd = document.getElementById("bd");
+function limpa() { while (bd.firstChild) bd.removeChild(bd.firstChild); }
+function el(t, txt, cls) { var e = document.createElement(t); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; }
+function erro(titulo, texto) { top_.textContent = titulo; top_.className = "top err"; limpa(); bd.appendChild(el("p", texto)); }
+function chamar(corpo) {
+  return fetch(FUNC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+    .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); });
+}
+
+function pedirConfirmacao(tipo) {
+  top_.textContent = "Confirme que é você"; top_.className = "top"; limpa();
+  var cpf = tipo === "cpf4";
+  var form = el("form"), lb = el("label", cpf ? "Digite os 4 últimos dígitos do seu CPF" : "Digite sua data de nascimento (dia, mês e ano)");
+  var inp = el("input"); inp.id = "resp"; lb.htmlFor = "resp";
+  inp.setAttribute("inputmode", "numeric"); inp.setAttribute("autocomplete", "off");
+  inp.maxLength = cpf ? 4 : 10; inp.placeholder = cpf ? "0000" : "dd/mm/aaaa";
+  var btn = el("button", "Abrir documento"), msg = el("div", "", "msg err");
+  form.appendChild(lb); form.appendChild(inp); form.appendChild(btn); form.appendChild(msg);
+  form.appendChild(el("div", "Esse passo protege o seu documento caso o link chegue a outra pessoa.", "nota"));
+  bd.appendChild(form); inp.focus();
+  form.onsubmit = function (ev) {
+    ev.preventDefault(); msg.textContent = ""; btn.disabled = true;
+    chamar({ acao: "abrir", token: token, resposta: inp.value }).then(function (r) {
+      if (r.s === 200 && r.j.url) return pronto(r.j);
+      btn.disabled = false;
+      if (r.s === 401) msg.textContent = r.j.restantes > 0 ? "Não confere. Você ainda tem " + r.j.restantes + " tentativa(s)." : "Não confere. O link foi bloqueado: peça um novo ao seu médico.";
+      else if (r.s === 429) msg.textContent = "Muitas tentativas. Tente de novo em " + (r.j.minutos || 30) + " minutos.";
+      else if (r.s === 410) msg.textContent = "Este link já atingiu o limite de downloads. Peça um novo ao seu médico.";
+      else if (r.s === 404) erro("Link indisponível", "Este link expirou ou foi cancelado. Peça um novo ao seu médico.");
+      else msg.textContent = "Não foi possível abrir agora. Tente novamente em instantes.";
+    }).catch(function () { btn.disabled = false; msg.textContent = "Sem conexão. Verifique a internet e tente de novo."; });
+  };
+}
+
+function pronto(d) {
+  top_.textContent = "Documento liberado"; top_.className = "top ok"; limpa();
+  if (d.titulo) bd.appendChild(el("p", d.titulo));
+  var a = el("a", "Baixar o documento (PDF)", "btn"); a.href = d.url; a.setAttribute("download", d.nome || "documento.pdf");
+  bd.appendChild(a);
+  bd.appendChild(el("div", "O arquivo está em PDF. Guarde-o em local seguro. Este link permite mais " + d.restantes + " download(s).", "nota"));
+}
+
+if (!/^[A-Za-z0-9_-]{20,80}$/.test(token)) erro("Link inválido", "O endereço está incompleto. Abra novamente o link que você recebeu.");
+else chamar({ acao: "abrir", token: token }).then(function (r) {
+  if (r.s === 200 && r.j.precisa) pedirConfirmacao(r.j.precisa);
+  else if (r.s === 429) erro("Link bloqueado", "Muitas tentativas incorretas. Tente de novo em " + (r.j.minutos || 30) + " minutos.");
+  else erro("Link indisponível", "Este link expirou ou foi cancelado. Peça um novo ao seu médico.");
+}).catch(function () { erro("Sem conexão", "Não foi possível verificar o link agora. Verifique a internet e tente de novo."); });
+</script>
+</body>
+</html>
