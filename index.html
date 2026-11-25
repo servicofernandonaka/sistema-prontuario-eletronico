@@ -515,7 +515,8 @@
       <div class="field"><label>Data de nascimento</label><input id="np-nasc" class="f" type="date"></div>
       <div class="field"><label>Sexo</label><select id="np-sexo" class="f"><option value="">—</option><option>Feminino</option><option>Masculino</option></select></div>
       <div class="field"><label>Nome da mãe</label><input id="np-mae" class="f"></div>
-      <div class="field"><label>Telefone</label><input id="np-tel" class="f" placeholder="(11) 90000-0000"></div>
+      <div class="field"><label>Telefone / WhatsApp</label><input id="np-tel" class="f" placeholder="(11) 90000-0000"></div>
+      <div class="field np-mail hidden"><label>E-mail</label><input id="np-email" class="f" type="email" placeholder="paciente@exemplo.com" autocomplete="off"></div>
       <div class="field np-end" style="grid-column:1/-1"><label>Endereço</label><input id="np-end" class="f" placeholder="Rua, número, bairro, cidade"></div>
     </div>
   </div>
@@ -624,7 +625,7 @@
     </div>
     <div class="muted" style="font-size:12px;margin-top:8px">A declaração de comparecimento não traz diagnóstico nem CID, preservando o sigilo. Com a assinatura digital ligada, o PDF já sai assinado.</div>
   </div>
-  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn ghost" id="rb-imp">Imprimir</button><button class="btn primary" id="rb-pdf">PDF</button></div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn ghost" id="rb-imp">Imprimir</button><button class="btn ghost" id="rb-pdf">PDF</button><button class="btn primary" id="rb-env">Enviar…</button></div>
 </div></div>
 
 <div class="overlay" id="m-assinar"><div class="modal" style="max-width:560px">
@@ -652,7 +653,26 @@
     <button class="btn ghost" id="rn-lista-imp">Imprimir lista</button>
     <button class="btn ghost" id="rn-lista-pdf">PDF da lista</button>
     <button class="btn ghost" id="rn-imp">Imprimir receita</button>
-    <button class="btn primary" id="rn-pdf">PDF da receita</button>
+    <button class="btn ghost" id="rn-pdf">PDF da receita</button>
+    <button class="btn primary" id="rn-env">Enviar receita…</button>
+  </div>
+</div></div>
+
+<div class="overlay" id="m-enviar"><div class="modal" style="max-width:520px">
+  <div class="mh"><span>Enviar ao paciente</span><button class="x" data-close>✕</button></div>
+  <div class="mb">
+    <div class="muted" id="sd-doc" style="margin-bottom:10px"></div>
+    <div class="field"><label>WhatsApp / telefone do paciente</label><input id="sd-tel" class="f" inputmode="tel" placeholder="(11) 90000-0000"></div>
+    <div class="field"><label>E-mail do paciente</label><input id="sd-mail" class="f" type="email" placeholder="paciente@exemplo.com"></div>
+    <label style="display:flex;gap:8px;align-items:flex-start;color:var(--fg);font-weight:500;margin-top:6px"><input type="checkbox" id="sd-ok" style="width:auto;margin-top:3px">
+      <span>O paciente pediu ou autorizou receber este documento por este canal, neste número ou e-mail.</span></label>
+    <div class="muted" id="sd-dica" style="margin-top:10px;line-height:1.5"></div>
+  </div>
+  <div class="mf" style="flex-wrap:wrap;gap:6px">
+    <button class="btn ghost" data-close>Cancelar</button>
+    <button class="btn ghost" id="sd-mail-btn" disabled>E-mail</button>
+    <button class="btn ghost" id="sd-wa-btn" disabled>WhatsApp</button>
+    <button class="btn primary" id="sd-share" disabled>Compartilhar…</button>
   </div>
 </div></div>
 
@@ -1593,6 +1613,7 @@ function docDoRecibo(){
 $('rb-tipo').onchange=trocarTipoRecibo;
 $('rb-imp').onclick=()=>{ const d=docDoRecibo(); if(d){ closeM('m-recibo'); imprimirDoc(d); } };
 $('rb-pdf').onclick=()=>{ const d=docDoRecibo(); if(d){ closeM('m-recibo'); baixarPDF(d); } };
+$('rb-env').onclick=()=>{ const d=docDoRecibo(); if(d){ closeM('m-recibo'); abrirEnviar(d); } };
 
 // ---------- assinatura digital no próprio aparelho (certificado A1) ----------
 // O arquivo .pfx/.p12 e a senha ficam só na memória desta sessão: nunca são salvos
@@ -1772,11 +1793,11 @@ $('btn-sair-topo').onclick=sairDaConta;
 
 // ---------- pacientes ----------
 // colunas que dependem do receitas_modelos_schema.sql: sem elas, o app segue como antes
-let enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false, rastreamentosOK=false, agendaOK=false;
+let emailOK=false, enderecoOK=false, tipoReceitaOK=false, retornoOK=false, encOK=false, segurancaOK=false, escalasOK=false, anexosOK=false, vacinasOK=false, rastreamentosOK=false, agendaOK=false;
 async function sondarColunas(){
   // sem internet, a resposta vem do espelho local e não prova nada: vale o que foi visto da última vez online
-  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; rastreamentosOK=!!c.ra; agendaOK=!!c.ag; }catch(e){} return; }
-  const [a,b,r,n,sg,ec,ax,va,rs,agd]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
+  if(!navigator.onLine){ try{ const c=JSON.parse(localStorage.getItem('pep_colunas')||'{}'); emailOK=!!c.em; enderecoOK=!!c.e; tipoReceitaOK=!!c.t; retornoOK=!!c.r; encOK=!!c.n; segurancaOK=!!c.s; escalasOK=!!c.es; anexosOK=!!c.ax; vacinasOK=!!c.va; rastreamentosOK=!!c.ra; agendaOK=!!c.ag; }catch(e){} return; }
+  const [a,b,r,n,sg,ec,ax,va,rs,agd,em]=await Promise.all([sb.from('pep_pacientes').select('endereco').limit(1),
                                  sb.from('pep_prescricao_itens').select('tipo_receita').limit(1),
                                  sb.from('pep_atendimentos').select('retorno_previsto').limit(1),
                                  sb.from('pep_encaminhamentos').select('id').limit(1),
@@ -1785,9 +1806,10 @@ async function sondarColunas(){
                                  sb.from('pep_anexos').select('id').limit(1),
                                  sb.from('pep_vacinas').select('id').limit(1),
                                  sb.from('pep_rastreamentos').select('id').limit(1),
-                                 sb.from('pep_agenda').select('id').limit(1)]);
-  enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error; agendaOK=!agd.error;
-  try{ localStorage.setItem('pep_colunas',JSON.stringify({e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK,ag:agendaOK}));}catch(e){}
+                                 sb.from('pep_agenda').select('id').limit(1),
+                                 sb.from('pep_pacientes').select('email').limit(1)]);
+  emailOK=!em.error; enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error; agendaOK=!agd.error;
+  try{ localStorage.setItem('pep_colunas',JSON.stringify({em:emailOK,e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK,ag:agendaOK}));}catch(e){}
 }
 // A busca roda sobre a lista completa (guardada por 1 min): acha por nome sem acento, por CPF, CNS ou telefone
 // (com ou sem pontos), e a lista lateral mostra quantos há além dos 200 exibidos.
@@ -1843,6 +1865,7 @@ function abrirModalPaciente(p){
   $('np-nasc').value=p?(p.data_nascimento||''):''; $('np-sexo').value=p?(p.sexo||''):'';
   $('np-mae').value=p?(p.nome_mae||''):''; $('np-tel').value=p?(p.telefone||''):'';
   $('np-end').value=p?(p.endereco||''):''; document.querySelector('.np-end').classList.toggle('hidden',!enderecoOK);
+  $('np-email').value=p?(p.email||''):''; document.querySelector('.np-mail').classList.toggle('hidden',!emailOK);
   openM('m-pac');
 }
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
@@ -1872,6 +1895,7 @@ $('np-save').onclick=async()=>{
     data_nascimento:$('np-nasc').value||null, sexo:$('np-sexo').value||null,
     nome_mae:$('np-mae').value.trim()||null, telefone:$('np-tel').value.trim()||null };
   if(enderecoOK) rec.endereco=$('np-end').value.trim()||null;
+  if(emailOK){ const em0=$('np-email').value.trim(); if(em0&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em0)){ toast('E-mail inválido',true); return; } rec.email=em0||null; }
   const btn=$('np-save'); btn.disabled=true;
   let res;
   if(pacEditando) res=await sb.from('pep_pacientes').update(rec).eq('id',pacEditando.id).select().single();
@@ -2801,27 +2825,102 @@ async function marcarAssinado(entrada){
   try{ await sb.from('pep_verificacoes').update({assinado:true}).in('token',toks); }catch(e){}
 }
 
-async function baixarPDF(d){
-  if(!d) return;
-  auditarDoc(d);
+// Gera o PDF (com QR de verificação e, se o certificado estiver ligado, assinado). Devolve {bytes,nome,assinado} ou null.
+async function gerarArquivoPDF(d,verbo){
   await prepararVerificacoes(d);
-  let bytes=await gerarPDF(d); if(!bytes) return;
+  let bytes=await gerarPDF(d); if(!bytes) return null;
   let assinado=false;
   if(assinaturaArmada()&&ASS.auto){
     try{ bytes=await assinarBytes(bytes); assinado=true; }
     catch(e){
-      if(!confirm('NÃO consegui assinar este documento:\n\n'+(e.message||e)+'\n\nBaixar mesmo assim, SEM assinatura digital?')){
-        toast('Download cancelado — o documento não foi assinado.',true); return;
+      if(!confirm('NÃO consegui assinar este documento:\n\n'+(e.message||e)+'\n\n'+(verbo||'Baixar')+' mesmo assim, SEM assinatura digital?')){
+        toast('Cancelado — o documento não foi assinado.',true); return null;
       }
     }
   }
   if(assinado) await marcarAssinado(d);
   const nome=assinado?nomeArquivo(d).replace(/\.pdf$/i,'')+'-assinado.pdf':nomeArquivo(d);
-  const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
-  const a=document.createElement('a'); a.href=url; a.download=nome; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),4000);
-  toast(assinado?'PDF assinado gerado ✓':(Array.isArray(d)&&d.length>1 ? 'PDF com '+d.length+' guias gerado ✓' : 'PDF gerado ✓'));
+  return {bytes,nome,assinado};
 }
+function baixarBytesPDF(r){
+  const url=URL.createObjectURL(new Blob([r.bytes],{type:'application/pdf'}));
+  const a=document.createElement('a'); a.href=url; a.download=r.nome; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+async function baixarPDF(d){
+  if(!d) return;
+  auditarDoc(d);
+  const r=await gerarArquivoPDF(d,'Baixar'); if(!r) return;
+  baixarBytesPDF(r);
+  toast(r.assinado?'PDF assinado gerado ✓':(Array.isArray(d)&&d.length>1 ? 'PDF com '+d.length+' guias gerado ✓' : 'PDF gerado ✓'));
+}
+
+// ---------- enviar ao paciente (WhatsApp / e-mail / menu de compartilhar do aparelho) ----------
+// O PDF é gerado AQUI, no aparelho, e entregue ao app que o médico escolher (WhatsApp, e-mail…): nada passa por servidor nosso.
+// O PDF é preparado ao abrir a janela, para o botão "Compartilhar" poder agir direto no toque (celulares exigem isso).
+let envioAtual=null;
+const telWhats=v=>{ let d=soDigitos(v); if(d.length===10||d.length===11) d='55'+d; return (d.length>=12&&d.length<=13&&d.startsWith('55'))?d:''; };
+function textoEnvio(d){
+  const x=Array.isArray(d)?d.filter(Boolean)[0]:d, p=pacienteSel||{}, prof=dadosProf();
+  const prim=String(p.nome||'').trim().split(/\s+/)[0]||'';
+  const tit=String((x&&x.tituloPrinc)||(x&&x.titulo)||'documento').toLowerCase();
+  return {assunto:'Documento médico — '+((x&&x.tituloPrinc)||(x&&x.titulo)||''),
+    corpo:'Olá'+(prim?', '+prim:'')+'. Segue em anexo o documento ('+tit+') emitido em '+dataBRsimples(hojeISO())+(prof.nome?' por '+prof.nome:'')+
+      '. Para conferir a autenticidade, leia o QR code que está no próprio documento. Qualquer dúvida, é só responder esta mensagem.'};
+}
+async function abrirEnviar(entrada){
+  if(!entrada||!pacienteSel) return;
+  const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada]; if(!docs.length) return;
+  const ok=$('sd-ok'); ok.checked=false;
+  ['sd-share','sd-wa-btn','sd-mail-btn'].forEach(i=>$(i).disabled=true);
+  $('sd-tel').value=pacienteSel.telefone||''; $('sd-mail').value=pacienteSel.email||'';
+  $('sd-doc').textContent='Preparando o PDF de “'+(docs[0].tituloPrinc||docs[0].titulo)+'”'+(docs.length>1?' (+'+(docs.length-1)+' guia(s))':'')+'…';
+  $('sd-dica').textContent='';
+  envioAtual={entrada,arquivo:null}; openM('m-enviar');
+  auditarDoc(entrada);
+  const r=await gerarArquivoPDF(entrada,'Enviar');
+  if(!envioAtual||envioAtual.entrada!==entrada) return;       // fechou/trocou enquanto gerava
+  if(!r){ closeM('m-enviar'); envioAtual=null; return; }
+  envioAtual.arquivo=r;
+  $('sd-doc').innerHTML='PDF pronto: <b>'+esc(r.nome)+'</b> · '+Math.max(1,Math.round(r.bytes.length/1024))+' KB'+(r.assinado?' · <span style="color:var(--ok)">assinado digitalmente</span>':' · sem assinatura digital');
+  const podeCompartilhar=!!(navigator.canShare&&navigator.canShare({files:[new File([r.bytes],r.nome,{type:'application/pdf'})]}));
+  $('sd-dica').innerHTML=(podeCompartilhar?'<b>Compartilhar…</b> abre o menu do aparelho com o PDF já anexado (escolha WhatsApp, e-mail…). ':
+      'Este aparelho não anexa arquivo pelo menu de compartilhar. ')+
+    '<b>WhatsApp</b> e <b>E-mail</b> baixam o PDF e abrem a conversa/mensagem já endereçada — <b>anexe o arquivo baixado</b> antes de enviar.'+
+    (r.assinado?'':'<br><span style="color:var(--err)">Antimicrobianos e controle especial costumam exigir assinatura digital para valer fora do papel: ligue a assinatura (A1) no menu antes de enviar.</span>');
+  $('sd-share').hidden=!podeCompartilhar;
+  atualizarBotoesEnvio();
+}
+function atualizarBotoesEnvio(){
+  const pronto=!!(envioAtual&&envioAtual.arquivo), ok=$('sd-ok').checked;
+  $('sd-share').disabled=!(pronto&&ok);
+  $('sd-wa-btn').disabled=!(pronto&&ok&&telWhats($('sd-tel').value));
+  $('sd-mail-btn').disabled=!(pronto&&ok&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('sd-mail').value.trim()));
+}
+['sd-ok','sd-tel','sd-mail'].forEach(i=>{ $(i).addEventListener('input',atualizarBotoesEnvio); $(i).addEventListener('change',atualizarBotoesEnvio); });
+function registrarEnvio(canal){ const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
+  registrarAcesso('documento',pacienteSel&&pacienteSel.id,'enviado por '+canal+': '+String((x&&x.titulo)||'').slice(0,60)); }
+$('sd-share').onclick=async()=>{
+  const r=envioAtual&&envioAtual.arquivo; if(!r) return;
+  const t=textoEnvio(envioAtual.entrada);
+  try{ await navigator.share({files:[new File([r.bytes],r.nome,{type:'application/pdf'})],title:t.assunto,text:t.corpo}); registrarEnvio('compartilhar'); closeM('m-enviar'); toast('Documento enviado ✓'); }
+  catch(e){ if(e&&e.name!=='AbortError') toast('Não consegui compartilhar: '+(e.message||e),true); }
+};
+$('sd-wa-btn').onclick=()=>{
+  const r=envioAtual&&envioAtual.arquivo, n=telWhats($('sd-tel').value); if(!r||!n) return;
+  baixarBytesPDF(r);
+  window.open('https://wa.me/'+n+'?text='+encodeURIComponent(textoEnvio(envioAtual.entrada).corpo),'_blank','noopener');
+  registrarEnvio('whatsapp'); toast('PDF baixado — anexe-o na conversa do WhatsApp que abriu');
+};
+$('sd-mail-btn').onclick=()=>{
+  const r=envioAtual&&envioAtual.arquivo, e=$('sd-mail').value.trim(); if(!r||!e) return;
+  const t=textoEnvio(envioAtual.entrada);
+  baixarBytesPDF(r);
+  const a=document.createElement('a'); a.href='mailto:'+encodeURIComponent(e).replace(/%40/g,'@')+'?subject='+encodeURIComponent(t.assunto)+'&body='+encodeURIComponent(t.corpo);
+  document.body.appendChild(a); a.click(); a.remove();
+  registrarEnvio('e-mail'); toast('PDF baixado — anexe-o no e-mail que abriu');
+};
+
 // "Via oral" vira o cabeçalho "USO ORAL", com a concordância certa
 function viaGrupo(v){
   const t=semAc(v||'').replace(/^via\s+/,'').trim(); if(!t) return '';
@@ -3026,7 +3125,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-24.1 · correções da auditoria';
+const VERSAO='2026-11-25.1 · envio ao paciente';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3148,20 +3247,25 @@ async function renderAtendimentoSalvo(c){
     const b1=el('button','btn ghost',ng>1?'Imprimir exames ('+ng+' guias)':'Imprimir exames');
     b1.onclick=()=>imprimirDoc(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b1);
     const b2=el('button','btn ghost',ng>1?'PDF dos exames ('+ng+' guias)':'PDF dos exames');
-    b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b2); }
+    b2.onclick=()=>baixarPDF(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b2);
+    const b2e=el('button','btn ghost','Enviar exames…'); b2e.onclick=()=>abrirEnviar(docsExames(exames,cab,a.data_atendimento,a.unidade_id)); acoes.appendChild(b2e); }
   if(meds.length){
     const b3=el('button','btn ghost','Imprimir receita'); b3.onclick=()=>imprimirDoc(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b3);
-    const b4=el('button','btn primary','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4);
+    const b4=el('button','btn ghost','PDF da receita'); b4.onclick=()=>baixarPDF(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4);
+    const b4e=el('button','btn primary','Enviar receita…'); b4e.title='WhatsApp, e-mail ou menu de compartilhar'; b4e.onclick=()=>abrirEnviar(docReceita(meds,a.data_atendimento,a.unidade_id)); acoes.appendChild(b4e);
     const b4b=el('button','btn ghost','Escolher itens da receita…'); b4b.onclick=()=>abrirSelecaoReceita(meds,a); acoes.appendChild(b4b); }
   if(atest){
     const b5=el('button','btn ghost','Imprimir atestado'); b5.onclick=()=>imprimirDoc(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b5);
-    const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6); }
+    const b6=el('button','btn ghost','PDF do atestado'); b6.onclick=()=>baixarPDF(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6);
+    const b6e=el('button','btn ghost','Enviar atestado…'); b6e.onclick=()=>abrirEnviar(docAtestado(atest,a.data_atendimento,a.unidade_id)); acoes.appendChild(b6e); }
   if(encs.length){
     const b9=el('button','btn ghost',encs.length>1?'Imprimir encaminhamentos ('+encs.length+')':'Imprimir encaminhamento'); b9.onclick=()=>imprimirDoc(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b9);
-    const b10=el('button','btn ghost',encs.length>1?'PDF dos encaminhamentos':'PDF do encaminhamento'); b10.onclick=()=>baixarPDF(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b10); }
+    const b10=el('button','btn ghost',encs.length>1?'PDF dos encaminhamentos':'PDF do encaminhamento'); b10.onclick=()=>baixarPDF(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b10);
+    const b10e=el('button','btn ghost','Enviar encaminhamento…'); b10e.onclick=()=>abrirEnviar(encs.map(e=>docEncaminhamento(e,a.data_atendimento,a.unidade_id))); acoes.appendChild(b10e); }
   if(rel){
     const b7=el('button','btn ghost','Imprimir relatório'); b7.onclick=()=>imprimirDoc(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b7);
-    const b8=el('button','btn ghost','PDF do relatório'); b8.onclick=()=>baixarPDF(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b8); }
+    const b8=el('button','btn ghost','PDF do relatório'); b8.onclick=()=>baixarPDF(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b8);
+    const b8e=el('button','btn ghost','Enviar relatório…'); b8e.onclick=()=>abrirEnviar(docRelatorio(rel,a.data_atendimento,a.unidade_id)); acoes.appendChild(b8e); }
   const bEd=el('button','btn ghost','Editar atendimento');
   bEd.onclick=()=>{
     examItens.length=0; prescItens.length=0; probSel=new Set();
@@ -4120,6 +4224,7 @@ $('rs-save').onclick=async()=>{
 };
 $('rn-imp').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); imprimirDoc(d); } };
 $('rn-pdf').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); baixarPDF(d); } };
+$('rn-env').onclick=()=>{ const d=receitaRenova(); if(d){ closeM('m-renova'); abrirEnviar(d); } };
 $('rn-lista-imp').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),renovaUnid); if(d){ closeM('m-renova'); imprimirDoc(d); } };
 $('rn-lista-pdf').onclick=()=>{ const d=docListaMedicamentos(medsRenovaSel(),renovaUnid); if(d){ closeM('m-renova'); baixarPDF(d); } };
 
