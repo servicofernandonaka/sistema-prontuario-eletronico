@@ -670,9 +670,10 @@
   </div>
   <div class="mf" style="flex-wrap:wrap;gap:6px">
     <button class="btn ghost" data-close>Cancelar</button>
-    <button class="btn ghost" id="sd-mail-btn" disabled>E-mail</button>
+    <button class="btn ghost" id="sd-mail-btn" disabled title="Baixa o PDF e abre o seu programa de e-mail para você anexar">Abrir e-mail</button>
     <button class="btn ghost" id="sd-wa-btn" disabled>WhatsApp</button>
     <button class="btn primary" id="sd-share" disabled>Compartilhar…</button>
+    <button class="btn primary" id="sd-auto-btn" disabled title="O PDF vai como anexo, direto do sistema, sem você abrir nada">Enviar e-mail agora</button>
   </div>
 </div></div>
 
@@ -2872,7 +2873,7 @@ async function abrirEnviar(entrada){
   if(!entrada||!pacienteSel) return;
   const docs=Array.isArray(entrada)?entrada.filter(Boolean):[entrada]; if(!docs.length) return;
   const ok=$('sd-ok'); ok.checked=false;
-  ['sd-share','sd-wa-btn','sd-mail-btn'].forEach(i=>$(i).disabled=true);
+  ['sd-share','sd-wa-btn','sd-mail-btn','sd-auto-btn'].forEach(i=>$(i).disabled=true);
   $('sd-tel').value=pacienteSel.telefone||''; $('sd-mail').value=pacienteSel.email||'';
   $('sd-doc').textContent='Preparando o PDF de “'+(docs[0].tituloPrinc||docs[0].titulo)+'”'+(docs.length>1?' (+'+(docs.length-1)+' guia(s))':'')+'…';
   $('sd-dica').textContent='';
@@ -2895,7 +2896,8 @@ function atualizarBotoesEnvio(){
   const pronto=!!(envioAtual&&envioAtual.arquivo), ok=$('sd-ok').checked;
   $('sd-share').disabled=!(pronto&&ok);
   $('sd-wa-btn').disabled=!(pronto&&ok&&telWhats($('sd-tel').value));
-  $('sd-mail-btn').disabled=!(pronto&&ok&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('sd-mail').value.trim()));
+  const mailOk=pronto&&ok&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('sd-mail').value.trim());
+  $('sd-mail-btn').disabled=!mailOk; $('sd-auto-btn').disabled=!mailOk||navigator.onLine===false;
 }
 ['sd-ok','sd-tel','sd-mail'].forEach(i=>{ $(i).addEventListener('input',atualizarBotoesEnvio); $(i).addEventListener('change',atualizarBotoesEnvio); });
 function registrarEnvio(canal){ const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
@@ -2911,6 +2913,30 @@ $('sd-wa-btn').onclick=()=>{
   baixarBytesPDF(r);
   window.open('https://wa.me/'+n+'?text='+encodeURIComponent(textoEnvio(envioAtual.entrada).corpo),'_blank','noopener');
   registrarEnvio('whatsapp'); toast('PDF baixado — anexe-o na conversa do WhatsApp que abriu');
+};
+// Envio automático por e-mail: o PDF vai para a função "enviar-documento" (Supabase), que o entrega como anexo.
+const bytesParaB64=u8=>{ let s='', n=0x8000; for(let i=0;i<u8.length;i+=n) s+=String.fromCharCode.apply(null,u8.subarray(i,i+n)); return btoa(s); };
+$('sd-auto-btn').onclick=async()=>{
+  const r=envioAtual&&envioAtual.arquivo, para=$('sd-mail').value.trim(); if(!r||!para) return;
+  if(r.bytes.length>5*1024*1024){ toast('PDF acima de 5 MB: use "Abrir e-mail" ou "Compartilhar"',true); return; }
+  const t=textoEnvio(envioAtual.entrada), btn=$('sd-auto-btn'), rot=btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
+  const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
+  try{
+    const {data,error}=await sb.functions.invoke('enviar-documento',{body:{para,assunto:t.assunto,corpo:t.corpo,nome_arquivo:r.nome,
+      pdf_base64:bytesParaB64(r.bytes),tipo:String((x&&x.tituloPrinc)||(x&&x.titulo)||'documento'),responder_para:emailAtual||undefined}});
+    if(error){
+      let cod='', det='', st=error.context&&error.context.status;
+      try{ const j=await error.context.json(); cod=j.error||''; det=j.detalhe||''; }catch(e){}
+      if(st===404||error.name==='FunctionsFetchError') throw new Error('o envio automático ainda não está instalado no Supabase (ou sem internet). Use "Abrir e-mail" ou "Compartilhar".');
+      if(cod==='nao_configurado') throw new Error('falta configurar o serviço de e-mail na função (segredos EMAIL_API_KEY e EMAIL_FROM).');
+      if(cod==='limite_por_hora') throw new Error('limite de envios por hora atingido. Tente mais tarde.');
+      if(cod==='provedor_recusou') throw new Error('o serviço de e-mail recusou o envio (confira o remetente verificado e a chave).');
+      throw new Error(det||cod||'falha no envio');
+    }
+    if(!data||!data.ok) throw new Error('resposta inesperada da função');
+    registrarEnvio('e-mail automático'); closeM('m-enviar'); toast('E-mail enviado para '+para+' ✓');
+  }catch(e){ toast('Não enviei: '+(e.message||e),true); btn.disabled=false; }
+  finally{ btn.textContent=rot; atualizarBotoesEnvio(); }
 };
 $('sd-mail-btn').onclick=()=>{
   const r=envioAtual&&envioAtual.arquivo, e=$('sd-mail').value.trim(); if(!r||!e) return;
