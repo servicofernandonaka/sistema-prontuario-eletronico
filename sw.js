@@ -8,7 +8,7 @@
 //     assim uma versão nova nunca fica presa atrás de uma cópia velha;
 //   • bibliotecas (vendor/) e ícones: guardados e servidos daqui, porque só mudam com a VERSAO;
 //   • Supabase: não passa por aqui.
-const VERSAO='2026-11-25.2';
+const VERSAO='2026-11-25.3';
 const CACHE='pep-'+VERSAO;
 const FIXOS=['./vendor/supabase.js','./vendor/jszip.min.js','./vendor/pdf-lib.min.js','./vendor/xlsx.full.min.js','./vendor/qrcode.js',
   './vendor/pdf.min.js','./vendor/pdf.worker.min.js','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./manifest.webmanifest'];
