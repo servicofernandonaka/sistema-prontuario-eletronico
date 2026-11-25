@@ -912,6 +912,9 @@ const EMAILS_AUTORIZADOS = [];
 // Botão "Enviar e-mail agora" (envio automático pela função "enviar-documento" do Supabase).
 // Deixe false até a função ter os segredos de e-mail e um remetente com domínio próprio autenticado.
 const ENVIO_EMAIL_AUTOMATICO = false;
+// Para TESTAR só neste aparelho: abra o app com ?envio_auto=1 no endereço (e ?envio_auto=0 para desligar).
+try{ const q=new URLSearchParams(location.search).get('envio_auto'); if(q==='1'||q==='0') localStorage.setItem('pep_envio_auto',q); }catch(e){}
+const envioAutoLigado=()=>{ try{ return ENVIO_EMAIL_AUTOMATICO||localStorage.getItem('pep_envio_auto')==='1'; }catch(e){ return ENVIO_EMAIL_AUTOMATICO; } };
 const VERIFICA_URL = "https://servicofernandonaka.github.io/sistema-prontuario-eletronico/verificar.html";
 // ==================================================
 
@@ -2893,7 +2896,7 @@ async function abrirEnviar(entrada){
     '<b>WhatsApp</b> e <b>E-mail</b> baixam o PDF e abrem a conversa/mensagem já endereçada — <b>anexe o arquivo baixado</b> antes de enviar.'+
     (r.assinado?'':'<br><span style="color:var(--err)">Antimicrobianos e controle especial costumam exigir assinatura digital para valer fora do papel: ligue a assinatura (A1) no menu antes de enviar.</span>');
   $('sd-share').hidden=!podeCompartilhar;
-  $('sd-auto-btn').hidden=!ENVIO_EMAIL_AUTOMATICO;
+  $('sd-auto-btn').hidden=!envioAutoLigado();
   atualizarBotoesEnvio();
 }
 function atualizarBotoesEnvio(){
