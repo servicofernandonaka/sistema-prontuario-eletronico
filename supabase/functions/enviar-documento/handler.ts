@@ -80,7 +80,11 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const limite = Math.max(1, parseInt(env.LIMITE_POR_HORA || "30", 10) || 30);
   if (await deps.contar(user.id) >= limite) return json(env, 429, { error: "limite_por_hora", detalhe: "Limite de envios por hora atingido." });
 
-  const nomeDe = env.EMAIL_FROM_NAME || "Consultório";
+  // Nome exibido: "Dr. Fulano (via PEP Clínico)". Vem do app, mas é limpo aqui: sem quebra de linha, aspas, < > , ; : nem "@"
+  // (para não parecer outro endereço de e-mail nem injetar cabeçalhos) e com no máximo 60 caracteres.
+  const nomeMedico = String(b?.remetente_nome || "").replace(/[\r\n<>"@,;:\\]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  const sistema = env.EMAIL_FROM_NAME || "PEP Clínico";
+  const nomeDe = nomeMedico ? `${nomeMedico} (via ${sistema})` : sistema;
   const prov = (env.EMAIL_PROVIDER || "brevo").toLowerCase();
   let r: Response;
   try {

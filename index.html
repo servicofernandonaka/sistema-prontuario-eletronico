@@ -2930,7 +2930,7 @@ $('sd-auto-btn').onclick=async()=>{
   const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
   try{
     const {data,error}=await sb.functions.invoke('enviar-documento',{body:{para,assunto:t.assunto,corpo:t.corpo,nome_arquivo:r.nome,
-      pdf_base64:bytesParaB64(r.bytes),tipo:String((x&&x.tituloPrinc)||(x&&x.titulo)||'documento'),responder_para:emailAtual||undefined}});
+      pdf_base64:bytesParaB64(r.bytes),tipo:String((x&&x.tituloPrinc)||(x&&x.titulo)||'documento'),responder_para:emailAtual||undefined,remetente_nome:dadosProf().nome||undefined}});
     if(error){
       let cod='', det='', st=error.context&&error.context.status;
       try{ const j=await error.context.json(); cod=j.error||''; det=j.detalhe||''; }catch(e){}

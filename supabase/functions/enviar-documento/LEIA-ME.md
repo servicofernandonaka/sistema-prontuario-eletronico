@@ -28,8 +28,8 @@ supabase functions deploy enviar-documento
 | Nome | Valor |
 |---|---|
 | `EMAIL_API_KEY` | a chave do serviço (nunca no código, nunca no `index.html`) |
-| `EMAIL_FROM` | o e-mail remetente já verificado |
-| `EMAIL_FROM_NAME` | ex.: `Dr. Fernando — UBS …` |
+| `EMAIL_FROM` | um endereço do SEU domínio autenticado no serviço (ex.: `envio@seudominio.com.br`) — um só para todos os médicos |
+| `EMAIL_FROM_NAME` | o nome do SISTEMA, ex.: `PEP Clínico`. O remetente aparece como **"Dr. Fulano (via PEP Clínico)"**, com o nome de cada médico logado |
 | `EMAIL_PROVIDER` | `brevo` (padrão) ou `resend` |
 | `LIMITE_POR_HORA` | opcional, padrão 30 |
 | `ALLOWED_ORIGIN` | opcional: o endereço do app (ex.: `https://seu-app.netlify.app`) |
