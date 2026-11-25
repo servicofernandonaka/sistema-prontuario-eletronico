@@ -673,6 +673,7 @@
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn primary sm" id="sd-lk-wa" disabled>Link por WhatsApp</button>
         <button class="btn ghost sm" id="sd-lk-mail" disabled>Link por e-mail</button>
+        <button class="btn ghost sm" id="sd-lk-gmail" disabled>Link pelo Gmail (web)</button>
         <button class="btn ghost sm" id="sd-lk-sms" disabled hidden>Link por SMS</button>
         <button class="btn ghost sm" id="sd-lk-copy" disabled>Copiar link</button>
       </div>
@@ -2966,7 +2967,7 @@ function prepararSecaoLink(){
 }
 function atualizarBotoesLink(pronto,ok,mailOk){
   const v=!!verificacaoDoPaciente(), base=pronto&&ok&&v&&navigator.onLine!==false, tel=!!telWhats($('sd-tel').value);
-  $('sd-lk-wa').disabled=!(base&&tel); $('sd-lk-sms').disabled=!(base&&tel); $('sd-lk-mail').disabled=!(base&&mailOk); $('sd-lk-copy').disabled=!base;
+  $('sd-lk-wa').disabled=!(base&&tel); $('sd-lk-sms').disabled=!(base&&tel); $('sd-lk-mail').disabled=!(base&&mailOk); $('sd-lk-gmail').disabled=!(base&&mailOk); $('sd-lk-copy').disabled=!base;
 }
 function msgErroLink(error,det){
   const st=error&&error.context&&error.context.status;
@@ -3009,6 +3010,8 @@ async function acaoLink(botao,canal,executar){
 $('sd-lk-wa').onclick=()=>acaoLink($('sd-lk-wa'),'whatsapp',async()=>{ const n=telWhats($('sd-tel').value); const l=await criarLinkSeguro(); if(l&&n){ window.open('https://wa.me/'+n+'?text='+encodeURIComponent(textoLink(l)),'_blank','noopener'); } return l; });
 $('sd-lk-mail').onclick=()=>acaoLink($('sd-lk-mail'),'e-mail',async()=>{ const l=await criarLinkSeguro(); if(l){ const a=document.createElement('a');
   a.href='mailto:'+encodeURIComponent($('sd-mail').value.trim()).replace(/%40/g,'@')+'?subject='+encodeURIComponent('Seu documento médico')+'&body='+encodeURIComponent(textoLink(l)); document.body.appendChild(a); a.click(); a.remove(); } return l; });
+$('sd-lk-gmail').onclick=()=>acaoLink($('sd-lk-gmail'),'gmail',async()=>{ const l=await criarLinkSeguro(); if(l){
+  window.open('https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent($('sd-mail').value.trim())+'&su='+encodeURIComponent('Seu documento médico')+'&body='+encodeURIComponent(textoLink(l)),'_blank','noopener'); } return l; });
 $('sd-lk-copy').onclick=()=>acaoLink($('sd-lk-copy'),'copiado',async()=>{ const l=await criarLinkSeguro(); if(l){ try{ await navigator.clipboard.writeText(textoLink(l)); toast('Mensagem com o link copiada ✓'); }catch(e){ toast('Não consegui copiar; selecione o texto manualmente',true); } } return l; });
 $('sd-lk-sms').onclick=()=>acaoLink($('sd-lk-sms'),'sms',async()=>{ const l=await criarLinkSeguro(soDigitos($('sd-tel').value));
   if(l){ if(l.sms&&l.sms.enviado) toast('SMS enviado ✓'); else toast('Link criado, mas o SMS não saiu ('+((l.sms&&l.sms.erro)||'erro')+'). Use WhatsApp ou copie o link.',true); } return l; });
@@ -3250,7 +3253,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-25.4 · link seguro';
+const VERSAO='2026-11-25.5 · link seguro';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
