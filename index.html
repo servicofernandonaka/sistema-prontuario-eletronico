@@ -695,6 +695,77 @@ html[data-tema="escuro"] .sbox .h{color:var(--fg)}
   .toast{width:calc(100vw - 28px);max-width:420px}
 }
 @media(hover:none){.hero-home .busca-rapida kbd{display:none}}
+
+/* =================== CELULAR: experiência de aplicativo =================== */
+.bnav{display:none}
+.phead-acoes{display:contents}
+@media(max-width:760px){
+  body{padding-bottom:0}
+  .topbar{background:var(--panel);backdrop-filter:none;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;gap:8px;min-height:56px}
+  .topbar .menu-btn{width:40px;height:40px;border-radius:12px;flex:0 0 auto}
+  .badge-proto{font-size:0!important;line-height:0;padding:0!important;flex:1;min-width:0;border:0;background:transparent!important;display:flex;align-items:center}
+  .badge-proto::before{content:"PROTÓTIPO · dados fictícios";font-size:10px;line-height:1;font-weight:700;letter-spacing:.04em;color:var(--warn-fg);background:var(--warn-bg);
+    border:1px solid var(--warn-br);border-radius:20px;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .tb-dir{gap:6px;flex:0 0 auto}
+  .tb-ico{width:38px;height:38px;border-radius:12px}
+  #btn-sair-topo{padding:8px 11px}
+  .content{padding:14px 14px calc(92px + env(safe-area-inset-bottom,0px))}
+
+  /* cabeçalho do paciente: foto + nome em cima, ações deslizando embaixo */
+  .phead{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;padding:16px;margin-bottom:14px}
+  .phead .sp{display:none}
+  .phead .avatar{grid-row:1/3}
+  .phead .nm{font-size:18px;line-height:1.2}
+  .phead .mt{font-size:12.5px;line-height:1.35}
+  .phead>.btn,.phead>div:not(.avatar):not(.sp)~.btn{grid-column:auto}
+  .phead .btn{white-space:nowrap}
+  .phead{overflow:hidden}
+  .phead-acoes{grid-column:1/-1;display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:2px 16px 4px;scroll-snap-type:x proximity;scroll-padding-left:16px;-webkit-overflow-scrolling:touch}
+  .phead-acoes::-webkit-scrollbar{display:none}
+  .phead-acoes .btn{flex:0 0 auto;scroll-snap-align:start}
+
+  /* botões de documentos viram grade de 2 colunas, ocupando a largura */
+  .acoes-doc{display:grid!important;grid-template-columns:1fr 1fr;gap:10px!important;justify-content:stretch!important}
+  .acoes-doc .btn{width:100%;padding:13px 10px;font-size:13.5px;text-align:center;line-height:1.2}
+  .acoes-doc .btn.primary{grid-column:1/-1}
+
+  /* título de cartão: quebra em duas linhas quando há botão ao lado */
+  .ch{flex-wrap:wrap;row-gap:8px}
+  .ch>*{min-width:0}
+  .ch .f,.ch select,.ch input{max-width:100%}
+  .cb{padding:12px 14px}
+  .atd-row{flex-wrap:wrap;gap:6px 10px}
+  .atd-row .dt{flex:1 1 100%;font-size:14px}
+  .atd-row .tp{flex:1 1 60%}
+  .sbox .bd{padding:12px 14px}
+  .sbox .h{padding:11px 14px}
+  table{font-size:13px}
+  th,td{padding:8px 6px}
+  .maxw{max-width:100%}
+  .resumo{gap:12px}
+
+  /* aviso (toast) fica acima da barra de baixo e some ao toque */
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px));width:calc(100vw - 28px);max-width:440px;padding:11px 16px;font-size:13.5px;pointer-events:none}
+  .toast.show{pointer-events:auto}
+
+  /* barra de navegação de baixo, como um aplicativo */
+  .bnav{display:flex;position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:40;height:62px;padding:6px;gap:4px;
+    background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+    border:1px solid var(--glass-br);border-radius:22px;box-shadow:0 14px 36px -10px rgba(10,30,55,.45);animation:sobe .6s var(--spring) .2s both}
+  .bnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:0;background:transparent;color:var(--muted);
+    border-radius:16px;font-size:10.5px;font-weight:700;transition:transform .25s var(--spring),background .2s,color .2s;-webkit-tap-highlight-color:transparent}
+  .bnav button span{font-size:20px;line-height:1;transition:transform .3s var(--spring)}
+  .bnav button.on{color:var(--brand);background:color-mix(in srgb,var(--aur1) 16%,transparent)}
+  .bnav button.on span{transform:translateY(-2px) scale(1.15)}
+  .bnav button:active{transform:scale(.9)}
+  .modal{border-radius:22px 22px 0 0}
+  .overlay{padding:0;align-items:flex-end}
+  .overlay .modal{margin:0 auto;max-height:94vh;overflow:auto;border-radius:24px 24px 0 0;width:100%}
+  .overlay.open .modal{animation:folha .45s var(--ease) both}
+  .lock-card,.login-card{border-radius:22px}
+}
+@keyframes folha{from{transform:translateY(100%)}to{transform:none}}
+body.com-modal .bnav{display:none}
 @media print{body::before{display:none}}
 </style>
 <script>try{if(localStorage.getItem("pep_tema")==="escuro")document.documentElement.setAttribute("data-tema","escuro")}catch(e){}</script>
@@ -3537,7 +3608,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-25.6 · aurora';
+const VERSAO='2026-11-25.7 · aurora';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -3652,7 +3723,7 @@ async function renderAtendimentoSalvo(c){
 
   const cardAxA=el('div','card'); cardAxA.style.margin='14px 0'; box.appendChild(cardAxA); renderAnexos(cardAxA,{atendimentoId:a.id});
 
-  const acoes=el('div','', '');
+  const acoes=el('div','acoes-doc', '');
   acoes.style.cssText='display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:30px';
   if(exames.length){
     const ng=agruparExames(exames).length;
@@ -7039,6 +7110,38 @@ document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); (paleta&&paleta.classList.contains('open'))?fecharPaleta():abrirPaleta(); }
   else if(e.key==='Escape'&&paleta&&paleta.classList.contains('open')) fecharPaleta();
 });
+
+// ---------- celular: barra de baixo, ações do paciente deslizantes, aviso que some ao toque ----------
+(function(){
+  const app=document.getElementById('view-app'); if(!app) return;
+  const nav=document.createElement('nav'); nav.className='bnav'; nav.setAttribute('aria-label','Navegação');
+  nav.innerHTML='<button type="button" data-n="home"><span>🏠</span>Início</button><button type="button" data-n="agenda"><span>🗓️</span>Agenda</button>'+
+    '<button type="button" data-n="busca"><span>⌕</span>Buscar</button><button type="button" data-n="menu"><span>☰</span>Menu</button>';
+  app.appendChild(nav);
+  nav.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const n=b.dataset.n;
+    if(n==='home'){ document.getElementById('sidebar').classList.remove('open'); abrirTela(null); window.scrollTo({top:0,behavior:'smooth'}); }
+    else if(n==='agenda'){ const t=document.getElementById('btn-agconsultas'); if(t) t.click(); }
+    else if(n==='busca'){ abrirPaleta(); }
+    else if(n==='menu'){ document.getElementById('sidebar').classList.toggle('open'); } };
+  function marcarNav(){ const on=(typeof pacienteSel!=='undefined'&&pacienteSel)?'':(typeof tela!=='undefined'&&tela==='agconsultas')?'agenda':(typeof tela!=='undefined'&&tela)?'':'home';
+    nav.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.n===on)); }
+  const orig2=renderMain; renderMain=function(){ const r=orig2.apply(this,arguments); marcarNav(); return r; };
+  marcarNav();
+  // ações do cabeçalho do paciente: uma faixa deslizante (no computador continua igual)
+  const mc=document.getElementById('main-content');
+  function arrumar(){ mc.querySelectorAll('.phead:not([data-ac])').forEach(h=>{ h.dataset.ac='1';
+    const bts=[...h.children].filter(x=>x.matches&&x.matches('button,.btn')); if(!bts.length) return;
+    const w=document.createElement('div'); w.className='phead-acoes'; bts.forEach(b=>w.appendChild(b)); h.appendChild(w); }); }
+  if(window.MutationObserver) new MutationObserver(arrumar).observe(mc,{childList:true,subtree:true}); arrumar();
+  // aviso: toque (ou rolar) para dispensar
+  const t=document.getElementById('toast');
+  if(t){ t.addEventListener('click',()=>t.classList.remove('show'));
+    let desde=0; new MutationObserver(()=>{ if(t.classList.contains('show')) desde=Date.now(); }).observe(t,{attributes:true,attributeFilter:['class']});
+    window.addEventListener('scroll',()=>{ if(t.classList.contains('show')&&Date.now()-desde>1500) t.classList.remove('show'); },{passive:true,capture:true}); }
+  // some a barra quando há janela aberta
+  new MutationObserver(()=>{ document.body.classList.toggle('com-modal',!!document.querySelector('.overlay.open,.lock:not(.hidden)')); })
+    .observe(document.body,{attributes:true,subtree:true,attributeFilter:['class']});
+})();
 })();
 </script>
 </body>
