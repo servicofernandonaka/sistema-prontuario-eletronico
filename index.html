@@ -425,6 +425,23 @@
   .ped-tx .muted{font-size:12.5px}
   .ped-ok{color:#17995c;font-size:12px;font-weight:600}
   @media (max-width:640px){ .ped-row .ag-ac{width:100%} .ped-row .ag-ac .btn{flex:1} }
+  /* ---------- agendamento online ---------- */
+  .ao-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .ao-dia{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .ao-dia:last-child{border-bottom:0}
+  .ao-dia .nm{width:118px;display:flex;align-items:center;gap:8px;font-weight:600}
+  .ao-dia.off .ao-per{opacity:.4;pointer-events:none}
+  .ao-per{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .ao-per input[type=time]{width:auto;padding:6px 8px}
+  .ao-per .sep{color:var(--muted);font-size:12px}
+  .ao-link{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .ao-link img{width:150px;height:150px;border-radius:10px;border:1px solid var(--line);background:#fff}
+  .ao-url{font-family:ui-monospace,Menlo,monospace;font-size:13px;word-break:break-all;background:var(--panel-2,#f3f6fa);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .ao-bl{display:flex;align-items:center;gap:8px;padding:4px 0}
+  .ao-prev{display:flex;flex-wrap:wrap;gap:6px}
+  .ao-prev span{font-size:12.5px;border:1px solid var(--line);border-radius:20px;padding:3px 10px}
+  .ao-on{display:flex;align-items:center;gap:10px;font-weight:700}
+  @media (max-width:640px){ .ao-dia .nm{width:100%} }
 /* =====================================================================
    CAMADA "AURORA CLÍNICA" — identidade visual, movimento e modo escuro.
    Fica por último de propósito: só redefine tokens e acrescenta efeitos.
@@ -908,6 +925,7 @@ textarea.voz-ouvindo{border-color:var(--err)!important;box-shadow:0 0 0 4px colo
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
     <button class="btn ghost block" id="btn-agconsultas">Agenda de consultas</button>
     <button class="btn ghost block" id="btn-pedidos">Pedidos e lembretes <span class="ped-n" id="ped-n" hidden></span></button>
+    <button class="btn ghost block" id="btn-agonline">Agendamento online</button>
     <button class="btn ghost block" id="btn-painel">Painel da unidade</button>
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
@@ -2141,6 +2159,120 @@ async function renderPedidos(c){
     renderMain(); });
 }
 
+// ---------- agendamento online (configuração do link público) ----------
+const FUNC_AGENDA=SUPABASE_URL+'/functions/v1/agenda-publica';
+const DIAS_NOME=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+function cfgPadrao(){ const d={}; for(let i=0;i<7;i++) d[i]=(i>=1&&i<=5)?[['08:00','12:00'],['14:00','18:00']]:[];
+  return {ativo:false,nome_publico:(profCache&&profCache.nome)||'',mensagem:'',duracao_min:30,intervalo_min:0,antecedencia_horas:12,janela_dias:30,modo:'aprovar',dias:d,bloqueios:[]}; }
+function novoSlug(){ const a='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', b=new Uint8Array(10); crypto.getRandomValues(b); return [...b].map(x=>a[x%a.length]).join(''); }
+const linkAgendar=slug=>new URL('agendar.html',location.href).href.split('?')[0].split('#')[0]+'?m='+slug;
+let aoReg=null;   // {slug, config}
+async function renderAgOnline(c){
+  c.innerHTML='<div class="phead"><div><div class="nm">Agendamento online</div><div class="mt">Seus pacientes escolhem um horário livre pelo link; o pedido chega em “Pedidos e lembretes”</div></div></div><div id="ao-corpo"><div class="muted">Carregando…</div></div>';
+  const box=$('ao-corpo');
+  const {data,error}=await sb.from('pep_agenda_config').select('slug,config').maybeSingle();
+  if(tela!=='agonline'||pacienteSel||!document.body.contains(box)) return;
+  if(error){ box.innerHTML='<div class="empty">'+(/does not exist|schema cache|PGRST205|42P01/i.test(error.message+' '+(error.code||''))?'Rode o agenda_publica_schema.sql no Supabase.':'Não consegui carregar: '+esc(error.message))+'</div>'; return; }
+  aoReg=data||null;
+  const cf=Object.assign(cfgPadrao(),(data&&data.config)||{});
+  const per=(i,k)=>{ const p=(cf.dias[i]||[])[k]||['','']; return '<input type="time" class="f" data-d="'+i+'" data-p="'+k+'" data-l="a" value="'+esc(p[0])+'"><span class="sep">às</span><input type="time" class="f" data-d="'+i+'" data-p="'+k+'" data-l="b" value="'+esc(p[1])+'">'; };
+  const ordem=[1,2,3,4,5,6,0];
+  box.innerHTML=
+   '<div class="card"><div class="cb">'+
+     '<label class="ao-on"><input type="checkbox" id="ao-ativo"'+(cf.ativo?' checked':'')+'> Receber agendamentos pelo link</label>'+
+     '<div class="muted" id="ao-ativo-tx" style="font-size:12.5px"></div>'+
+   '</div></div>'+
+   '<div class="ped-sec">🔗 Seu link</div><div class="card"><div class="cb" id="ao-linkbox"></div></div>'+
+   '<div class="ped-sec">🗓️ Dias e horários de atendimento <small>deixe o 2º período vazio se não houver</small></div>'+
+   '<div class="card"><div class="cb" style="gap:0;padding:0">'+ordem.map(i=>{ const on=(cf.dias[i]||[]).length>0;
+     return '<div class="ao-dia'+(on?'':' off')+'" data-dia="'+i+'"><label class="nm"><input type="checkbox" data-on="'+i+'"'+(on?' checked':'')+'>'+DIAS_NOME[i]+'</label>'+
+       '<div class="ao-per">'+per(i,0)+'<span class="sep" style="margin:0 6px">e</span>'+per(i,1)+'</div></div>'; }).join('')+'</div></div>'+
+   '<div class="ped-sec">⚙️ Regras</div><div class="card"><div class="cb"><div class="ao-grid">'+
+     '<div class="field"><label>Duração da consulta</label><select class="f" id="ao-dur">'+[15,20,30,40,45,60,90].map(v=>'<option value="'+v+'"'+(v==cf.duracao_min?' selected':'')+'>'+v+' min</option>').join('')+'</select></div>'+
+     '<div class="field"><label>Intervalo entre consultas</label><select class="f" id="ao-int">'+[0,5,10,15,30].map(v=>'<option value="'+v+'"'+(v==cf.intervalo_min?' selected':'')+'>'+(v?v+' min':'sem intervalo')+'</option>').join('')+'</select></div>'+
+     '<div class="field"><label>Antecedência mínima</label><select class="f" id="ao-ant">'+[[2,'2 horas'],[12,'12 horas'],[24,'1 dia'],[48,'2 dias'],[72,'3 dias']].map(([v,t])=>'<option value="'+v+'"'+(v==cf.antecedencia_horas?' selected':'')+'>'+t+'</option>').join('')+'</select></div>'+
+     '<div class="field"><label>Pode marcar até</label><select class="f" id="ao-jan">'+[[7,'1 semana'],[14,'2 semanas'],[30,'1 mês'],[60,'2 meses'],[90,'3 meses']].map(([v,t])=>'<option value="'+v+'"'+(v==cf.janela_dias?' selected':'')+'>'+t+' à frente</option>').join('')+'</select></div>'+
+   '</div>'+
+   '<div class="field"><label>Quando o paciente pede um horário</label><select class="f" id="ao-modo">'+
+     '<option value="aprovar"'+(cf.modo!=='confirmar'?' selected':'')+'>Fica aguardando a minha aprovação</option>'+
+     '<option value="confirmar"'+(cf.modo==='confirmar'?' selected':'')+'>Já entra marcado na agenda</option></select></div>'+
+   '<div class="field"><label>Nome que aparece para o paciente</label><input class="f" id="ao-nome" maxlength="80" value="'+esc(cf.nome_publico)+'" placeholder="Dr. Nome Sobrenome — Clínica geral"></div>'+
+   '<div class="field"><label>Recado na página (opcional)</label><textarea class="f" id="ao-msg" maxlength="300" rows="2" placeholder="Ex.: Consulta particular. Endereço: …">'+esc(cf.mensagem)+'</textarea></div>'+
+   '</div></div>'+
+   '<div class="ped-sec">🏖️ Dias bloqueados <small>férias, congressos, feriados</small></div><div class="card"><div class="cb">'+
+     '<div id="ao-bls"></div>'+
+     '<div class="ao-bl"><input type="date" class="f" id="ao-bde" style="width:auto"><span class="sep">até</span><input type="date" class="f" id="ao-bate" style="width:auto"><button class="btn ghost sm" id="ao-badd">+ Bloquear</button></div>'+
+   '</div></div>'+
+   '<div style="display:flex;gap:8px;margin:16px 0 30px;flex-wrap:wrap"><button class="btn primary" id="ao-salvar">Salvar</button><span class="muted" id="ao-st" style="align-self:center;font-size:13px"></span></div>';
+
+  let bloqueios=(cf.bloqueios||[]).slice();
+  const desenharBl=()=>{ const hj=hojeISO(); bloqueios=bloqueios.filter(b=>b.ate>=hj).sort((a,b)=>a.de<b.de?-1:1);
+    $('ao-bls').innerHTML=bloqueios.length?bloqueios.map((b,i)=>'<div class="ao-bl">🚫 '+esc(dataBRsimples(b.de))+(b.ate!==b.de?' a '+esc(dataBRsimples(b.ate)):'')+' <button class="btn ghost sm" data-blx="'+i+'">remover</button></div>').join(''):'<div class="muted" style="font-size:13px">Nenhum bloqueio.</div>';
+    $('ao-bls').querySelectorAll('[data-blx]').forEach(b=>b.onclick=()=>{ bloqueios.splice(+b.dataset.blx,1); desenharBl(); marcarSujo(); }); };
+  desenharBl();
+  $('ao-badd').onclick=()=>{ const de=$('ao-bde').value, ate=$('ao-bate').value||de; if(!de){ toast('Escolha a data inicial',true); return; }
+    if(ate<de){ toast('A data final é antes da inicial',true); return; } bloqueios.push({de,ate}); $('ao-bde').value=''; $('ao-bate').value=''; desenharBl(); marcarSujo(); };
+  box.querySelectorAll('[data-on]').forEach(ch=>ch.onchange=()=>{ const row=box.querySelector('[data-dia="'+ch.dataset.on+'"]'); row.classList.toggle('off',!ch.checked);
+    if(ch.checked&&!row.querySelector('[data-p="0"][data-l="a"]').value){ row.querySelector('[data-p="0"][data-l="a"]').value='08:00'; row.querySelector('[data-p="0"][data-l="b"]').value='12:00'; } });
+  const marcarSujo=()=>{ $('ao-st').textContent='Alterações não salvas'; };
+  box.addEventListener('input',e=>{ if(e.target.closest('.card')) marcarSujo(); });
+  box.addEventListener('change',e=>{ if(e.target.id!=='ao-ativo'&&e.target.closest('.card')) marcarSujo(); });
+
+  const ler=()=>{ const dias={}, erros=[];
+    for(let i=0;i<7;i++){ dias[i]=[]; if(!box.querySelector('[data-on="'+i+'"]').checked) continue;
+      for(const k of [0,1]){ const a=box.querySelector('[data-d="'+i+'"][data-p="'+k+'"][data-l="a"]').value, b=box.querySelector('[data-d="'+i+'"][data-p="'+k+'"][data-l="b"]').value;
+        if(!a&&!b) continue; if(!a||!b||b<=a){ erros.push(DIAS_NOME[i]+': confira o '+(k+1)+'º período'); continue; } dias[i].push([a,b]); }
+      if(dias[i].length===2&&dias[i][1][0]<dias[i][0][1]) erros.push(DIAS_NOME[i]+': os períodos se sobrepõem');
+      if(!dias[i].length) erros.push(DIAS_NOME[i]+': marque um horário ou desmarque o dia'); }
+    return {erros, cfg:{ativo:$('ao-ativo').checked, nome_publico:$('ao-nome').value.trim(), mensagem:$('ao-msg').value.trim(),
+      duracao_min:+$('ao-dur').value, intervalo_min:+$('ao-int').value, antecedencia_horas:+$('ao-ant').value, janela_dias:+$('ao-jan').value,
+      modo:$('ao-modo').value, dias, bloqueios}}; };
+
+  async function salvar(){
+    const {erros,cfg}=ler();
+    if(erros.length){ toast(erros[0],true); return false; }
+    if(cfg.ativo&&!Object.values(cfg.dias).some(d=>d.length)){ toast('Marque pelo menos um dia de atendimento',true); return false; }
+    if(cfg.ativo&&!cfg.nome_publico){ toast('Preencha o nome que aparece para o paciente',true); $('ao-nome').focus(); return false; }
+    const u=(await sb.auth.getUser()).data.user; if(!u){ toast('Sessão expirada. Entre de novo.',true); return false; }
+    let slug=(aoReg&&aoReg.slug)||novoSlug(), err=null;
+    for(let t=0;t<3;t++){
+      ({error:err}=await sb.from('pep_agenda_config').upsert({owner_id:u.id,slug,config:cfg,atualizado_em:new Date().toISOString()},{onConflict:'owner_id'}));
+      if(!err||err.code!=='23505') break; slug=novoSlug(); }
+    if(err){ toast('Não consegui salvar: '+err.message,true); return false; }
+    aoReg={slug,config:cfg}; $('ao-st').textContent='Salvo ✓'; desenharLink(); return true; }
+  $('ao-salvar').onclick=async()=>{ const b=$('ao-salvar'); b.disabled=true; try{ if(await salvar()) toast('Agendamento online salvo ✓'); } finally{ b.disabled=false; } };
+  $('ao-ativo').onchange=async()=>{ const ch=$('ao-ativo'); if(!(await salvar())){ ch.checked=!ch.checked; return; } toast(ch.checked?'Agendamento online ligado ✓':'Agendamento online desligado'); };
+
+  async function desenharLink(){
+    const lb=$('ao-linkbox'); if(!lb) return; const on=$('ao-ativo').checked;
+    $('ao-ativo-tx').textContent=on?'Ligado: qualquer pessoa com o link vê os horários livres e pode pedir um horário.':'Desligado: o link mostra “agenda indisponível”.';
+    if(!aoReg||!aoReg.slug){ lb.innerHTML='<div class="muted" style="font-size:13px">Ajuste os horários e clique em <b>Salvar</b> para criar o seu link.</div>'; return; }
+    const url=linkAgendar(aoReg.slug);
+    lb.innerHTML='<div class="ao-link"><img id="ao-qr" alt="QR code do link de agendamento"><div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:8px">'+
+      '<div class="ao-url">'+esc(url)+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn ghost sm" id="ao-cop">Copiar link</button><button class="btn ghost sm" id="ao-wa">Enviar por WhatsApp</button>'+
+      '<a class="btn ghost sm" href="'+esc(url)+'" target="_blank" rel="noopener">Ver como o paciente vê</a><button class="btn ghost sm" id="ao-baixar">Baixar QR</button><button class="btn ghost sm" id="ao-trocar">Trocar link</button></div>'+
+      '<div class="muted" style="font-size:12.5px" id="ao-prevtx"></div><div class="ao-prev" id="ao-prev"></div></div></div>';
+    try{ $('ao-qr').src=await gerarQRpng(url); }catch(e){ $('ao-qr').remove(); }
+    $('ao-cop').onclick=()=>{ navigator.clipboard.writeText(url).then(()=>toast('Link copiado ✓'),()=>toast('Não consegui copiar',true)); };
+    $('ao-wa').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent('Para agendar sua consulta, escolha um horário por este link: '+url),'_blank','noopener');
+    $('ao-baixar').onclick=()=>{ const i=$('ao-qr'); if(!i) return; const a=document.createElement('a'); a.href=i.src; a.download='qr-agendamento.png'; a.click(); };
+    $('ao-trocar').onclick=async()=>{ if(!confirm('Criar um link novo? O link atual (e o QR impresso) deixa de funcionar. Consultas já marcadas não mudam.')) return;
+      const {error}=await sb.from('pep_agenda_config').update({slug:novoSlug(),atualizado_em:new Date().toISOString()}).eq('owner_id',(await sb.auth.getUser()).data.user.id).select('slug');
+      if(error){ toast('Não consegui trocar: '+error.message,true); return; } const r=await sb.from('pep_agenda_config').select('slug,config').maybeSingle(); aoReg=r.data; desenharLink(); toast('Link novo criado ✓'); };
+    // prévia: o que o paciente vê agora (consulta a própria função pública)
+    if(!on){ $('ao-prevtx').textContent=''; return; }
+    $('ao-prevtx').textContent='Verificando os horários livres…';
+    try{ const r=await fetch(FUNC_AGENDA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'horarios',slug:aoReg.slug})}); const j=await r.json();
+      const dias=Object.keys(j.dias||{}).sort(), tot=dias.reduce((n,k)=>n+j.dias[k].length,0);
+      if(!r.ok) throw new Error(j.erro||r.status);
+      $('ao-prevtx').textContent=tot?('Nas próximas 2 semanas o paciente vê '+tot+' horário(s) livre(s) em '+dias.length+' dia(s). Os primeiros:'):'Nenhum horário livre nas próximas 2 semanas. Confira os dias, a antecedência e os bloqueios.';
+      $('ao-prev').innerHTML=dias.slice(0,4).map(k=>{ const d=new Date(k+'T12:00:00'); return '<span>'+DIAS_SEM[d.getDay()]+' '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+': '+esc(j.dias[k].slice(0,3).join(', '))+(j.dias[k].length>3?'…':'')+'</span>'; }).join('');
+    }catch(e){ $('ao-prevtx').textContent='Não consegui verificar a página pública agora (sem internet ou função fora do ar).'; }
+  }
+  desenharLink();
+}
+
 // ---------- recibo de honorários e declaração de comparecimento ----------
 function tresCent(n){ if(n===0)return''; if(n===100)return'cem'; let s=''; const c=Math.floor(n/100),r=n%100;
   if(c)s+=CEN[c]; if(r){ if(s)s+=' e '; if(r<20)s+=UNI[r]; else { s+=DEZ[Math.floor(r/10)]; if(r%10)s+=' e '+UNI[r%10]; } } return s; }
@@ -2453,6 +2585,7 @@ $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('btn-busca').onclick=()=>abrirTela('busca');
 $('btn-agconsultas').onclick=()=>abrirTela('agconsultas');
 $('btn-pedidos').onclick=()=>abrirTela('pedidos');
+$('btn-agonline').onclick=()=>abrirTela('agonline');
 $('btn-agenda').onclick=()=>abrirTela('agenda');
 $('btn-painel').onclick=()=>abrirTela('painel');
 $('btn-backup').onclick=()=>abrirTela('backup');
@@ -2698,6 +2831,7 @@ function renderMain(){
   if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
   if(!pacienteSel&&tela==='agconsultas') return renderAgendaConsultas(c);
   if(!pacienteSel&&tela==='pedidos') return renderPedidos(c);
+  if(!pacienteSel&&tela==='agonline') return renderAgOnline(c);
   if(!pacienteSel&&tela==='painel') return renderPainel(c);
   if(!pacienteSel&&tela==='backup') return renderBackup(c);
   if(!pacienteSel&&tela==='seguranca') return renderSeguranca(c);
@@ -3813,7 +3947,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-27.1 · pedidos e lembretes';
+const VERSAO='2026-11-27.2 · agendamento online';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -7281,6 +7415,7 @@ function acoesBase(){
   return [
     {e:'➕',t:'Novo paciente',s:'Cadastrar um paciente',f:clk('#btn-novo-pac')},
     {e:'🗓️',t:'Agenda de consultas',s:'Consultas do dia',f:clk('#btn-agconsultas')},
+    {e:'🌐',t:'Agendamento online',s:'Dias, horários, link e QR para o paciente marcar',f:clk('#btn-agonline')},
     {e:'📥',t:'Pedidos e lembretes',s:'Aprovar pedidos online e avisar quem vem amanhã',f:clk('#btn-pedidos')},
     {e:'🔁',t:'Retornos',s:'Quem precisa voltar',f:clk('#btn-agenda')},
     {e:'🔎',t:'Busca ativa',s:'Rastreamentos e atrasos',f:clk('#btn-busca')},

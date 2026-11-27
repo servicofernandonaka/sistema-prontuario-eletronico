@@ -42,7 +42,9 @@ async function instalar(page,{db=criarDB(),log=[]}={}){
     if(url.pathname.startsWith('/auth/v1/user')) return J(200,USER);
     if(url.pathname.startsWith('/auth/v1/')) return J(200,{});
     if(url.pathname.startsWith('/storage/')) return J(200,[]);
-    if(url.pathname.startsWith('/functions/')) return J(200,{ok:true});
+    if(url.pathname.startsWith('/functions/')){ const b=req.postData()?JSON.parse(req.postData()):{}; log.push({fn:b});
+      if(b.acao==='horarios') return J(200,{ok:true,dias:{[dia(1)]:['08:00','08:30','09:00','09:30'],[dia(2)]:['14:00']}});
+      return J(200,{ok:true}); }
     const m=/^\/rest\/v1\/(rpc\/)?([^/?]+)/.exec(url.pathname); if(!m) return J(404,{});
     if(m[1]) return J(200,[]);
     const tb=m[2]; db[tb]=db[tb]||[]; const p=[...url.searchParams];
@@ -58,6 +60,8 @@ async function instalar(page,{db=criarDB(),log=[]}={}){
     }
     if(meth==='PATCH'){ const rows=filtrar(db[tb],p); rows.forEach(r=>Object.assign(r,body)); return J(200,rows); }
     if(meth==='DELETE'){ const rows=filtrar(db[tb],p); db[tb]=db[tb].filter(r=>!rows.includes(r)); return J(200,rows); }
+    if(meth==='POST'&&url.searchParams.get('on_conflict')){ const k=url.searchParams.get('on_conflict'); const out=[];
+      for(const r of (Array.isArray(body)?body:[body])){ const ex=db[tb].find(x=>x[k]===r[k]); if(ex){ Object.assign(ex,r); out.push(ex);} else { db[tb].push(r); out.push(r);} } return J(201,out); }
     if(meth==='POST'){ const arr=(Array.isArray(body)?body:[body]).map(r=>({id:'n'+Math.random().toString(36).slice(2,8),...r})); db[tb].push(...arr); return J(201,arr); }
     return J(200,[]);
   });
