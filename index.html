@@ -446,6 +446,11 @@
   .pc-chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:20px;background:#e6f7ef;color:#17995c;border:0;cursor:pointer;font-family:inherit}
   .pcm dl{margin:0;display:grid;gap:10px}.pcm dt{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
   .pcm dd{margin:2px 0 0;white-space:pre-wrap}
+  .pt-st{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13.5px}
+  .pt-acs{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .pt-log{margin-top:10px;max-height:260px;overflow:auto;border-top:1px solid var(--line)}
+  .pt-log div{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid #eef3f9;font-size:13px}
+  .pt-log time{color:var(--muted);min-width:112px;font-variant-numeric:tabular-nums}
   .pcm .alerta{background:#fff4e0;color:#8a5a00;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:4px}
 /* =====================================================================
    CAMADA "AURORA CLÍNICA" — identidade visual, movimento e modo escuro.
@@ -2328,6 +2333,73 @@ async function botaoPreconsultaAtendimento(head,p){
   b.onclick=()=>abrirPreconsulta(a); const ref=head.querySelector('.btn-calcmed'); if(ref&&ref.parentNode) ref.parentNode.insertBefore(b,ref); else head.appendChild(b);
 }
 
+// ---------- portal do paciente (lado do médico) ----------
+let portalOK=null;   // null = ainda não verificado
+async function verificarPortal(){ if(portalOK!==null) return portalOK; const {error}=await sb.from('pep_portal_docs').select('id').limit(1); portalOK=!error; return portalOK; }
+const linkPortal=t=>new URL('portal.html',location.href).href.split('?')[0].split('#')[0]+'#c='+t;
+function tokenAleatorio(n){ const b=new Uint8Array(n); crypto.getRandomValues(b); return btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+async function sha256hex(t){ return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)))].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+const fmtDH=t=>new Date(t).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+// guarda uma cópia do PDF enviado para o paciente ver no portal (uma vez por envio)
+async function guardarNoPortal(env,pac,titulo){
+  const r=env&&env.arquivo; if(!r||!r.bytes||!pac||!pac.id||env.portalGuardado||!navigator.onLine) return;
+  if(r.bytes.length>5*1024*1024||!(await verificarPortal())) return;
+  env.portalGuardado=true;
+  const u=(await sb.auth.getUser()).data.user; if(!u) return;
+  const caminho=u.id+'/'+pac.id+'/'+Date.now()+'-'+tokenAleatorio(6)+'.pdf';
+  const up=await sb.storage.from('portal-documentos').upload(caminho,new Blob([r.bytes],{type:'application/pdf'}),{contentType:'application/pdf'});
+  if(up.error){ env.portalGuardado=false; return; }
+  const {error}=await sb.from('pep_portal_docs').insert({paciente_id:pac.id,titulo:titulo.slice(0,120),nome_arquivo:String(r.nome||'documento.pdf').slice(0,120),storage_path:caminho});
+  if(error){ env.portalGuardado=false; sb.storage.from('portal-documentos').remove([caminho]).catch(()=>{}); }
+}
+async function renderCardPortal(card,p){
+  card.innerHTML='<div class="ch">🔐 Portal do paciente</div><div class="cb" id="pt-cb"><div class="muted">Carregando…</div></div>';
+  const cb=card.querySelector('#pt-cb');
+  if(!(await verificarPortal())){ cb.innerHTML='<div class="muted" style="font-size:13px">Para ativar, rode o portal_schema.sql no Supabase.</div>'; return; }
+  const [ss,cv,lg,dc]=await Promise.all([
+    sb.from('pep_portal_sessoes').select('id,aparelho,criado_em,ultimo_uso,expira_em,revogada').eq('paciente_id',p.id).order('ultimo_uso',{ascending:false}),
+    sb.from('pep_portal_convites').select('id,criado_em,expira_em,usado_em,bloqueado').eq('paciente_id',p.id).order('criado_em',{ascending:false}).limit(1),
+    sb.from('pep_portal_log').select('em,acao,detalhe').eq('paciente_id',p.id).order('em',{ascending:false}).limit(60),
+    sb.from('pep_portal_docs').select('id',{count:'exact',head:true}).eq('paciente_id',p.id)]);
+  if(!document.body.contains(card)||!pacienteSel||pacienteSel.id!==p.id) return;
+  const agora=Date.now(), ativas=(ss.data||[]).filter(x=>!x.revogada&&Date.parse(x.expira_em)>agora), conv=(cv.data||[])[0], logs=lg.data||[];
+  const convPend=conv&&!conv.usado_em&&!conv.bloqueado&&Date.parse(conv.expira_em)>agora;
+  const podeConvidar=!!(p.data_nascimento&&soDigitos(p.cpf).length>=4);
+  let st='';
+  if(ativas.length) st='<span class="chip" style="background:#e6f7ef;color:#17995c">ativo</span> '+ativas.length+' aparelho(s) conectado(s): '+ativas.map(x=>esc(x.aparelho||'aparelho')).join(', ')+' · último uso '+esc(fmtDH(ativas[0].ultimo_uso));
+  else if(convPend) st='<span class="chip" style="background:#fff4e0;color:#b26a00">convite enviado</span> em '+esc(fmtDH(conv.criado_em))+', vale até '+esc(new Date(conv.expira_em).toLocaleDateString('pt-BR'));
+  else if(conv&&conv.bloqueado) st='<span class="chip" style="background:#fdecec;color:#c62828">convite bloqueado</span> por tentativas com dados errados. Envie um novo se foi o paciente.';
+  else st='<span class="chip">sem acesso</span> o paciente ainda não entrou no portal.';
+  st+=' · '+(dc.count||0)+' documento(s) no portal';
+  cb.innerHTML='<div class="pt-st">'+st+'</div>'+
+    (podeConvidar?'':'<div class="muted" style="font-size:12.5px;margin-top:6px">Para enviar o acesso, o cadastro precisa ter <b>data de nascimento</b> e <b>CPF</b> (o paciente confirma os dois ao entrar).</div>')+
+    '<div class="pt-acs"><button class="btn primary sm" id="pt-conv"'+(podeConvidar?'':' disabled')+'>'+(ativas.length?'Enviar novo acesso':'Enviar acesso')+' (WhatsApp)</button>'+
+    (ativas.length?'<button class="btn ghost sm" id="pt-desc">Desconectar aparelhos</button>':'')+
+    (logs.length?'<button class="btn ghost sm" id="pt-hist">Histórico de acessos ('+logs.length+(logs.length>=60?'+':'')+')</button>':'')+'</div>'+
+    '<div class="pt-log" id="pt-log" hidden>'+logs.map(l=>'<div><time>'+esc(fmtDH(l.em))+'</time><span><b>'+esc(l.acao)+'</b>'+(l.detalhe?' · '+esc(l.detalhe):'')+'</span></div>').join('')+'</div>';
+  const bH=cb.querySelector('#pt-hist'); if(bH) bH.onclick=()=>{ const lg2=cb.querySelector('#pt-log'); lg2.hidden=!lg2.hidden; };
+  const bD=cb.querySelector('#pt-desc'); if(bD) bD.onclick=async()=>{
+    if(!confirm('Desconectar todos os aparelhos de '+p.nome+' do portal? Para voltar, ele vai precisar de um novo acesso.')) return;
+    const {error}=await sb.from('pep_portal_sessoes').update({revogada:true}).eq('paciente_id',p.id).eq('revogada',false);
+    if(error){ toast('Não consegui desconectar: '+error.message,true); return; }
+    registrarAcesso('portal',p.id,'aparelhos desconectados do portal'); toast('Aparelhos desconectados ✓'); renderCardPortal(card,p); };
+  cb.querySelector('#pt-conv').onclick=async()=>{
+    const tel=telWhats(p.telefone||'');
+    if(!tel&&!confirm('O paciente não tem celular válido no cadastro. Criar o link mesmo assim? (ele será copiado)')) return;
+    const token=tokenAleatorio(24);
+    // convites antigos ainda não usados deixam de valer
+    await sb.from('pep_portal_convites').update({bloqueado:true}).eq('paciente_id',p.id).is('usado_em',null).eq('bloqueado',false);
+    const {error}=await sb.from('pep_portal_convites').insert({paciente_id:p.id,token_hash:await sha256hex(token)});
+    if(error){ toast('Não consegui criar o acesso: '+error.message,true); return; }
+    registrarAcesso('portal',p.id,'acesso ao portal enviado');
+    const prof=(profCache&&profCache.nome)||'';
+    const txt='Olá, '+nomeCurto(p.nome)+'! '+(prof?prof+' liberou':'Foi liberado')+' o seu acesso ao Portal do Paciente: lá você vê suas consultas, marca horários, responde a pré-consulta e baixa receitas e exames.\n\n'+
+      'Entre por este link (vale 7 dias e só pode ser usado uma vez). Vamos pedir sua data de nascimento e os 4 últimos números do CPF:\n'+linkPortal(token);
+    if(tel) window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(txt),'_blank','noopener');
+    else navigator.clipboard&&navigator.clipboard.writeText(txt).then(()=>toast('Mensagem com o link copiada'),()=>{});
+    renderCardPortal(card,p); };
+}
+
 // ---------- recibo de honorários e declaração de comparecimento ----------
 function tresCent(n){ if(n===0)return''; if(n===100)return'cem'; let s=''; const c=Math.floor(n/100),r=n%100;
   if(c)s+=CEN[c]; if(r){ if(s)s+=' e '; if(r<20)s+=UNI[r]; else { s+=DEZ[Math.floor(r/10)]; if(r%10)s+=' e '+UNI[r%10]; } } return s; }
@@ -2912,6 +2984,7 @@ async function renderFichaPaciente(c){
   if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
 
   const cardPend=el('div','card'); cardPend.style.marginBottom='16px'; cardPend.id='card-pend'; c.appendChild(cardPend); renderPendencias(cardPend);
+  const cardPortal=el('div','card'); cardPortal.style.marginBottom='16px'; cardPortal.id='card-portal'; c.appendChild(cardPortal); renderCardPortal(cardPortal,p).catch(()=>{ cardPortal.remove(); });
 
   // resumo: problemas e alergias
   const res=el('div','resumo');
@@ -3686,6 +3759,7 @@ function mascararTel(id){ const e=$(id); if(!e) return; e.setAttribute('inputmod
 ['sd-tel','np-tel','ag-tel','un-tel'].forEach(mascararTel);
 ['sd-ok','sd-tel','sd-mail'].forEach(i=>{ $(i).addEventListener('input',atualizarBotoesEnvio); $(i).addEventListener('change',atualizarBotoesEnvio); });
 function registrarEnvio(canal){ const x=Array.isArray(envioAtual.entrada)?envioAtual.entrada[0]:envioAtual.entrada;
+  guardarNoPortal(envioAtual, pacienteSel, String((x&&(x.tituloPrinc||x.titulo))||'Documento')).catch(()=>{});
   registrarAcesso('documento',pacienteSel&&pacienteSel.id,'enviado por '+canal+': '+String((x&&x.titulo)||'').slice(0,60)); }
 $('sd-share').onclick=async()=>{
   const r=envioAtual&&envioAtual.arquivo; if(!r) return;
@@ -4002,7 +4076,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-27.3 · pré-consulta';
+const VERSAO='2026-11-27.4 · portal do paciente';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);

@@ -4,7 +4,7 @@ const dia=n=>iso(Date.now()+n*864e5);
 const USER={id:'00000000-0000-4000-8000-000000000001',email:'medico@teste.local',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{}};
 function criarDB(){
   return {
-    pep_pacientes:[{id:'p1',nome:'Maria Aparecida Souza',telefone:'(11) 98888-7777',data_nascimento:'1960-05-01',sexo:'F'}],
+    pep_pacientes:[{id:'p1',nome:'Maria Aparecida Souza',telefone:'(11) 98888-7777',data_nascimento:'1960-05-01',sexo:'F',cpf:'123.456.789-09'}],
     pep_profissional:[{user_id:USER.id,nome:'Dr. Teste',crm:'1',uf_crm:'SP'}],
     pep_agenda:[
       {id:'a1',profissional_id:USER.id,nome:'João Pedido',telefone:'11977776666',data:dia(2),hora:'09:00',duracao_min:30,status:'solicitada',origem:'publico',observacao:'Dor nas costas'},
@@ -41,7 +41,8 @@ async function instalar(page,{db=criarDB(),log=[]}={}){
     if(meth==='OPTIONS') return route.fulfill({status:204,headers:cors});
     if(url.pathname.startsWith('/auth/v1/user')) return J(200,USER);
     if(url.pathname.startsWith('/auth/v1/')) return J(200,{});
-    if(url.pathname.startsWith('/storage/')) return J(200,[]);
+    if(url.pathname.startsWith('/storage/')){ log.push({storage:meth,path:url.pathname}); (db._storage=db._storage||[]).push(url.pathname);
+      return J(200,meth==='POST'?{Key:url.pathname.replace('/storage/v1/object/',''),Id:'x'}:[]); }
     if(url.pathname.startsWith('/functions/')){ const b=req.postData()?JSON.parse(req.postData()):{}; log.push({fn:b});
       if(b.acao==='horarios') return J(200,{ok:true,dias:{[dia(1)]:['08:00','08:30','09:00','09:30'],[dia(2)]:['14:00']}});
       return J(200,{ok:true}); }
@@ -62,7 +63,9 @@ async function instalar(page,{db=criarDB(),log=[]}={}){
     if(meth==='DELETE'){ const rows=filtrar(db[tb],p); db[tb]=db[tb].filter(r=>!rows.includes(r)); return J(200,rows); }
     if(meth==='POST'&&url.searchParams.get('on_conflict')){ const k=url.searchParams.get('on_conflict'); const out=[];
       for(const r of (Array.isArray(body)?body:[body])){ const ex=db[tb].find(x=>x[k]===r[k]); if(ex){ Object.assign(ex,r); out.push(ex);} else { db[tb].push(r); out.push(r);} } return J(201,out); }
-    if(meth==='POST'){ const arr=(Array.isArray(body)?body:[body]).map(r=>({id:'n'+Math.random().toString(36).slice(2,8),...r})); db[tb].push(...arr); return J(201,arr); }
+    if(meth==='POST'){ const comDono=['pep_portal_convites','pep_portal_docs','pep_agenda','pep_agenda_config'].includes(tb);
+      const arr=(Array.isArray(body)?body:[body]).map(r=>({id:'n'+Math.random().toString(36).slice(2,8),criado_em:new Date().toISOString(),...(comDono&&tb==='pep_agenda'?{profissional_id:USER.id}:comDono?{owner_id:USER.id}:{}),...r}));
+      if(tb==='pep_portal_convites') arr.forEach(r=>{ r.expira_em=r.expira_em||new Date(Date.now()+7*864e5).toISOString(); r.tentativas=0; r.bloqueado=false; r.usado_em=null; }); db[tb].push(...arr); return J(201,arr); }
     return J(200,[]);
   });
   return {db,log};

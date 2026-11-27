@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0a6fbd">
+<title>Portal do paciente</title>
+<style>
+  :root{--brand:#0a6fbd;--ink:#13293f;--mut:#5e7490;--line:#d8e3ef;--bg:#eef3f9;color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;padding:16px 16px 40px;
+    background:radial-gradient(60vmax 40vmax at 10% -10%,#cfe6fb,transparent 60%),radial-gradient(50vmax 40vmax at 100% 0,#d6f4ee,transparent 60%),var(--bg)}
+  .wrap{max-width:520px;margin:0 auto}
+  .card{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 18px 40px -18px rgba(17,42,68,.3);margin-top:12px}
+  .top{padding:20px;color:#fff;background:linear-gradient(125deg,#0b4f86,#1a7fcf 55%,#12b5a2)}
+  .top h1{margin:0;font-size:21px;font-weight:800}.top p{margin:2px 0 0;opacity:.9;font-size:14px}
+  .top.err{background:linear-gradient(125deg,#9b1c1c,#c62828)}
+  .bd{padding:18px 20px 20px}
+  .abas{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:#f1f6fb;border-bottom:1px solid var(--line);padding:6px}
+  .abas button{margin:0;padding:9px 4px;font-size:13px;font-weight:700;border-radius:12px;background:transparent;color:var(--mut);box-shadow:none;border:0}
+  .abas button.on{background:#fff;color:var(--brand);box-shadow:0 2px 8px -3px rgba(17,42,68,.25)}
+  .abas button span{display:block;font-size:18px;line-height:1.2}
+  h2{font-size:15px;margin:18px 0 8px}h2:first-child{margin-top:0}
+  .it{border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+  .it .q{font-weight:800;font-size:16px}.it .s{color:var(--mut);font-size:13.5px}
+  .tag{display:inline-block;font-size:12px;font-weight:800;padding:3px 10px;border-radius:20px;background:#e8f1fb;color:var(--brand);margin-top:6px}
+  .tag.ok{background:#e1f6ea;color:#157347}.tag.err{background:#fdecec;color:#c62828}.tag.warn{background:#fff3df;color:#8a6414}.tag.mut{background:#eef0f2;color:#6b7785}
+  .lin{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #eef3f9}
+  .lin:last-child{border-bottom:0}.lin b{font-size:14.5px}.lin small{display:block;color:var(--mut);font-size:12.5px}
+  button,a.btn{display:block;width:100%;margin-top:10px;padding:13px;font:inherit;font-size:15.5px;font-weight:800;border:0;border-radius:14px;text-align:center;text-decoration:none;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,#0a6fbd,#1a8ad8 60%,#12b5a2);box-shadow:0 12px 24px -10px #0a6fbd}
+  button.verde{background:linear-gradient(135deg,#0f7a4a,#17a35e);box-shadow:0 12px 24px -10px #0f7a4a}
+  button.sec{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  button.perigo{background:#fff;color:#c62828;border:1px solid #f1b9b9;box-shadow:none}
+  button.mini{display:inline-block;width:auto;margin:0;padding:8px 14px;font-size:13.5px}
+  button[disabled]{opacity:.55}
+  .duas{display:grid;grid-template-columns:1fr 1fr;gap:8px}.duas button{margin-top:8px}
+  label.f{display:block;font-weight:700;font-size:14px;margin:14px 0 5px}
+  input.f{width:100%;font:inherit;font-size:18px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);letter-spacing:.04em}
+  .msg{color:#c62828;font-size:14px;margin-top:10px;text-align:center;min-height:1em}
+  .nota{font-size:12.5px;color:var(--mut);margin-top:12px;text-align:center}
+  .vazio{color:var(--mut);font-size:14px;text-align:center;padding:16px 6px}
+  .dias{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px}
+  .dias button{flex:0 0 64px;margin:0;padding:8px 4px;background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;font-size:12px;font-weight:600}
+  .dias button b{display:block;font-size:20px}.dias button.on{border-color:var(--brand);background:#e8f1fb;color:var(--brand)}
+  .horas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .horas button{margin:0;padding:10px 2px;background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;font-size:14.5px}
+  .horas button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .rodape{text-align:center;font-size:12.5px;color:var(--mut);margin:18px 0 6px}
+  .nota a{color:var(--brand)}
+  [hidden]{display:none!important}
+  .pc,.fpc .nota{text-align:left}
+  .fpc button{margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="top" id="top"><h1 id="t1">Portal do paciente</h1><p id="t2">Carregando…</p></div>
+    <div class="abas" id="abas" hidden>
+      <button type="button" data-aba="consultas"><span>🗓️</span>Consultas</button>
+      <button type="button" data-aba="marcar"><span>➕</span>Marcar</button>
+      <button type="button" data-aba="documentos"><span>📄</span>Documentos</button>
+      <button type="button" data-aba="acessos"><span>🔐</span>Acessos</button>
+    </div>
+    <div class="bd" id="bd"></div>
+  </div>
+  <div class="rodape">PEP Clínico · portal do paciente · seus acessos ficam registrados para sua segurança</div>
+</div>
+<script src="preconsulta.js"></script>
+<script>
+var FUNC = "https://joygodczajayygjxerno.supabase.co/functions/v1/portal-paciente";
+var CHAVE = "pep_portal_sessao";
+var bd = document.getElementById("bd"), abas = document.getElementById("abas"), dados = null, abaAtual = "consultas";
+var SEML = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"], SEM = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+var MESL = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"], MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+function el(t, txt, cls) { var e = document.createElement(t); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; }
+function limpa(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function lerSessao() { try { return localStorage.getItem(CHAVE) || ""; } catch (e) { return ""; } }
+function gravarSessao(v) { try { if (v) localStorage.setItem(CHAVE, v); else localStorage.removeItem(CHAVE); } catch (e) {} }
+function chamar(acao, extra) { var corpo = { acao: acao, sessao: lerSessao() }; for (var k in (extra || {})) corpo[k] = extra[k];
+  return fetch(FUNC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+    .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+    .then(function (r) { if (r.s === 401 && acao !== "entrar") { gravarSessao(""); fim("Seu acesso terminou", "Este aparelho foi desconectado ou o acesso venceu. Peça um novo link ao consultório."); throw new Error("sessao"); } return r; }); }
+function dt(iso) { var p = iso.split("-"); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
+function dataLonga(iso) { var d = dt(iso); return SEML[d.getDay()] + ", " + d.getDate() + " de " + MESL[d.getMonth()]; }
+function dataCurta(iso) { var d = dt(iso); return d.getDate() + " " + MES[d.getMonth()] + " " + d.getFullYear(); }
+function quando(isoTs) { var d = new Date(isoTs); return d.toLocaleDateString("pt-BR") + " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
+function titulo(a, b, erro) { document.getElementById("t1").textContent = a; document.getElementById("t2").textContent = b || ""; document.getElementById("top").className = "top" + (erro ? " err" : ""); }
+function fim(t, txt) { abas.hidden = true; titulo(t, "", true); limpa(bd); bd.appendChild(el("p", txt)); }
+function semRede() { alert("Sem conexão. Verifique a internet e tente de novo."); }
+
+// ---------- entrada com convite ----------
+function telaEntrar(convite) {
+  abas.hidden = true; titulo("Portal do paciente", "Confirme seus dados para entrar"); limpa(bd);
+  bd.appendChild(el("p", "Por segurança, confirme a sua data de nascimento e os 4 últimos números do seu CPF. Depois disso, este aparelho fica conectado por 90 dias."));
+  var f = el("form"); f.noValidate = true;
+  var l1 = el("label", "Data de nascimento", "f"); l1.htmlFor = "nasc"; f.appendChild(l1);
+  var nasc = el("input", null, "f"); nasc.id = "nasc"; nasc.inputMode = "numeric"; nasc.placeholder = "dd/mm/aaaa"; nasc.autocomplete = "bday"; nasc.maxLength = 10; f.appendChild(nasc);
+  nasc.addEventListener("input", function () { var d = nasc.value.replace(/\D/g, "").slice(0, 8); nasc.value = d.length > 4 ? d.slice(0, 2) + "/" + d.slice(2, 4) + "/" + d.slice(4) : d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d; });
+  var l2 = el("label", "4 últimos números do CPF", "f"); l2.htmlFor = "cpf4"; f.appendChild(l2);
+  var cpf = el("input", null, "f"); cpf.id = "cpf4"; cpf.inputMode = "numeric"; cpf.placeholder = "0000"; cpf.maxLength = 4; cpf.autocomplete = "off"; f.appendChild(cpf);
+  cpf.addEventListener("input", function () { cpf.value = cpf.value.replace(/\D/g, "").slice(0, 4); });
+  var msg = el("div", "", "msg"); f.appendChild(msg);
+  var b = el("button", "Entrar"); b.type = "submit"; f.appendChild(b);
+  bd.appendChild(f);
+  bd.appendChild(el("p", "Se o seu CPF não estiver no cadastro do consultório, avise para que atualizem antes de você entrar.", "nota"));
+  f.onsubmit = function (ev) {
+    ev.preventDefault(); msg.textContent = "";
+    var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(nasc.value);
+    if (!m) { msg.textContent = "Digite a data completa, por exemplo 05/03/1960."; nasc.focus(); return; }
+    if (cpf.value.length !== 4) { msg.textContent = "Digite os 4 últimos números do CPF."; cpf.focus(); return; }
+    b.disabled = true;
+    chamar("entrar", { convite: convite, nascimento: m[3] + "-" + m[2] + "-" + m[1], cpf4: cpf.value }).then(function (r) {
+      b.disabled = false;
+      if (r.s === 200 && r.j.ok) { gravarSessao(r.j.sessao); history.replaceState(null, "", location.pathname); carregar(); return; }
+      if (r.j.erro === "dados_nao_conferem") { msg.textContent = "Os dados não conferem com o cadastro. Tentativas restantes: " + r.j.restantes + "."; return; }
+      if (r.j.erro === "convite_bloqueado") { fim("Link bloqueado", "Houve muitas tentativas com dados errados. Por segurança, este link foi bloqueado. Peça um novo ao consultório."); return; }
+      fim("Link inválido", "Este link já foi usado, venceu ou não existe. Peça um novo link ao consultório.");
+    }).catch(function () { b.disabled = false; semRede(); });
+  };
+}
+
+// ---------- início ----------
+function carregar() {
+  titulo("Portal do paciente", "Carregando…");
+  return chamar("inicio").then(function (r) {
+    if (!(r.s === 200 && r.j.ok)) { fim("Não foi possível abrir", "Tente de novo em alguns minutos."); return; }
+    dados = r.j; titulo("Olá, " + (dados.nome || "paciente") + "!", dados.medico ? "Seu portal com " + dados.medico : "Seu portal de saúde");
+    abas.hidden = false; mostrar(abaAtual);
+  }).catch(function (e) { if (e.message !== "sessao") fim("Sem conexão", "Não consegui abrir agora. Verifique a internet e tente de novo."); });
+}
+Array.prototype.forEach.call(abas.querySelectorAll("button"), function (b) { b.onclick = function () { mostrar(b.dataset.aba); }; });
+function mostrar(aba) {
+  abaAtual = aba; Array.prototype.forEach.call(abas.querySelectorAll("button"), function (b) { b.classList.toggle("on", b.dataset.aba === aba); });
+  limpa(bd); ({ consultas: abaConsultas, marcar: abaMarcar, documentos: abaDocumentos, acessos: abaAcessos })[aba]();
+}
+var ST = { solicitada: ["Aguardando o consultório", "warn"], marcada: ["Marcada", ""], confirmada: ["Confirmada ✓", "ok"], atendida: ["Atendida", "ok"], faltou: ["Não compareceu", "err"], cancelada: ["Cancelada", "mut"] };
+function abaConsultas() {
+  bd.appendChild(el("h2", "Próximas consultas"));
+  if (!dados.proximas.length) bd.appendChild(el("div", "Nenhuma consulta marcada.", "vazio"));
+  dados.proximas.forEach(function (c) {
+    var it = el("div", null, "it"); it.appendChild(el("div", dataLonga(c.data) + (c.hora ? " · " + c.hora : ""), "q"));
+    if (c.tipo) it.appendChild(el("div", c.tipo, "s"));
+    var st = ST[c.status] || [c.status, ""]; it.appendChild(el("span", st[0], "tag " + st[1]));
+    var acoes = el("div", null, "duas");
+    if (c.status === "marcada") { var bc = el("button", "✔ Confirmar presença", "verde"); bc.onclick = function () { agir(c, "confirmar", bc); }; acoes.appendChild(bc); }
+    var bp = el("button", c.preconsulta ? "📝 Pré-consulta ✓" : "📝 Pré-consulta", "sec"); bp.onclick = function () { preconsulta(c); }; acoes.appendChild(bp);
+    var bx = el("button", "Cancelar", "perigo"); bx.onclick = function () { if (confirm("Cancelar a consulta de " + dataLonga(c.data) + "?")) agir(c, "cancelar", bx); }; acoes.appendChild(bx);
+    it.appendChild(acoes); bd.appendChild(it);
+  });
+  if (dados.agendamento) { var bm = el("button", "➕ Marcar nova consulta", "sec"); bm.onclick = function () { mostrar("marcar"); }; bd.appendChild(bm); }
+  if (dados.anteriores.length) {
+    bd.appendChild(el("h2", "Anteriores")); var box = el("div");
+    dados.anteriores.forEach(function (c) { var l = el("div", null, "lin"), t = el("div"); t.appendChild(el("b", dataCurta(c.data) + (c.hora ? " · " + c.hora : ""))); if (c.tipo) t.appendChild(el("small", c.tipo));
+      var st = /^(solicitada|marcada|confirmada)$/.test(c.status) ? ["Já passou", "mut"] : (ST[c.status] || [c.status, ""]); l.appendChild(t); l.appendChild(el("span", st[0], "tag " + st[1])); box.appendChild(l); });
+    bd.appendChild(box);
+  }
+  bd.appendChild(sair());
+}
+function agir(c, op, btn) {
+  btn.disabled = true;
+  chamar("consulta", { id: c.id, op: op }).then(function (r) {
+    if (r.s === 200 && r.j.ok) return carregar();
+    btn.disabled = false; alert(r.j.erro === "consulta_encerrada" ? "Esta consulta já foi encerrada." : "Não foi possível agora. Tente de novo.");
+  }).catch(function (e) { btn.disabled = false; if (e.message !== "sessao") semRede(); });
+}
+function preconsulta(c) {
+  limpa(bd); bd.appendChild(el("h2", "Pré-consulta · " + dataLonga(c.data) + (c.hora ? " · " + c.hora : "")));
+  if (c.preconsulta) bd.appendChild(el("p", "Você já respondeu. Se algo mudou, pode enviar de novo: a resposta nova substitui a anterior.", "nota"));
+  PreConsulta.abrir(bd, {
+    enviar: function (resp) { return chamar("preconsulta", { id: c.id, respostas: resp, aceite: true }).then(function (r) {
+      if (r.s === 200 && r.j.ok) { alert("Pré-consulta enviada. Obrigado!"); carregar(); return { ok: true }; } return { ok: false, erro: r.j && r.j.erro }; }); },
+    voltar: function () { mostrar("consultas"); }
+  });
+}
+// ---------- marcar ----------
+function abaMarcar() {
+  if (!dados.agendamento) { bd.appendChild(el("div", "No momento o agendamento pelo portal está desligado. Fale com o consultório para marcar.", "vazio")); return; }
+  bd.appendChild(el("p", "Escolha o dia e o horário. " + (dados.modo === "aprovar" ? "O consultório confirma o seu pedido." : "A consulta já fica marcada."), "nota"));
+  var cx = el("div", "Buscando horários livres…", "vazio"); bd.appendChild(cx);
+  chamar("horarios").then(function (r) {
+    limpa(cx); cx.className = "";
+    var dias = Object.keys((r.j && r.j.dias) || {}).sort();
+    if (!dias.length) { cx.className = "vazio"; cx.textContent = "Não há horários livres nos próximos dias. Fale com o consultório."; return; }
+    var lin = el("div", null, "dias"), hs = el("div", null, "horas"), form = el("div"); form.hidden = true; var sel = null;
+    cx.appendChild(el("h2", "Dia")); cx.appendChild(lin); var tHoras = el("h2", "Horário"); tHoras.hidden = true; cx.appendChild(tHoras); cx.appendChild(hs); cx.appendChild(form);
+    dias.forEach(function (k) { var d = dt(k), b = el("button"); b.type = "button"; b.appendChild(el("span", SEM[d.getDay()])); b.appendChild(el("b", String(d.getDate()))); b.appendChild(el("span", MES[d.getMonth()]));
+      b.onclick = function () { Array.prototype.forEach.call(lin.children, function (x) { x.classList.remove("on"); }); b.classList.add("on"); tHoras.hidden = false; limpa(hs); form.hidden = true;
+        r.j.dias[k].forEach(function (h) { var bh = el("button", h); bh.type = "button"; bh.onclick = function () { Array.prototype.forEach.call(hs.children, function (x) { x.classList.remove("on"); }); bh.classList.add("on"); sel = { data: k, hora: h }; montar(); }; hs.appendChild(bh); }); };
+      lin.appendChild(b); });
+    function montar() {
+      limpa(form); form.hidden = false;
+      form.appendChild(el("h2", "📅 " + dataLonga(sel.data) + " às " + sel.hora));
+      var lm = el("label", "Motivo (opcional)", "f"); lm.htmlFor = "motivo"; form.appendChild(lm);
+      var mo = el("input", null, "f"); mo.id = "motivo"; mo.maxLength = 200; mo.style.fontSize = "16px"; mo.style.letterSpacing = "0"; form.appendChild(mo);
+      var msg = el("div", "", "msg"); form.appendChild(msg);
+      var ok = el("button", dados.modo === "aprovar" ? "Pedir este horário" : "Marcar este horário", "verde"); form.appendChild(ok);
+      ok.onclick = function () { ok.disabled = true;
+        chamar("marcar", { data: sel.data, hora: sel.hora, motivo: mo.value }).then(function (r2) {
+          if (r2.s === 200 && r2.j.ok) { alert(r2.j.status === "solicitada" ? "Pedido enviado! O consultório vai confirmar pelo WhatsApp." : "Consulta marcada!"); abaAtual = "consultas"; carregar(); return; }
+          ok.disabled = false;
+          msg.textContent = { horario_indisponivel: "Esse horário acabou de ser ocupado. Escolha outro.", limite_consultas: "Você já tem 2 consultas marcadas. Para outra, fale com o consultório." }[r2.j.erro] || "Não foi possível agora. Tente de novo.";
+        }).catch(function (e) { ok.disabled = false; if (e.message !== "sessao") semRede(); }); };
+      form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }).catch(function (e) { if (e.message !== "sessao") { cx.className = "vazio"; cx.textContent = "Sem conexão. Tente de novo."; } });
+}
+// ---------- documentos ----------
+function abaDocumentos() {
+  bd.appendChild(el("h2", "Seus documentos"));
+  if (!dados.documentos.length) { bd.appendChild(el("div", "Nenhum documento ainda. Receitas, pedidos de exame e atestados enviados pelo consultório aparecem aqui.", "vazio")); return; }
+  var box = el("div");
+  dados.documentos.forEach(function (doc) {
+    var l = el("div", null, "lin"), t = el("div"); t.appendChild(el("b", doc.titulo)); t.appendChild(el("small", "Enviado em " + new Date(doc.criado_em).toLocaleDateString("pt-BR") + (doc.baixado ? " · já baixado" : "")));
+    var b = el("button", "Baixar", "mini"); b.onclick = function () { b.disabled = true;
+      chamar("documento", { id: doc.id }).then(function (r) { b.disabled = false; if (r.s === 200 && r.j.url) { doc.baixado = true; location.href = r.j.url; } else alert("Não foi possível abrir agora."); })
+        .catch(function (e) { b.disabled = false; if (e.message !== "sessao") semRede(); }); };
+    l.appendChild(t); l.appendChild(b); box.appendChild(l); });
+  bd.appendChild(box);
+}
+// ---------- acessos ----------
+function abaAcessos() {
+  bd.appendChild(el("h2", "Histórico de acessos"));
+  bd.appendChild(el("p", "Tudo o que é feito no seu portal fica registrado. Se você não reconhece algum acesso, avise o consultório e desconecte este aparelho.", "nota"));
+  var box = el("div");
+  (dados.acessos || []).forEach(function (a) { var l = el("div", null, "lin"), t = el("div"); t.appendChild(el("b", a.acao.charAt(0).toUpperCase() + a.acao.slice(1)));
+    t.appendChild(el("small", quando(a.em) + (a.detalhe ? " · " + a.detalhe : ""))); l.appendChild(t); box.appendChild(l); });
+  if (!box.children.length) box.appendChild(el("div", "Nenhum registro.", "vazio"));
+  bd.appendChild(box); bd.appendChild(sair());
+}
+function sair() { var b = el("button", "Desconectar este aparelho", "sec"); b.onclick = function () {
+  if (!confirm("Desconectar este aparelho? Para entrar de novo, você vai precisar de um novo link do consultório.")) return;
+  chamar("sair").catch(function () {}).then(function () { gravarSessao(""); fim("Aparelho desconectado", "Você saiu do portal. Para entrar de novo, peça um novo link ao consultório."); }); }; return b; }
+
+// ---------- início da página ----------
+var mh = /^#c=([A-Za-z0-9_-]{20,80})$/.exec(location.hash || "");
+if (mh) telaEntrar(mh[1]);
+else if (lerSessao()) carregar();
+else fim("Portal do paciente", "Para entrar, use o link que o consultório enviou para você pelo WhatsApp.");
+</script>
+</body>
+</html>
