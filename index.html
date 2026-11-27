@@ -413,6 +413,18 @@
   .ag-resultados{display:flex;flex-direction:column;gap:2px;max-height:200px;overflow:auto}
   .ag-opt{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 10px;font-size:13.5px;cursor:pointer}
   .ag-opt:hover{background:var(--brand-050);border-color:#bcd9f2}
+  /* ---------- pedidos e lembretes ---------- */
+  .ped-n{display:inline-block;min-width:20px;padding:1px 7px;margin-left:6px;border-radius:20px;background:#e8590c;color:#fff;font-size:11px;font-weight:700;line-height:18px}
+  .ped-sec{margin:18px 0 8px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
+  .ped-sec small{font-weight:500;color:var(--muted);font-size:12.5px}
+  .ped-row{display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .ped-row:last-child{border-bottom:0}
+  .ped-q{min-width:92px;font-weight:700;font-size:14px;display:flex;flex-direction:column}
+  .ped-q small{font-weight:500;font-size:11.5px;color:var(--muted)}
+  .ped-tx{flex:1;min-width:180px}
+  .ped-tx .muted{font-size:12.5px}
+  .ped-ok{color:#17995c;font-size:12px;font-weight:600}
+  @media (max-width:640px){ .ped-row .ag-ac{width:100%} .ped-row .ag-ac .btn{flex:1} }
 /* =====================================================================
    CAMADA "AURORA CLÍNICA" — identidade visual, movimento e modo escuro.
    Fica por último de propósito: só redefine tokens e acrescenta efeitos.
@@ -895,6 +907,7 @@ textarea.voz-ouvindo{border-color:var(--err)!important;box-shadow:0 0 0 4px colo
     </div>
     <button class="btn primary block" id="btn-novo-pac">+ Novo paciente</button>
     <button class="btn ghost block" id="btn-agconsultas">Agenda de consultas</button>
+    <button class="btn ghost block" id="btn-pedidos">Pedidos e lembretes <span class="ped-n" id="ped-n" hidden></span></button>
     <button class="btn ghost block" id="btn-painel">Painel da unidade</button>
     <div style="display:flex;gap:6px"><button class="btn ghost block" id="btn-agenda" style="flex:1">Retornos</button><button class="btn ghost block" id="btn-busca" style="flex:1">Busca ativa</button></div>
     <div class="side-list" id="pac-list"></div>
@@ -1909,7 +1922,7 @@ const OFF=(()=>{
 // ---------- agenda de consultas (agenda interna) ----------
 let agendaData=hojeISO();
 let agConsultaPac=null;
-const STATUS_AG={marcada:{rot:'Marcada',cor:'#5e7490',bg:'#eef2f7'},confirmada:{rot:'Confirmada',cor:'#0a6fbd',bg:'#e6f1fb'},
+const STATUS_AG={solicitada:{rot:'Pedido',cor:'#b26a00',bg:'#fff4e0'},marcada:{rot:'Marcada',cor:'#5e7490',bg:'#eef2f7'},confirmada:{rot:'Confirmada',cor:'#0a6fbd',bg:'#e6f1fb'},
   atendida:{rot:'Atendida',cor:'#17995c',bg:'#e6f7ef'},faltou:{rot:'Faltou',cor:'#c62828',bg:'#fdecec'},cancelada:{rot:'Cancelada',cor:'#8a8a8a',bg:'#eef0f2'}};
 function addDiasISO(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return isoLocal(d); }
 function nomeDaConsulta(a){ if(a.paciente_id){ const pc=(pacientes||[]).find(x=>x.id===a.paciente_id); return (pc&&pc.nome)||'(paciente cadastrado)'; } return a.nome||'(sem nome)'; }
@@ -2036,6 +2049,97 @@ $('ag-salvar').onclick=async()=>{
   closeM('m-consulta'); toast('Consulta marcada ✓');
   if(reg.data===agendaData && tela==='agconsultas') renderMain();
 };
+
+// ---------- pedidos (agendamento online) e lembretes da véspera ----------
+const DIAS_SEM=['dom','seg','ter','qua','qui','sex','sáb'];
+const DIAS_EXT=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+function quandoTxt(a,ext){ const d=new Date(a.data+'T12:00:00'); return (ext?DIAS_EXT:DIAS_SEM)[d.getDay()]+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+(a.hora?' às '+String(a.hora).slice(0,5):''); }
+function telDaConsulta(a){ if(a.telefone) return formatarTel(a.telefone); const pc=a.paciente_id&&(pacientes||[]).find(x=>x.id===a.paciente_id); return (pc&&pc.telefone)||''; }
+const nomeCurto=n=>String(n||'').trim().split(/\s+/)[0]||'';
+function faltaColunaAgenda(e){ return /lembrado_em|token_hash|confirmado_em|column|solicitada|check constraint|PGRST204|42703/i.test(((e&&e.message)||'')+' '+((e&&e.code)||'')); }
+// cria um link pessoal novo para o paciente (só o hash vai ao banco; o link anterior deixa de valer)
+async function novoLinkConsulta(id, extra){
+  const b=new Uint8Array(24); crypto.getRandomValues(b);
+  const token=btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const h=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const {error}=await sb.from('pep_agenda').update(Object.assign({token_hash:h},extra||{})).eq('id',id);
+  if(error) throw error;
+  return new URL('consulta.html',location.href).href.split('?')[0]+'#'+token;
+}
+function abrirWhats(tel, texto){
+  const n=telWhats(tel);
+  if(!n){ navigator.clipboard&&navigator.clipboard.writeText(texto).catch(()=>{}); toast('Sem celular válido. A mensagem foi copiada.',true); return; }
+  window.open('https://wa.me/'+n+'?text='+encodeURIComponent(texto),'_blank','noopener');
+}
+async function contarPedidos(){
+  const n=document.getElementById('ped-n');
+  if(!agendaOK){ if(n) n.hidden=true; return 0; }
+  const {count,error}=await sb.from('pep_agenda').select('id',{count:'exact',head:true}).eq('status','solicitada').gte('data',hojeISO());
+  const k=error?0:(count||0);
+  if(n){ n.textContent=k; n.hidden=!k; }
+  return k;
+}
+async function renderPedidos(c){
+  c.innerHTML='<div class="phead"><div><div class="nm">Pedidos e lembretes</div><div class="mt">Aprove os pedidos do agendamento online e avise quem tem consulta amanhã</div></div><div class="sp"></div>'+
+    '<button class="btn ghost" id="pd-atual">Atualizar</button></div><div id="pd-corpo"><div class="muted">Carregando…</div></div>';
+  $('pd-atual').onclick=()=>renderMain();
+  const box=$('pd-corpo');
+  if(!agendaOK){ box.innerHTML='<div class="empty">Para usar esta tela, rode o agenda_schema.sql e o agenda_publica_schema.sql no Supabase.</div>'; return; }
+  const hoje=hojeISO(), amanha=addDiasISO(hoje,1);
+  const [pd,lb]=await Promise.all([
+    sb.from('pep_agenda').select('*').eq('status','solicitada').gte('data',hoje).order('data').order('hora'),
+    sb.from('pep_agenda').select('*').eq('data',amanha).in('status',['marcada','confirmada']).order('hora')]);
+  if(tela!=='pedidos'||pacienteSel||!document.body.contains(box)) return;
+  const err=pd.error||lb.error;
+  if(err){ box.innerHTML='<div class="empty">'+(faltaColunaAgenda(err)?'Rode o agenda_publica_schema.sql no Supabase para ativar os pedidos e lembretes.':'Não consegui carregar: '+esc(err.message))+'</div>'; return; }
+  const pedidos=pd.data||[], lembr=lb.data||[];
+  const nAmanha=new Date(amanha+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'});
+  let h='<div class="ped-sec">📥 Pedidos aguardando sua aprovação <small>'+(pedidos.length||'nenhum')+'</small></div>';
+  h+=pedidos.length?'<div class="card"><div class="cb" style="gap:0;padding:0">'+pedidos.map(a=>
+    '<div class="ped-row"><div class="ped-q">'+esc(quandoTxt(a))+'<small>'+(a.duracao_min||30)+' min</small></div>'+
+    '<div class="ped-tx"><b>'+esc(nomeDaConsulta(a))+'</b>'+(telDaConsulta(a)?'<div class="muted">'+esc(telDaConsulta(a))+'</div>':'')+
+      (a.observacao?'<div class="muted">Motivo: '+esc(a.observacao)+'</div>':'')+'</div>'+
+    '<div class="ag-ac"><button class="btn primary sm" data-aprovar="'+esc(a.id)+'">Aprovar</button><button class="btn ghost sm" data-recusar="'+esc(a.id)+'">Recusar</button></div></div>').join('')+'</div></div>'
+    :'<div class="empty">Nenhum pedido novo. Quando um paciente marcar pelo link público, ele aparece aqui.</div>';
+  h+='<div class="ped-sec">🔔 Lembretes de amanhã <small>'+esc(nAmanha)+' · '+lembr.length+' consulta(s)</small></div>';
+  h+=lembr.length?'<div class="card"><div class="cb" style="gap:0;padding:0">'+lembr.map(a=>{
+    const tel=telDaConsulta(a), st=STATUS_AG[a.status]||STATUS_AG.marcada;
+    return '<div class="ped-row"><div class="ped-q">'+esc(String(a.hora||'--:--').slice(0,5))+'<small>'+(a.duracao_min||30)+' min</small></div>'+
+      '<div class="ped-tx"><b>'+esc(nomeDaConsulta(a))+'</b> <span class="ag-badge" style="color:'+st.cor+';background:'+st.bg+'">'+st.rot+'</span>'+
+        (tel?'<div class="muted">'+esc(tel)+'</div>':'<div class="muted">sem telefone cadastrado</div>')+
+        (a.lembrado_em?'<div class="ped-ok">✓ lembrete enviado '+esc(new Date(a.lembrado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</div>':'')+'</div>'+
+      '<div class="ag-ac"><button class="btn '+(a.lembrado_em?'ghost':'primary')+' sm" data-lembrar="'+esc(a.id)+'"'+(tel?'':' disabled')+'>'+(a.lembrado_em?'Reenviar':'Enviar lembrete')+' (WhatsApp)</button></div></div>'; }).join('')+'</div></div>'
+    :'<div class="empty">Ninguém marcado para amanhã.</div>';
+  box.innerHTML=h;
+  const achar=id=>pedidos.concat(lembr).find(x=>x.id===id);
+  const prof=()=>(typeof profCache!=='undefined'&&profCache&&profCache.nome)||'';
+  box.querySelectorAll('[data-aprovar]').forEach(b=>b.onclick=async()=>{
+    const a=achar(b.dataset.aprovar); b.disabled=true;
+    let link=''; try{ link=await novoLinkConsulta(a.id,{status:'marcada'}); }
+    catch(e){ const {error}=await sb.from('pep_agenda').update({status:'marcada'}).eq('id',a.id); if(error){ b.disabled=false; toast('Não consegui aprovar: '+error.message,true); return; } }
+    toast('Pedido aprovado ✓'); contarPedidos();
+    const tel=telDaConsulta(a);
+    if(tel&&confirm('Avisar '+nomeCurto(nomeDaConsulta(a))+' pelo WhatsApp que a consulta foi confirmada?'))
+      abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'! Sua consulta'+(prof()?' com '+prof():'')+' está marcada para '+quandoTxt(a,true)+'.'+(link?'\n\nPara ver os detalhes, confirmar ou desmarcar: '+link:''));
+    renderMain(); });
+  box.querySelectorAll('[data-recusar]').forEach(b=>b.onclick=async()=>{
+    const a=achar(b.dataset.recusar);
+    if(!confirm('Recusar o pedido de '+nomeDaConsulta(a)+' ('+quandoTxt(a)+')?')) return;
+    const {error}=await sb.from('pep_agenda').update({status:'cancelada'}).eq('id',a.id);
+    if(error){ toast('Não consegui recusar: '+error.message,true); return; }
+    toast('Pedido recusado'); contarPedidos();
+    const tel=telDaConsulta(a);
+    if(tel&&confirm('Avisar o paciente pelo WhatsApp?'))
+      abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'. Infelizmente não será possível atender no horário pedido ('+quandoTxt(a,true)+'). Se quiser, escolha outro horário ou responda esta mensagem.');
+    renderMain(); });
+  box.querySelectorAll('[data-lembrar]').forEach(b=>b.onclick=async()=>{
+    const a=achar(b.dataset.lembrar), tel=telDaConsulta(a); b.disabled=true;
+    let link='';
+    try{ link=await novoLinkConsulta(a.id,{lembrado_em:new Date().toISOString()}); }
+    catch(e){ b.disabled=false; toast(faltaColunaAgenda(e)?'Rode o agenda_publica_schema.sql no Supabase':'Não consegui registrar: '+e.message,true); return; }
+    abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'! Lembrete: sua consulta'+(prof()?' com '+prof():'')+' é amanhã, '+quandoTxt(a,true)+'.\n\nPor favor, confirme ou desmarque por este link: '+link);
+    renderMain(); });
+}
 
 // ---------- recibo de honorários e declaração de comparecimento ----------
 function tresCent(n){ if(n===0)return''; if(n===100)return'cem'; let s=''; const c=Math.floor(n/100),r=n%100;
@@ -2285,6 +2389,7 @@ async function sondarColunas(){
                                  sb.from('pep_agenda').select('id').limit(1),
                                  sb.from('pep_pacientes').select('email').limit(1)]);
   emailOK=!em.error; enderecoOK=!a.error; tipoReceitaOK=!b.error; retornoOK=!r.error; encOK=!n.error; segurancaOK=!sg.error; escalasOK=!ec.error; anexosOK=!ax.error; vacinasOK=!va.error; rastreamentosOK=!rs.error; agendaOK=!agd.error;
+  if(agendaOK){ contarPedidos().catch(()=>{}); if(!window._pedTimer) window._pedTimer=setInterval(()=>{ if(navigator.onLine) contarPedidos().catch(()=>{}); },120000); }
   try{ localStorage.setItem('pep_colunas',JSON.stringify({em:emailOK,e:enderecoOK,t:tipoReceitaOK,r:retornoOK,n:encOK,s:segurancaOK,es:escalasOK,ax:anexosOK,va:vacinasOK,ra:rastreamentosOK,ag:agendaOK}));}catch(e){}
 }
 // A busca roda sobre a lista completa (guardada por 1 min): acha por nome sem acento, por CPF, CNS ou telefone
@@ -2347,6 +2452,7 @@ function abrirModalPaciente(p){
 $('btn-novo-pac').onclick=()=> abrirModalPaciente(null);
 $('btn-busca').onclick=()=>abrirTela('busca');
 $('btn-agconsultas').onclick=()=>abrirTela('agconsultas');
+$('btn-pedidos').onclick=()=>abrirTela('pedidos');
 $('btn-agenda').onclick=()=>abrirTela('agenda');
 $('btn-painel').onclick=()=>abrirTela('painel');
 $('btn-backup').onclick=()=>abrirTela('backup');
@@ -2591,6 +2697,7 @@ function renderMain(){
   if(!pacienteSel&&tela==='busca') return renderBuscaAtiva(c);
   if(!pacienteSel&&tela==='agenda') return renderAgenda(c);
   if(!pacienteSel&&tela==='agconsultas') return renderAgendaConsultas(c);
+  if(!pacienteSel&&tela==='pedidos') return renderPedidos(c);
   if(!pacienteSel&&tela==='painel') return renderPainel(c);
   if(!pacienteSel&&tela==='backup') return renderBackup(c);
   if(!pacienteSel&&tela==='seguranca') return renderSeguranca(c);
@@ -3706,7 +3813,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-25.9 · ditado por voz';
+const VERSAO='2026-11-27.1 · pedidos e lembretes';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -7089,6 +7196,7 @@ window.renderHome=function(c){
      '<div class="stat" style="--c:#7c6cf0"><div class="ic">📅</div><div class="n" id="st-hoje">–</div><div class="l">Consultas hoje</div></div>'+
      '<div class="stat" style="--c:#12b5a2"><div class="ic">✅</div><div class="n" id="st-ok">–</div><div class="l">Já atendidos hoje</div></div>'+
      '<div class="stat" style="--c:#ff8fab"><div class="ic">⏳</div><div class="n" id="st-falta">–</div><div class="l">Ainda por atender</div></div>'+
+     '<button type="button" class="stat stat-ped" id="st-pedbox" hidden style="--c:#e8590c;cursor:pointer;text-align:left;font:inherit;color:inherit"><div class="ic">📥</div><div class="n" id="st-ped">0</div><div class="l">Pedidos para aprovar</div></button>'+
    '</div>'+
    '<div class="home-cols">'+
      '<div class="panel"><h3>📋 Agenda de hoje <small id="hm-agsub"></small></h3><div class="tl" id="hm-tl"><div class="skel" style="height:54px;margin:8px 0"></div><div class="skel" style="height:54px;margin:8px 0"></div></div></div>'+
@@ -7124,6 +7232,8 @@ window.renderHome=function(c){
       b.innerHTML='<span class="av">'+esc(ini)+'</span><span><b>'+esc(p.nome)+'</b><span>'+esc([safe(()=>idade(p.data_nascimento)),p.sexo].filter(Boolean).join(' · '))+'</span></span>';
       b.onclick=()=>abrirPacientePorId(p.id,false); box.appendChild(b); }); }
 
+  // pedidos do agendamento online
+  (async()=>{ try{ const k=await contarPedidos(); const bx=home.querySelector('#st-pedbox'); if(k&&bx&&document.body.contains(home)){ bx.hidden=false; contar(home.querySelector('#st-ped'),k); bx.onclick=()=>abrirTela('pedidos'); } }catch(e){} })();
   // agenda de hoje (só se a tabela existir)
   (async()=>{
     const tl=home.querySelector('#hm-tl'), sub=home.querySelector('#hm-sub');
@@ -7171,6 +7281,7 @@ function acoesBase(){
   return [
     {e:'➕',t:'Novo paciente',s:'Cadastrar um paciente',f:clk('#btn-novo-pac')},
     {e:'🗓️',t:'Agenda de consultas',s:'Consultas do dia',f:clk('#btn-agconsultas')},
+    {e:'📥',t:'Pedidos e lembretes',s:'Aprovar pedidos online e avisar quem vem amanhã',f:clk('#btn-pedidos')},
     {e:'🔁',t:'Retornos',s:'Quem precisa voltar',f:clk('#btn-agenda')},
     {e:'🔎',t:'Busca ativa',s:'Rastreamentos e atrasos',f:clk('#btn-busca')},
     {e:'📈',t:'Painel da unidade',s:'Indicadores',f:clk('#btn-painel')},
