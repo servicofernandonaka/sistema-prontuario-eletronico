@@ -14,6 +14,6 @@ Deno.serve((req) => handle(req, {
   contarPendentes: async (owner) => (await admin.from("pep_agenda").select("id", { count: "exact", head: true }).eq("profissional_id", owner).eq("status", "solicitada")).count ?? 0,
   contarAtivosTelefone: async (owner, u8, desde) => (await admin.from("pep_agenda").select("id", { count: "exact", head: true }).eq("profissional_id", owner).gte("data", desde).in("status", ATIVAS).like("telefone", "%" + u8)).count ?? 0,
   inserir: async (row) => { const { error } = await admin.from("pep_agenda").insert(row); return error ? { ok: false, conflito: error.code === "23505" } : { ok: true }; },
-  porHash: async (h) => (await admin.from("pep_agenda").select("id,profissional_id,nome,data,hora,duracao_min,status,token_hash").eq("token_hash", h).maybeSingle()).data,
+  porHash: async (h) => (await admin.from("pep_agenda").select("id,profissional_id,nome,data,hora,duracao_min,status,token_hash,preconsulta_em").eq("token_hash", h).maybeSingle()).data,
   atualizar: async (id, patch) => { await admin.from("pep_agenda").update(patch).eq("id", id); },
 }));

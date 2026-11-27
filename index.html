@@ -442,6 +442,11 @@
   .ao-prev span{font-size:12.5px;border:1px solid var(--line);border-radius:20px;padding:3px 10px}
   .ao-on{display:flex;align-items:center;gap:10px;font-weight:700}
   @media (max-width:640px){ .ao-dia .nm{width:100%} }
+  /* ---------- pré-consulta ---------- */
+  .pc-chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:20px;background:#e6f7ef;color:#17995c;border:0;cursor:pointer;font-family:inherit}
+  .pcm dl{margin:0;display:grid;gap:10px}.pcm dt{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .pcm dd{margin:2px 0 0;white-space:pre-wrap}
+  .pcm .alerta{background:#fff4e0;color:#8a5a00;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:4px}
 /* =====================================================================
    CAMADA "AURORA CLÍNICA" — identidade visual, movimento e modo escuro.
    Fica por último de propósito: só redefine tokens e acrescenta efeitos.
@@ -1042,6 +1047,11 @@ textarea.voz-ouvindo{border-color:var(--err)!important;box-shadow:0 0 0 4px colo
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
 </div></div>
 
+<div class="overlay" id="m-preconsulta"><div class="modal" style="max-width:560px">
+  <div class="mh"><span id="pcm-tit">Pré-consulta</span><button class="x" data-close>✕</button></div>
+  <div class="mb" id="pcm-corpo"></div>
+  <div class="mf"><button class="btn ghost" id="pcm-copiar">Copiar texto</button><button class="btn primary" id="pcm-inserir" hidden>Inserir no Subjetivo</button><button class="btn ghost" data-close>Fechar</button></div>
+</div></div>
 <div class="overlay" id="m-vincular"><div class="modal" style="max-width:460px">
   <div class="mh"><span>Vincular a um paciente cadastrado</span><button class="x" data-close>✕</button></div>
   <div class="mb">
@@ -1951,6 +1961,7 @@ function linhaConsulta(a){
     '<div class="ag-nm">'+(vinc?'<button class="ba-nome" data-abrir="'+esc(a.paciente_id)+'">'+esc(nm)+'</button>':'<b>'+esc(nm)+'</b>')+
       (a.tipo?' <span class="chip">'+esc(a.tipo)+'</span>':'')+
       (a.origem&&a.origem!=='manual'?' <span class="chip" style="background:#e9f6ff">via '+esc(a.origem)+'</span>':'')+
+      ' '+chipPreconsulta(a)+
       (a.telefone?'<div class="muted" style="font-size:12px">'+esc(a.telefone)+'</div>':'')+
       (a.observacao?'<div class="muted" style="font-size:12px">'+esc(a.observacao)+'</div>':'')+'</div>'+
     '<div class="ag-badge" style="color:'+st.cor+';background:'+st.bg+'">'+st.rot+'</div>'+
@@ -1991,6 +2002,7 @@ async function renderAgendaConsultas(c){
   box.innerHTML='<div class="muted" style="margin:0 0 8px">'+ativas+' consulta(s) neste dia'+(lista.length>ativas?' · '+(lista.length-ativas)+' cancelada(s)':'')+'</div>'+
     '<div class="card"><div class="cb" style="gap:0;padding:0">'+lista.map(linhaConsulta).join('')+'</div></div>';
   box.querySelectorAll('[data-abrir]').forEach(b=>b.onclick=()=>abrirPacientePorId(b.dataset.abrir,false));
+  ligarChipsPC(box,lista);
   box.querySelectorAll('[data-atend]').forEach(b=>b.onclick=()=>abrirPacientePorId(b.dataset.atend,true));
   box.querySelectorAll('[data-vinc]').forEach(b=>b.onclick=()=>abrirVincular(b.dataset.vinc));
   box.querySelectorAll('[data-st]').forEach(sel=>sel.onchange=async()=>{
@@ -2124,11 +2136,13 @@ async function renderPedidos(c){
     const tel=telDaConsulta(a), st=STATUS_AG[a.status]||STATUS_AG.marcada;
     return '<div class="ped-row"><div class="ped-q">'+esc(String(a.hora||'--:--').slice(0,5))+'<small>'+(a.duracao_min||30)+' min</small></div>'+
       '<div class="ped-tx"><b>'+esc(nomeDaConsulta(a))+'</b> <span class="ag-badge" style="color:'+st.cor+';background:'+st.bg+'">'+st.rot+'</span>'+
+        ' '+chipPreconsulta(a)+
         (tel?'<div class="muted">'+esc(tel)+'</div>':'<div class="muted">sem telefone cadastrado</div>')+
         (a.lembrado_em?'<div class="ped-ok">✓ lembrete enviado '+esc(new Date(a.lembrado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</div>':'')+'</div>'+
       '<div class="ag-ac"><button class="btn '+(a.lembrado_em?'ghost':'primary')+' sm" data-lembrar="'+esc(a.id)+'"'+(tel?'':' disabled')+'>'+(a.lembrado_em?'Reenviar':'Enviar lembrete')+' (WhatsApp)</button></div></div>'; }).join('')+'</div></div>'
     :'<div class="empty">Ninguém marcado para amanhã.</div>';
   box.innerHTML=h;
+  ligarChipsPC(box,pedidos.concat(lembr));
   const achar=id=>pedidos.concat(lembr).find(x=>x.id===id);
   const prof=()=>(typeof profCache!=='undefined'&&profCache&&profCache.nome)||'';
   box.querySelectorAll('[data-aprovar]').forEach(b=>b.onclick=async()=>{
@@ -2138,7 +2152,7 @@ async function renderPedidos(c){
     toast('Pedido aprovado ✓'); contarPedidos();
     const tel=telDaConsulta(a);
     if(tel&&confirm('Avisar '+nomeCurto(nomeDaConsulta(a))+' pelo WhatsApp que a consulta foi confirmada?'))
-      abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'! Sua consulta'+(prof()?' com '+prof():'')+' está marcada para '+quandoTxt(a,true)+'.'+(link?'\n\nPara ver os detalhes, confirmar ou desmarcar: '+link:''));
+      abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'! Sua consulta'+(prof()?' com '+prof():'')+' está marcada para '+quandoTxt(a,true)+'.'+(link?'\n\nPara ver os detalhes, confirmar, desmarcar ou responder a pré-consulta (2 minutos): '+link:''));
     renderMain(); });
   box.querySelectorAll('[data-recusar]').forEach(b=>b.onclick=async()=>{
     const a=achar(b.dataset.recusar);
@@ -2155,7 +2169,7 @@ async function renderPedidos(c){
     let link='';
     try{ link=await novoLinkConsulta(a.id,{lembrado_em:new Date().toISOString()}); }
     catch(e){ b.disabled=false; toast(faltaColunaAgenda(e)?'Rode o agenda_publica_schema.sql no Supabase':'Não consegui registrar: '+e.message,true); return; }
-    abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'! Lembrete: sua consulta'+(prof()?' com '+prof():'')+' é amanhã, '+quandoTxt(a,true)+'.\n\nPor favor, confirme ou desmarque por este link: '+link);
+    abrirWhats(tel,'Olá, '+nomeCurto(nomeDaConsulta(a))+'! Lembrete: sua consulta'+(prof()?' com '+prof():'')+' é amanhã, '+quandoTxt(a,true)+'.\n\nPor favor, confirme ou desmarque por este link'+(a.preconsulta_em?'':' e, se puder, responda a pré-consulta (2 minutos)')+': '+link);
     renderMain(); });
 }
 
@@ -2271,6 +2285,47 @@ async function renderAgOnline(c){
     }catch(e){ $('ao-prevtx').textContent='Não consegui verificar a página pública agora (sem internet ou função fora do ar).'; }
   }
   desenharLink();
+}
+
+// ---------- pré-consulta (respondida pelo paciente no link pessoal) ----------
+const PC_CAMPOS=[['motivo','Motivo da consulta'],['desde','Desde quando'],['remedios','Remédios em uso (relato do paciente)'],['alergias','Alergias (relato)'],['doencas','Doenças e cirurgias prévias'],['outros','Outras informações']];
+function escoresPC(pc){ const r=[]; const s=a=>Array.isArray(a)?a[0]+a[1]:null;
+  const p=s(pc.phq2), g=s(pc.gad2);
+  if(p!=null) r.push({t:'PHQ-2',v:p,pos:p>=3}); if(g!=null) r.push({t:'GAD-2',v:g,pos:g>=3}); return r; }
+function textoPreconsulta(pc,em){
+  const l=['Pré-consulta respondida pelo paciente'+(em?' em '+new Date(em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'')+':'];
+  PC_CAMPOS.forEach(([k,t])=>{ if(pc[k]) l.push('- '+t+': '+pc[k]); });
+  escoresPC(pc).forEach(e=>l.push('- '+e.t+': '+e.v+'/6'+(e.pos?' (rastreio positivo; considerar '+(e.t==='PHQ-2'?'PHQ-9':'GAD-7')+')':'')));
+  return l.join('\n'); }
+function chipPreconsulta(a){
+  if(a.preconsulta_em&&a.preconsulta) return '<button type="button" class="pc-chip" data-pc="'+esc(a.id)+'" title="Ver as respostas">📝 pré-consulta'+(escoresPC(a.preconsulta).some(e=>e.pos)?' ⚠️':'')+'</button>';
+  return ''; }
+let pcAtual=null;
+function abrirPreconsulta(a){
+  if(!a||!a.preconsulta) return; pcAtual=a; const pc=a.preconsulta;
+  $('pcm-tit').textContent='Pré-consulta · '+nomeDaConsulta(a);
+  $('pcm-corpo').innerHTML='<div class="pcm"><div class="muted" style="font-size:12.5px;margin-bottom:10px">Respondida '+esc(new Date(a.preconsulta_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}))+
+    ' · consulta '+esc(quandoTxt(a))+'. Informação relatada pelo paciente: confira na consulta.</div><dl>'+
+    PC_CAMPOS.filter(([k])=>pc[k]).map(([k,t])=>'<div><dt>'+esc(t)+'</dt><dd>'+esc(pc[k])+'</dd></div>').join('')+
+    escoresPC(pc).map(e=>'<div><dt>'+e.t+'</dt><dd>'+e.v+' / 6'+(e.pos?'<div class="alerta">Rastreio positivo (≥ 3). Considere aplicar o '+(e.t==='PHQ-2'?'PHQ-9':'GAD-7')+'.</div>':'')+'</dd></div>').join('')+'</dl></div>';
+  $('pcm-inserir').hidden=!document.getElementById('f-s');
+  openM('m-preconsulta'); }
+$('pcm-copiar').onclick=()=>{ if(!pcAtual) return; navigator.clipboard.writeText(textoPreconsulta(pcAtual.preconsulta,pcAtual.preconsulta_em)).then(()=>toast('Texto copiado ✓'),()=>toast('Não consegui copiar',true)); };
+$('pcm-inserir').onclick=()=>{ const t=document.getElementById('f-s'); if(!t||!pcAtual) return;
+  const txt=textoPreconsulta(pcAtual.preconsulta,pcAtual.preconsulta_em);
+  if(t.value.includes(txt)){ toast('Já está no Subjetivo'); closeM('m-preconsulta'); return; }
+  t.value=(t.value.trim()?t.value.replace(/\s+$/,'')+'\n\n':'')+txt; t.dispatchEvent(new Event('input',{bubbles:true})); closeM('m-preconsulta'); toast('Inserido no Subjetivo ✓'); t.focus(); };
+function ligarChipsPC(box,lista){ box.querySelectorAll('[data-pc]').forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); abrirPreconsulta(lista.find(x=>x.id===b.dataset.pc)); }); }
+// no atendimento: procura a pré-consulta da consulta de hoje (ou de até 2 dias antes/depois) deste paciente
+async function botaoPreconsultaAtendimento(head,p){
+  if(!agendaOK||!p||!p.id) return;
+  const {data,error}=await sb.from('pep_agenda').select('*').eq('paciente_id',p.id).not('preconsulta_em','is',null).gte('data',addDiasISO(hojeISO(),-2)).lte('data',addDiasISO(hojeISO(),2)).order('data').limit(5);
+  if(error||!data||!data.length) return;
+  head=document.querySelector('#main-content .phead');
+  if(!head||!pacienteSel||pacienteSel.id!==p.id||!document.getElementById('f-s')||document.getElementById('btn-pc-at')) return;
+  const hj=hojeISO(), a=data.find(x=>x.data===hj)||data[0];
+  const b=el('button','btn ghost','📝 Pré-consulta'+(escoresPC(a.preconsulta||{}).some(e=>e.pos)?' ⚠️':'')); b.id='btn-pc-at'; b.title='Respostas que o paciente enviou antes da consulta';
+  b.onclick=()=>abrirPreconsulta(a); const ref=head.querySelector('.btn-calcmed'); if(ref&&ref.parentNode) ref.parentNode.insertBefore(b,ref); else head.appendChild(b);
 }
 
 // ---------- recibo de honorários e declaração de comparecimento ----------
@@ -3947,7 +4002,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-27.2 · agendamento online';
+const VERSAO='2026-11-27.3 · pré-consulta';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);
@@ -4152,6 +4207,7 @@ function renderAtendimento(c){
   if(!edit){ const bRep=el('button','btn ghost','Repetir da última consulta'); bRep.onclick=repetirUltima; head.appendChild(bRep); }
   const bVolta=el('button','btn ghost','← Voltar'); bVolta.title='Sai guardando o que foi digitado como rascunho'; bVolta.onclick=voltarDoAtendimento; head.appendChild(bVolta);
   c.appendChild(head);
+  botaoPreconsultaAtendimento(head,p).catch(()=>{});
   if(alergias.length) c.insertAdjacentHTML('beforeend', faixaAlergias());
 
   const ativos=problemas.filter(x=>x.situacao==='ativo');

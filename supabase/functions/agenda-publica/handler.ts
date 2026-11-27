@@ -4,6 +4,7 @@
 //   horarios  {slug, de?, ate?}                         → horários livres por dia
 //   solicitar {slug,nome,telefone,data,hora,motivo?,aceite,site?} → cria o pedido; devolve o token do link do paciente
 //   consulta  {token}  | confirmar {token} | cancelar {token}   → o paciente vê, confirma ou cancela a própria consulta
+//   preconsulta {token, respostas, aceite}                  → o paciente envia a pré-consulta (as respostas nunca são devolvidas pelo link)
 // Segurança: o token do paciente é aleatório (só o hash fica no banco); respostas iguais para token inexistente;
 // limites por telefone e por profissional contra abuso; campo-isca "site"; nenhum dado de outros pacientes é devolvido.
 
@@ -11,7 +12,7 @@ export type Cfg = { dias: Record<string, [string, string][]>; duracao_min: numbe
   janela_dias: number; modo: "aprovar" | "confirmar"; bloqueios: { de: string; ate: string }[]; nome_publico: string; mensagem: string; ativo: boolean };
 export type Ocupado = { data: string; hora: string | null; duracao_min: number | null };
 export type Linha = { id: string; profissional_id: string; nome: string | null; data: string; hora: string | null; duracao_min: number | null;
-  status: string; token_hash: string | null };
+  status: string; token_hash: string | null; preconsulta_em?: string | null };
 export type Deps = {
   env: { ALLOWED_ORIGIN?: string };
   agora: () => number;                                   // ms (UTC)
@@ -79,6 +80,16 @@ const primeiroNome = (n: string | null) => String(n || "").trim().split(/\s+/)[0
 export const soDigitos = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 const telefoneOK = (v: string) => { const d = soDigitos(v).replace(/^55(?=\d{10,11}$)/, ""); return /^\d{10,11}$/.test(d) ? d : ""; };
 
+// pré-consulta: só textos curtos e escalas 0–3 (PHQ-2 e GAD-2); qualquer outro campo é descartado
+const TXT_PC: Record<string, number> = { motivo: 500, desde: 120, remedios: 600, alergias: 300, doencas: 400, outros: 600 };
+export function normalizarPreconsulta(raw: unknown): Record<string, unknown> | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>; const out: Record<string, unknown> = {};
+  for (const [k, max] of Object.entries(TXT_PC)) { const v = String(r[k] ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").replace(/[ \t]+/g, " ").trim().slice(0, max); if (v) out[k] = v; }
+  for (const k of ["phq2", "gad2"]) { const a = r[k]; if (Array.isArray(a) && a.length === 2 && a.every((x) => Number.isInteger(x) && x >= 0 && x <= 3)) out[k] = [a[0], a[1]]; }
+  if (!out.motivo) return null;
+  return out;
+}
+
 export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(deps) });
   if (req.method !== "POST") return json(deps, 405, { erro: "metodo_nao_permitido" });
@@ -128,7 +139,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   }
 
   // ---------- ações com token (paciente) ----------
-  if (acao === "consulta" || acao === "confirmar" || acao === "cancelar") {
+  if (acao === "consulta" || acao === "confirmar" || acao === "cancelar" || acao === "preconsulta") {
     const token = String(b?.token || "");
     if (!/^[A-Za-z0-9_-]{20,80}$/.test(token)) return json(deps, 404, { erro: "link_invalido" });
     const l = await deps.porHash(await sha256(token));
@@ -137,9 +148,18 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     const ativa = ["solicitada", "marcada", "confirmada"].includes(l.status);
     if (acao === "confirmar" && ativa && !passada && l.status === "marcada") { await deps.atualizar(l.id, { status: "confirmada", confirmado_em: new Date(deps.agora()).toISOString() }); l.status = "confirmada"; }
     if (acao === "cancelar" && ativa && !passada) { await deps.atualizar(l.id, { status: "cancelada" }); l.status = "cancelada"; }
+    if (acao === "preconsulta") {
+      if (!ativa || passada) return json(deps, 409, { erro: "consulta_encerrada" });
+      if (b?.aceite !== true) return json(deps, 400, { erro: "aceite_necessario" });
+      const pc = normalizarPreconsulta(b?.respostas);
+      if (!pc) return json(deps, 400, { erro: "motivo_obrigatorio" });
+      const em = new Date(deps.agora()).toISOString();
+      await deps.atualizar(l.id, { preconsulta: pc, preconsulta_em: em }); l.preconsulta_em = em;
+    }
     const c = await deps.configPorOwner(l.profissional_id); const cfg = c ? normalizarCfg(c.config) : null;
     return json(deps, 200, { ok: true, nome: primeiroNome(l.nome), data: l.data, hora: l.hora ? String(l.hora).slice(0, 5) : null, status: l.status,
-      medico: cfg?.nome_publico || "", duracao_min: l.duracao_min || 30, passada, slug: c?.slug || null, agendamento_ativo: !!cfg?.ativo });
+      medico: cfg?.nome_publico || "", duracao_min: l.duracao_min || 30, passada, slug: c?.slug || null, agendamento_ativo: !!cfg?.ativo,
+      preconsulta: !!l.preconsulta_em, preconsulta_em: l.preconsulta_em || null });
   }
   return json(deps, 400, { erro: "acao_invalida" });
 }
