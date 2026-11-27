@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0a6fbd">
+<title>Sua consulta</title>
+<style>
+  :root{--brand:#0a6fbd;--ink:#13293f;--mut:#5e7490;--line:#d8e3ef;--bg:#eef3f9;color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;padding:16px;
+    background:radial-gradient(60vmax 40vmax at 10% -10%,#cfe6fb,transparent 60%),radial-gradient(50vmax 40vmax at 100% 0,#d6f4ee,transparent 60%),var(--bg)}
+  .wrap{max-width:460px;margin:0 auto}
+  .card{background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 18px 40px -18px rgba(17,42,68,.3);margin-top:12px}
+  .top{padding:20px;color:#fff;font-weight:800;font-size:19px;background:linear-gradient(125deg,#0b4f86,#1a7fcf 55%,#12b5a2)}
+  .top.ok{background:linear-gradient(125deg,#0f7a4a,#17a35e)}.top.err{background:linear-gradient(125deg,#9b1c1c,#c62828)}.top.mut{background:linear-gradient(125deg,#52667d,#7088a3)}
+  .bd{padding:20px}
+  .quando{text-align:center;margin:4px 0 14px}.quando .d{font-size:21px;font-weight:800;letter-spacing:-.02em}.quando .h{font-size:38px;font-weight:300;letter-spacing:-.03em;line-height:1.1}
+  .quando .m{color:var(--mut);font-size:14px;margin-top:2px}
+  .tag{display:inline-block;font-size:12.5px;font-weight:800;padding:4px 12px;border-radius:20px;background:#e8f1fb;color:var(--brand);margin-bottom:8px}
+  .tag.ok{background:#e1f6ea;color:#157347}.tag.err{background:#fdecec;color:#c62828}.tag.warn{background:#fff3df;color:#8a6414}
+  button,a.btn{display:block;width:100%;margin-top:12px;padding:14px;font:inherit;font-size:16px;font-weight:800;border:0;border-radius:14px;text-align:center;text-decoration:none;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,#0a6fbd,#1a8ad8 60%,#12b5a2);box-shadow:0 12px 24px -10px #0a6fbd}
+  button.verde{background:linear-gradient(135deg,#0f7a4a,#17a35e);box-shadow:0 12px 24px -10px #0f7a4a}
+  button.sec,a.sec{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  button.perigo{background:#fff;color:#c62828;border:1px solid #f1b9b9;box-shadow:none}
+  button[disabled]{opacity:.55}
+  .nota{font-size:12.5px;color:var(--mut);margin-top:14px;text-align:center}
+  .rodape{text-align:center;font-size:12.5px;color:var(--mut);margin:18px 0 6px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card"><div class="top" id="top">Sua consulta</div><div class="bd" id="bd">Aguarde um instante…</div></div>
+  <div class="rodape">PEP Clínico · link pessoal da sua consulta</div>
+</div>
+<script>
+var FUNC = "https://joygodczajayygjxerno.supabase.co/functions/v1/agenda-publica";
+var token = (location.hash || "").replace(/^#/, "");
+var top_ = document.getElementById("top"), bd = document.getElementById("bd"), atual = null;
+var SEML = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+var MESL = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+function el(t, txt, cls) { var e = document.createElement(t); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; }
+function limpa() { while (bd.firstChild) bd.removeChild(bd.firstChild); }
+function chamar(acao) { return fetch(FUNC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ acao: acao, token: token }) })
+  .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); }); }
+function dt(iso) { var p = iso.split("-"); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
+function erro(t, x) { top_.textContent = t; top_.className = "top err"; limpa(); bd.appendChild(el("p", x)); }
+
+function desenhar(c) {
+  atual = c; limpa();
+  var d = dt(c.data), st = c.status, passada = c.passada;
+  var info = { solicitada: ["Aguardando confirmação", "warn", "mut"], marcada: ["Marcada", "", ""], confirmada: ["Confirmada ✓", "ok", "ok"], cancelada: ["Cancelada", "err", "err"], atendida: ["Atendida", "ok", "ok"], faltou: ["Não compareceu", "err", "err"] }[st] || [st, "", ""];
+  top_.textContent = (c.nome ? "Olá, " + c.nome + "! " : "") + "Sua consulta"; top_.className = "top " + info[2];
+  var q = el("div", null, "quando");
+  q.appendChild(el("div", SEML[d.getDay()] + ", " + d.getDate() + " de " + MESL[d.getMonth()], "d")); q.appendChild(el("div", c.hora || "", "h"));
+  if (c.medico) q.appendChild(el("div", c.medico, "m"));
+  bd.appendChild(q);
+  var c2 = el("div"); c2.style.textAlign = "center"; c2.appendChild(el("span", info[0], "tag " + info[1])); bd.appendChild(c2);
+  if (st === "solicitada") bd.appendChild(el("p", "O consultório ainda vai confirmar este horário. Você receberá a resposta pelo WhatsApp.", "nota"));
+  var ativa = st === "solicitada" || st === "marcada" || st === "confirmada";
+  if (ativa && !passada) {
+    if (st === "marcada") { var b1 = el("button", "✔ Confirmo minha presença", "verde"); b1.onclick = function () { agir("confirmar", b1); }; bd.appendChild(b1); }
+    var b2 = el("button", "📅 Adicionar ao meu calendário", "sec"); b2.onclick = ics; bd.appendChild(b2);
+    if (c.agendamento_ativo && c.slug) { var b3 = el("button", "Preciso remarcar", "sec"); b3.onclick = remarcar; bd.appendChild(b3); }
+    var b4 = el("button", "Cancelar consulta", "perigo"); b4.onclick = function () { if (confirm("Cancelar esta consulta?")) agir("cancelar", b4); }; bd.appendChild(b4);
+  } else if (st === "cancelada" && c.agendamento_ativo && c.slug) {
+    var a = el("a", "Marcar um novo horário", "btn"); a.href = "agendar.html?m=" + encodeURIComponent(c.slug); bd.appendChild(a);
+  }
+}
+function agir(acao, btn) { btn.disabled = true; chamar(acao).then(function (r) { if (r.s === 200 && r.j.ok) desenhar(r.j); else { btn.disabled = false; alert("Não foi possível agora. Tente de novo."); } })
+  .catch(function () { btn.disabled = false; alert("Sem conexão. Tente de novo."); }); }
+function remarcar() {
+  if (!confirm("Para remarcar, esta consulta será cancelada e você escolherá um novo horário. Continuar?")) return;
+  chamar("cancelar").then(function (r) { if (r.s === 200 && r.j.ok && r.j.status === "cancelada") location.href = "agendar.html?m=" + encodeURIComponent(atual.slug); else alert("Não foi possível agora."); });
+}
+function ics() {
+  var c = atual, ini = c.data.replace(/-/g, "") + "T" + c.hora.replace(":", "") + "00", p = c.hora.split(":"), m = (+p[0]) * 60 + (+p[1]) + (c.duracao_min || 30);
+  var fim = c.data.replace(/-/g, "") + "T" + String(Math.floor(m / 60) % 24).padStart(2, "0") + String(m % 60).padStart(2, "0") + "00";
+  var txt = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PEP Clinico//Agenda//PT", "BEGIN:VEVENT", "UID:" + c.data + c.hora + "@pep", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z",
+    "DTSTART;TZID=America/Sao_Paulo:" + ini, "DTEND;TZID=America/Sao_Paulo:" + fim, "SUMMARY:Consulta" + (c.medico ? " - " + c.medico : ""), "BEGIN:VALARM", "TRIGGER:-PT2H", "ACTION:DISPLAY", "DESCRIPTION:Consulta em 2 horas", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/calendar" })); a.download = "consulta.ics"; document.body.appendChild(a); a.click(); a.remove();
+}
+if (!/^[A-Za-z0-9_-]{20,80}$/.test(token)) erro("Link incompleto", "Use o link completo que você recebeu do consultório.");
+else chamar("consulta").then(function (r) { if (r.s === 200 && r.j.ok) desenhar(r.j); else erro("Link não encontrado", "Este link não é válido ou já foi substituído. Fale com o consultório."); })
+  .catch(function () { erro("Sem conexão", "Não consegui abrir agora. Verifique a internet e tente de novo."); });
+</script>
+</body>
+</html>

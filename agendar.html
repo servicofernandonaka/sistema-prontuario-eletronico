@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0a6fbd">
+<title>Agendar consulta</title>
+<style>
+  :root{--brand:#0a6fbd;--ink:#13293f;--mut:#5e7490;--line:#d8e3ef;--bg:#eef3f9;color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;
+    background:radial-gradient(60vmax 40vmax at 10% -10%,#cfe6fb,transparent 60%),radial-gradient(50vmax 40vmax at 100% 0,#d6f4ee,transparent 60%),var(--bg);padding:16px}
+  .wrap{max-width:520px;margin:0 auto}
+  .hero{border-radius:22px;padding:22px 22px 20px;color:#fff;background:linear-gradient(125deg,#0b4f86,#1a7fcf 55%,#12b5a2);box-shadow:0 18px 40px -16px rgba(10,92,158,.6)}
+  .hero small{letter-spacing:.08em;text-transform:uppercase;font-weight:700;opacity:.85;font-size:12px}
+  .hero h1{margin:4px 0 6px;font-size:24px;letter-spacing:-.02em}
+  .hero p{margin:0;opacity:.92;font-size:14.5px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:14px;box-shadow:0 10px 30px -14px rgba(17,42,68,.22)}
+  h2{font-size:14px;margin:0 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+  .dias{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity}
+  .dia{flex:0 0 64px;scroll-snap-align:start;border:1px solid var(--line);background:#fff;border-radius:16px;padding:10px 4px;text-align:center;cursor:pointer;font:inherit;color:inherit;transition:transform .2s,box-shadow .2s}
+  .dia b{display:block;font-size:20px;line-height:1.1}.dia span{font-size:11.5px;color:var(--mut);text-transform:uppercase}
+  .dia.on{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 10px 20px -8px var(--brand)}.dia.on span{color:#d6ecff}
+  .dia:active{transform:scale(.94)}
+  .horas{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
+  .hora{border:1px solid var(--line);background:#f6f9fd;border-radius:12px;padding:11px 0;font:inherit;font-weight:700;cursor:pointer;color:var(--ink);transition:transform .15s}
+  .hora.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .hora:active{transform:scale(.94)}
+  label{display:block;font-weight:600;font-size:13.5px;margin:12px 0 5px}
+  input[type=text],input[type=tel],textarea{width:100%;font:inherit;font-size:16px;padding:12px;border:1px solid #b9c9db;border-radius:12px;background:#fbfdff}
+  textarea{min-height:70px;resize:vertical}
+  input:focus,textarea:focus{outline:2px solid var(--brand);border-color:transparent}
+  .chk{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:13px;color:var(--mut);margin-top:14px}
+  .chk input{margin-top:3px;width:18px;height:18px;flex:0 0 auto}
+  button.go,a.go{display:block;width:100%;margin-top:16px;padding:14px;font:inherit;font-size:16px;font-weight:800;border:0;border-radius:14px;color:#fff;text-align:center;text-decoration:none;cursor:pointer;
+    background:linear-gradient(135deg,#0a6fbd,#1a8ad8 60%,#12b5a2);box-shadow:0 12px 24px -10px #0a6fbd}
+  button.go[disabled]{opacity:.55;cursor:not-allowed}
+  a.sec,button.sec{display:block;width:100%;margin-top:10px;padding:12px;font:inherit;font-weight:700;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--ink);text-align:center;text-decoration:none;cursor:pointer}
+  .msg{margin-top:12px;font-size:14px;color:#c62828}
+  .vazio{color:var(--mut);text-align:center;padding:18px 6px}
+  .ok{text-align:center;padding:6px 4px}.ok .big{font-size:46px}.ok h2{color:#157347;font-size:20px;text-transform:none;letter-spacing:0}
+  .resumo{background:#f3f8fe;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:12px 0;font-size:15px}
+  .nota{font-size:12.5px;color:var(--mut);margin-top:12px}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  [hidden]{display:none!important}
+  .rodape{text-align:center;font-size:12.5px;color:var(--mut);margin:18px 0 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero"><small>Agendamento online</small><h1 id="h-med">Agendar consulta</h1><p id="h-sub">Escolha o melhor dia e horário.</p></div>
+  <div id="erro" class="card" hidden></div>
+
+  <div id="passo" hidden>
+    <div class="card"><h2>1 · Escolha o dia</h2><div class="dias" id="dias"></div><div class="vazio" id="sem-dias" hidden>Não há horários livres nos próximos dias. Fale com o consultório.</div></div>
+    <div class="card" id="c-horas" hidden><h2>2 · Escolha o horário</h2><div class="horas" id="horas"></div></div>
+    <form class="card" id="c-form" hidden autocomplete="on">
+      <h2>3 · Seus dados</h2>
+      <div class="resumo" id="resumo"></div>
+      <label for="nome">Nome completo</label><input type="text" id="nome" autocomplete="name" maxlength="80" required>
+      <label for="tel">Celular com DDD (WhatsApp)</label><input type="tel" id="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="(11) 91234-5678" required>
+      <label for="motivo">Motivo da consulta (opcional)</label><textarea id="motivo" maxlength="200" placeholder="Em poucas palavras. Não envie exames nem dados sensíveis aqui."></textarea>
+      <input class="hp" type="text" name="site" id="site" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="chk"><input type="checkbox" id="aceite"><span>Autorizo o uso do meu nome e celular apenas para agendar, confirmar e lembrar esta consulta.</span></label>
+      <button class="go" id="enviar" type="submit">Pedir este horário</button>
+      <div class="msg" id="msg" role="alert"></div>
+    </form>
+  </div>
+
+  <div class="card ok" id="sucesso" hidden>
+    <div class="big" id="s-ico">✅</div><h2 id="s-tit">Pedido enviado</h2>
+    <div class="resumo" id="s-res"></div>
+    <p id="s-txt" style="font-size:14.5px;margin:6px 0"></p>
+    <a class="go" id="s-link" href="#">Ver ou cancelar minha consulta</a>
+    <button class="sec" id="s-ics" type="button">📅 Adicionar ao meu calendário</button>
+    <div class="nota">Guarde o link acima: é com ele que você confirma ou cancela sem precisar ligar.</div>
+  </div>
+  <div class="rodape">Agendamento seguro · PEP Clínico</div>
+</div>
+<script>
+var FUNC = "https://joygodczajayygjxerno.supabase.co/functions/v1/agenda-publica";
+var slug = (new URLSearchParams(location.search).get("m") || "").trim();
+var $ = function (id) { return document.getElementById(id); };
+var info = null, grade = {}, diaSel = null, horaSel = null;
+var SEM = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"], SEML = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+var MES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+function chamar(corpo) { return fetch(FUNC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
+  .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); }); }
+function el(t, txt, cls) { var e = document.createElement(t); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; }
+function limpa(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function dt(iso) { var p = iso.split("-"); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
+function brData(iso) { var d = dt(iso); return SEML[d.getDay()] + ", " + d.getDate() + " de " + ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"][d.getMonth()]; }
+function falha(titulo, txt) { var e = $("erro"); limpa(e); e.hidden = false; $("passo").hidden = true; e.appendChild(el("h2", titulo)); e.appendChild(el("p", txt)); }
+
+function iniciar() {
+  if (!/^[A-Za-z0-9_-]{6,40}$/.test(slug)) { falha("Link incompleto", "Peça ao consultório o endereço correto para agendar."); return; }
+  chamar({ acao: "info", slug: slug }).then(function (r) {
+    if (r.s !== 200 || !r.j.ok) { falha("Agenda indisponível", "No momento este consultório não está recebendo agendamentos online. Entre em contato diretamente."); return; }
+    info = r.j; $("h-med").textContent = info.medico || "Agendar consulta";
+    $("h-sub").textContent = info.mensagem || ("Consulta de " + info.duracao_min + " minutos. " + (info.modo === "aprovar" ? "O consultório confirma o seu pedido." : "Marcação na hora."));
+    document.title = "Agendar consulta" + (info.medico ? " — " + info.medico : "");
+    return carregar(info.de, info.ate);
+  }).catch(function () { falha("Sem conexão", "Não consegui abrir a agenda agora. Verifique a internet e tente de novo."); });
+}
+function somaDias(iso, n) { var d = dt(iso); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function carregar(de, ate) {   // a função devolve até 31 dias por chamada
+  var pedidos = [], ini = de;
+  while (ini <= ate) { var fim = somaDias(ini, 30); if (fim > ate) fim = ate; pedidos.push(chamar({ acao: "horarios", slug: slug, de: ini, ate: fim })); ini = somaDias(fim, 1); }
+  return Promise.all(pedidos).then(function (rs) {
+    rs.forEach(function (r) { if (r.j && r.j.dias) for (var k in r.j.dias) grade[k] = r.j.dias[k]; });
+    $("passo").hidden = false; desenharDias();
+  });
+}
+function desenharDias() {
+  var box = $("dias"); limpa(box); var chaves = Object.keys(grade).sort();
+  $("sem-dias").hidden = chaves.length > 0;
+  chaves.forEach(function (k) { var d = dt(k), b = el("button", null, "dia"); b.type = "button";
+    b.appendChild(el("span", SEM[d.getDay()])); b.appendChild(el("b", String(d.getDate()))); b.appendChild(el("span", MES[d.getMonth()]));
+    b.onclick = function () { escolherDia(k, b); }; box.appendChild(b); });
+}
+function escolherDia(k, btn) {
+  diaSel = k; horaSel = null; Array.prototype.forEach.call(document.querySelectorAll(".dia"), function (x) { x.classList.remove("on"); }); btn.classList.add("on");
+  var box = $("horas"); limpa(box); $("c-horas").hidden = false; $("c-form").hidden = true;
+  grade[k].forEach(function (h) { var b = el("button", h, "hora"); b.type = "button"; b.onclick = function () { escolherHora(h, b); }; box.appendChild(b); });
+  $("c-horas").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function escolherHora(h, btn) {
+  horaSel = h; Array.prototype.forEach.call(document.querySelectorAll(".hora"), function (x) { x.classList.remove("on"); }); btn.classList.add("on");
+  $("resumo").textContent = "📅 " + brData(diaSel) + " às " + h; $("c-form").hidden = false; $("msg").textContent = "";
+  $("c-form").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+// máscara de celular
+$("tel").addEventListener("input", function () { var d = this.value.replace(/\D/g, "").slice(0, 11);
+  this.value = !d ? "" : d.length <= 2 ? "(" + d : d.length <= 6 ? "(" + d.slice(0, 2) + ") " + d.slice(2) : d.length <= 10 ? "(" + d.slice(0, 2) + ") " + d.slice(2, 6) + "-" + d.slice(6) : "(" + d.slice(0, 2) + ") " + d.slice(2, 7) + "-" + d.slice(7); });
+
+var ERROS = { aceite_necessario: "Marque a autorização para continuar.", nome_invalido: "Digite seu nome completo.", telefone_invalido: "Confira o celular com DDD.",
+  horario_indisponivel: "Esse horário acabou de ser ocupado. Escolha outro.", horario_invalido: "Escolha um dia e um horário.",
+  limite_por_telefone: "Este celular já tem consultas marcadas. Para marcar outra, cancele uma pelo link que você recebeu ou fale com o consultório.",
+  muitos_pedidos: "A agenda está com muitos pedidos agora. Tente novamente mais tarde ou ligue para o consultório." };
+$("c-form").onsubmit = function (ev) {
+  ev.preventDefault(); var btn = $("enviar"), msg = $("msg"); msg.textContent = "";
+  if (!diaSel || !horaSel) { msg.textContent = ERROS.horario_invalido; return; }
+  if ($("nome").value.trim().length < 3) { msg.textContent = ERROS.nome_invalido; return; }
+  if ($("tel").value.replace(/\D/g, "").length < 10) { msg.textContent = ERROS.telefone_invalido; return; }
+  if (!$("aceite").checked) { msg.textContent = ERROS.aceite_necessario; return; }
+  btn.disabled = true; btn.textContent = "Enviando…";
+  chamar({ acao: "solicitar", slug: slug, nome: $("nome").value, telefone: $("tel").value, data: diaSel, hora: horaSel, motivo: $("motivo").value, aceite: $("aceite").checked, site: $("site").value })
+  .then(function (r) {
+    if (r.s === 200 && r.j.ok) { sucesso(r.j); return; }
+    msg.textContent = ERROS[r.j && r.j.erro] || "Não foi possível enviar agora. Tente de novo em instantes.";
+    if (r.j && r.j.erro === "horario_indisponivel") { delete grade[diaSel]; carregar(info.de, info.ate); $("c-form").hidden = true; }
+    btn.disabled = false; btn.textContent = "Pedir este horário";
+  }).catch(function () { msg.textContent = "Sem conexão. Tente de novo."; btn.disabled = false; btn.textContent = "Pedir este horário"; });
+};
+function sucesso(j) {
+  $("passo").hidden = true; $("sucesso").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" });
+  var pedido = j.status === "solicitada";
+  $("s-ico").textContent = pedido ? "📨" : "✅"; $("s-tit").textContent = pedido ? "Pedido enviado" : "Consulta marcada";
+  $("s-res").textContent = "📅 " + brData(j.data) + " às " + j.hora + (j.medico ? " · " + j.medico : "");
+  $("s-txt").textContent = pedido ? "O consultório vai confirmar o seu horário. Você receberá a resposta pelo WhatsApp." : "Tudo certo! Você receberá um lembrete antes da consulta.";
+  var link = location.href.replace(/agendar\.html.*$/, "consulta.html") + "#" + j.token;
+  $("s-link").href = link;
+  $("s-ics").onclick = function () { baixarIcs(j.data, j.hora, info.duracao_min, j.medico); };
+  try { localStorage.setItem("agenda_ultimo", link); } catch (e) {}
+}
+function baixarIcs(data, hora, dur, medico) {
+  var ini = data.replace(/-/g, "") + "T" + hora.replace(":", "") + "00", p = hora.split(":"), m = (+p[0]) * 60 + (+p[1]) + (dur || 30);
+  var fim = data.replace(/-/g, "") + "T" + String(Math.floor(m / 60) % 24).padStart(2, "0") + String(m % 60).padStart(2, "0") + "00";
+  var txt = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PEP Clinico//Agenda//PT", "BEGIN:VEVENT", "UID:" + data + hora + "@pep", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z",
+    "DTSTART;TZID=America/Sao_Paulo:" + ini, "DTEND;TZID=America/Sao_Paulo:" + fim, "SUMMARY:Consulta" + (medico ? " - " + medico : ""), "BEGIN:VALARM", "TRIGGER:-PT2H", "ACTION:DISPLAY", "DESCRIPTION:Consulta em 2 horas", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/calendar" })); a.download = "consulta.ics"; document.body.appendChild(a); a.click(); a.remove();
+}
+iniciar();
+</script>
+</body>
+</html>

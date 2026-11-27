@@ -139,7 +139,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     if (acao === "cancelar" && ativa && !passada) { await deps.atualizar(l.id, { status: "cancelada" }); l.status = "cancelada"; }
     const c = await deps.configPorOwner(l.profissional_id); const cfg = c ? normalizarCfg(c.config) : null;
     return json(deps, 200, { ok: true, nome: primeiroNome(l.nome), data: l.data, hora: l.hora ? String(l.hora).slice(0, 5) : null, status: l.status,
-      medico: cfg?.nome_publico || "", passada, slug: c?.slug || null, agendamento_ativo: !!cfg?.ativo });
+      medico: cfg?.nome_publico || "", duracao_min: l.duracao_min || 30, passada, slug: c?.slug || null, agendamento_ativo: !!cfg?.ativo });
   }
   return json(deps, 400, { erro: "acao_invalida" });
 }
