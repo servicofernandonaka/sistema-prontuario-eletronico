@@ -2177,7 +2177,7 @@ async function renderPedidos(c){
     '<div class="ped-row"><div class="ped-q">'+esc(quandoTxt(a))+'<small>'+(a.duracao_min||30)+' min</small></div>'+
     '<div class="ped-tx"><b>'+esc(nomeDaConsulta(a))+'</b>'+(telDaConsulta(a)?'<div class="muted">'+esc(telDaConsulta(a))+'</div>':'')+
       (a.observacao?'<div class="muted">Motivo: '+esc(a.observacao)+'</div>':'')+'</div>'+
-    '<div class="ag-ac"><button class="btn primary sm" data-aprovar="'+esc(a.id)+'">Aprovar</button><button class="btn ghost sm" data-recusar="'+esc(a.id)+'">Recusar</button></div></div>').join('')+'</div></div>'
+    '<div class="ag-ac"><button class="btn primary sm" data-aprovar="'+esc(a.id)+'">Aprovar</button><button class="btn ghost sm" data-recusar="'+esc(a.id)+'">Recusar</button>'+(a.paciente_id?'':'<button class="btn ghost sm" data-cadastrar="'+esc(a.id)+'" title="Criar o cadastro deste paciente já com nome e telefone">Cadastrar</button>')+'</div></div>').join('')+'</div></div>'
     :'<div class="empty">Nenhum pedido novo. Quando um paciente marcar pelo link público, ele aparece aqui.</div>';
   h+='<div class="ped-sec">🔔 Lembretes de amanhã <small>'+esc(nAmanha)+' · '+lembr.length+' consulta(s)</small></div>';
   h+=lembr.length?'<div class="card"><div class="cb" style="gap:0;padding:0">'+lembr.map(a=>{
@@ -2187,10 +2187,13 @@ async function renderPedidos(c){
         ' '+chipPreconsulta(a)+
         (tel?'<div class="muted">'+esc(tel)+'</div>':'<div class="muted">sem telefone cadastrado</div>')+
         (a.lembrado_em?'<div class="ped-ok">✓ lembrete enviado '+esc(new Date(a.lembrado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}))+'</div>':'')+'</div>'+
-      '<div class="ag-ac"><button class="btn '+(a.lembrado_em?'ghost':'primary')+' sm" data-lembrar="'+esc(a.id)+'"'+(tel?'':' disabled')+'>'+(a.lembrado_em?'Reenviar':'Enviar lembrete')+' (WhatsApp)</button></div></div>'; }).join('')+'</div></div>'
+      '<div class="ag-ac"><button class="btn '+(a.lembrado_em?'ghost':'primary')+' sm" data-lembrar="'+esc(a.id)+'"'+(tel?'':' disabled')+'>'+(a.lembrado_em?'Reenviar':'Enviar lembrete')+' (WhatsApp)</button>'+(a.paciente_id?'':'<button class="btn ghost sm" data-cadastrar="'+esc(a.id)+'">Cadastrar</button>')+'</div></div>'; }).join('')+'</div></div>'
     :'<div class="empty">Ninguém marcado para amanhã.</div>';
   box.innerHTML=h;
   ligarChipsPC(box,pedidos.concat(lembr));
+  box.querySelectorAll('[data-cadastrar]').forEach(b=>b.onclick=()=>{ const a=pedidos.concat(lembr).find(x=>x.id===b.dataset.cadastrar); if(!a) return;
+    abrirModalPaciente(null,a.id); $('np-nome').value=a.nome||''; $('np-tel').value=formatarTel(a.telefone||'');
+    toast('Complete o cadastro (CPF, nascimento e e-mail liberam o portal do paciente)'); });
   const achar=id=>pedidos.concat(lembr).find(x=>x.id===id);
   const prof=()=>(typeof profCache!=='undefined'&&profCache&&profCache.nome)||'';
   box.querySelectorAll('[data-aprovar]').forEach(b=>b.onclick=async()=>{
@@ -2788,8 +2791,9 @@ $('pac-search').addEventListener('input',e=>{ clearTimeout(searchTimer); searchT
 
 // Novo paciente
 let pacEditando=null;
-function abrirModalPaciente(p){
-  pacEditando=p||null;
+let cadastroDaConsulta=null;   // id da consulta (pep_agenda) a ligar ao paciente que for cadastrado agora
+function abrirModalPaciente(p,daConsulta){
+  pacEditando=p||null; cadastroDaConsulta=(!p&&daConsulta)||null;
   $('np-titulo').textContent=p?'Editar paciente':'Novo paciente';
   $('np-nome').value=p?(p.nome||''):''; $('np-cpf').value=p?(p.cpf||''):''; $('np-cns').value=p?(p.cns||''):'';
   $('np-nasc').value=p?(p.data_nascimento||''):''; $('np-sexo').value=p?(p.sexo||''):'';
@@ -2835,7 +2839,10 @@ $('np-save').onclick=async()=>{
   btn.disabled=false;
   if(res.error){ toast('Erro ao salvar: '+res.error.message,true); return; }
   closeM('m-pac'); toast(salvoMsg(mk,pacEditando?'Paciente atualizado ✓':'Paciente cadastrado ✓'));
-  const novo=res.data; pacEditando=null;
+  const novo=res.data, eraNovo=!pacEditando; pacEditando=null;
+  if(eraNovo&&cadastroDaConsulta){ const {error:eV}=await sb.from('pep_agenda').update({paciente_id:novo.id,nome:null}).eq('id',cadastroDaConsulta);
+    toast(eV?'Paciente cadastrado, mas não consegui ligar à consulta: use Vincular':'Paciente cadastrado e ligado à consulta ✓',!!eV); }
+  cadastroDaConsulta=null;
   await carregarPacientes(); pacienteSel=novo; atendAtual=null; renderSideList(); renderMain();
 };
 
@@ -4166,7 +4173,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-27.5 · página de entrada';
+const VERSAO='2026-11-27.6 · cadastrar pelo pedido';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);

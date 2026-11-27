@@ -43,6 +43,18 @@ const srv=http.createServer((q,r)=>{let f=path.join(ROOT,decodeURIComponent(q.ur
   await page.setViewportSize({width:390,height:844}); await page.waitForTimeout(300);
   await page.screenshot({path:require('path').join(require('os').tmpdir(),'pedidos-celular.png'),fullPage:true});
   const sw=await page.evaluate(()=>document.documentElement.scrollWidth); ok(sw<=390,'sem rolagem horizontal no celular ('+sw+')');
+  // cadastrar a partir do lembrete de um paciente avulso
+  await page.setViewportSize({width:1280,height:900}); await page.click('#btn-pedidos'); await page.waitForTimeout(700);
+  await page.click('[data-cadastrar="a4"]'); await page.waitForTimeout(300);
+  ok(await page.inputValue('#np-nome')==='Carlos Avulso'&&(await page.inputValue('#np-tel')).includes('(11) 93333-2222'),'Cadastrar abre o cadastro com nome e telefone');
+  await page.fill('#np-cpf','529.982.247-25'); await page.fill('#np-nasc','1980-02-03'); await page.click('#np-save'); await page.waitForTimeout(1200);
+  const a4=db.pep_agenda.find(x=>x.id==='a4'), novoP=db.pep_pacientes.find(x=>x.nome==='Carlos Avulso');
+  ok(novoP&&a4.paciente_id===novoP.id&&a4.nome===null,'consulta ligada ao paciente recém-cadastrado');
+  await page.click('#btn-novo-pac'); await page.waitForTimeout(200); await page.fill('#np-nome','Outro Paciente'); await page.click('#np-save'); await page.waitForTimeout(900);
+  ok(db.pep_agenda.filter(x=>x.paciente_id&&x.paciente_id===(db.pep_pacientes.find(y=>y.nome==='Outro Paciente')||{}).id).length===0,'cadastro comum não mexe em consulta nenhuma');
+  // navegação nas páginas do paciente
+  for(const pg of ['agendar.html?m=xxxxxxxx','consulta.html#tokenFalsoTokenFalsoTokenFalso','portal.html']){ const p2=await ctx.newPage(); await p2.goto('http://localhost:8765/'+pg); await p2.waitForTimeout(300);
+    ok(await p2.isVisible('a[href="./"]'),pg.split(/[?#]/)[0]+' tem link para a página inicial'); await p2.close(); }
   // paleta
   await page.keyboard.press('Control+k'); await page.fill('#cmdk-q','pedidos'); await page.waitForTimeout(200);
   ok((await page.textContent('#cmdk-l')).includes('Pedidos e lembretes'),'Ctrl+K encontra a tela');

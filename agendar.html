@@ -44,12 +44,14 @@
   .resumo{background:#f3f8fe;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:12px 0;font-size:15px}
   .nota{font-size:12.5px;color:var(--mut);margin-top:12px}
   .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+  .navp{text-align:center;font-size:14px;margin:14px 0 4px}.navp a{color:#0a6fbd;font-weight:700;text-decoration:none;margin:0 8px;display:inline-block;padding:6px 4px}
   [hidden]{display:none!important}
   .rodape{text-align:center;font-size:12.5px;color:var(--mut);margin:18px 0 6px}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div class="navp" style="text-align:left;margin:0 0 6px"><a href="./" style="margin:0">‹ Página inicial</a></div>
   <div class="hero"><small>Agendamento online</small><h1 id="h-med">Agendar consulta</h1><p id="h-sub">Escolha o melhor dia e horário.</p></div>
   <div id="erro" class="card" hidden></div>
 
@@ -76,7 +78,9 @@
     <a class="go" id="s-link" href="#">Ver ou cancelar minha consulta</a>
     <button class="sec" id="s-ics" type="button">📅 Adicionar ao meu calendário</button>
     <div class="nota">Guarde o link acima: é com ele que você confirma ou cancela sem precisar ligar.</div>
+    <a class="sec" href="./">Voltar à página inicial</a>
   </div>
+  <div class="navp"><a href="./">‹ Página inicial</a><a href="portal.html">Portal do paciente</a></div>
   <div class="rodape">Agendamento seguro · PEP Clínico</div>
 </div>
 <script>

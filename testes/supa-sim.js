@@ -50,6 +50,8 @@ async function instalar(page,{db=criarDB(),log=[]}={}){
     if(m[1]) return J(200,[]);
     const tb=m[2]; db[tb]=db[tb]||[]; const p=[...url.searchParams];
     const body=req.postData()?JSON.parse(req.postData()):null;
+    const umSo=/vnd\.pgrst\.object/.test(req.headers()['accept']||'');
+    const J0=J; const Jr=(st,b,h)=>J0(st,umSo&&Array.isArray(b)?(b[0]||null):b,h);
     log.push({meth,tb,q:url.search,body});
     if(meth==='GET'||meth==='HEAD'){
       let rows=ordenar(filtrar(db[tb],p),url.searchParams.get('order'));
@@ -59,13 +61,14 @@ async function instalar(page,{db=criarDB(),log=[]}={}){
       if(meth==='HEAD') return route.fulfill({status:200,headers:{...cors,...h}});
       return J(200,single?(rows[0]||null):rows,h);
     }
-    if(meth==='PATCH'){ const rows=filtrar(db[tb],p); rows.forEach(r=>Object.assign(r,body)); return J(200,rows); }
+    if(meth==='PATCH'){ const rows=filtrar(db[tb],p); rows.forEach(r=>Object.assign(r,body)); return Jr(200,rows); }
     if(meth==='DELETE'){ const rows=filtrar(db[tb],p); db[tb]=db[tb].filter(r=>!rows.includes(r)); return J(200,rows); }
     if(meth==='POST'&&url.searchParams.get('on_conflict')){ const k=url.searchParams.get('on_conflict'); const out=[];
       for(const r of (Array.isArray(body)?body:[body])){ const ex=db[tb].find(x=>x[k]===r[k]); if(ex){ Object.assign(ex,r); out.push(ex);} else { db[tb].push(r); out.push(r);} } return J(201,out); }
     if(meth==='POST'){ const comDono=['pep_portal_convites','pep_portal_docs','pep_agenda','pep_agenda_config'].includes(tb);
       const arr=(Array.isArray(body)?body:[body]).map(r=>({id:'n'+Math.random().toString(36).slice(2,8),criado_em:new Date().toISOString(),...(comDono&&tb==='pep_agenda'?{profissional_id:USER.id}:comDono?{owner_id:USER.id}:{}),...r}));
-      if(tb==='pep_portal_convites') arr.forEach(r=>{ r.expira_em=r.expira_em||new Date(Date.now()+7*864e5).toISOString(); r.tentativas=0; r.bloqueado=false; r.usado_em=null; }); db[tb].push(...arr); return J(201,arr); }
+      if(tb==='pep_portal_convites') arr.forEach(r=>{ r.expira_em=r.expira_em||new Date(Date.now()+7*864e5).toISOString(); r.tentativas=0; r.bloqueado=false; r.usado_em=null; });
+      db[tb].push(...arr); return Jr(201,arr); }
     return J(200,[]);
   });
   return {db,log};
