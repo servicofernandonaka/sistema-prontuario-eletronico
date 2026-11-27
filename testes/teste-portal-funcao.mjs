@@ -102,4 +102,40 @@ ok(!JSON.stringify(db.log).includes("Dor"), "o histórico não guarda conteúdo 
 r = await chamar({ acao: "sair", sessao: S }); r = await chamar({ acao: "inicio", sessao: S }); ok(r.s === 401, "depois de sair, a sessão não vale mais");
 r = await chamar({ acao: "inicio", sessao: "x".repeat(40) }); ok(r.s === 401, "sessão inventada é recusada");
 ok(resumoAparelho("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Version/17.0 Mobile/15E148 Safari/604.1") === "iPhone/iPad · Safari", "resumo do aparelho (iPhone)");
+// ---------- entrada pela página aberta (código por e-mail) ----------
+db.pacientes.p1.email = "maria.souza@exemplo.com"; db.codigos = []; const emails = [];
+let emailResultado = "ok";
+Object.assign(deps, {
+  pacientesPorNascimento: async (n) => Object.values(db.pacientes).filter((p) => p.data_nascimento === n).map((p) => ({ ...p, owner: null })),
+  ownerPadrao: async () => DR,
+  contarCodigos: async (pid, desde) => db.codigos.filter((c) => c.paciente_id === pid && c.criado_em >= desde).length,
+  salvarCodigo: async (r) => db.codigos.push({ id: "k" + ++seq, tentativas: 0, usado_em: null, ...r }),
+  ultimoCodigo: async (pid) => [...db.codigos].reverse().find((c) => c.paciente_id === pid) || null,
+  atualizarCodigo: async (id, p) => Object.assign(db.codigos.find((c) => c.id === id), p),
+  enviarEmail: async (para, assunto, texto) => { if (emailResultado === "ok") emails.push({ para, assunto, texto }); return emailResultado; },
+  slugAtivo: async () => "slugAtivo123" });
+r = await chamar({ acao: "agenda_link" }); ok(r.j.slug === "slugAtivo123", "página de entrada recebe o link de agendamento");
+r = await chamar({ acao: "codigo_pedir", cpf: "123.456.789-09", nascimento: "1960-05-02" }); ok(r.s === 404, "CPF certo com data errada: não acha");
+r = await chamar({ acao: "codigo_pedir", cpf: "98765432100", nascimento: "1950-01-01" }); ok(r.s === 422 && r.j.erro === "sem_email", "sem e-mail no cadastro: avisa");
+emailResultado = "nao_configurado"; r = await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" });
+ok(r.s === 503 && r.j.erro === "email_nao_configurado", "Brevo não configurada: avisa"); emailResultado = "ok"; db.codigos = [];
+r = await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" });
+const cod = (emails.at(-1)?.texto.match(/\b(\d{6})\b/) || [])[1];
+ok(r.s === 200 && r.j.email === "ma******@exemplo.com" && cod && emails.at(-1).para === "maria.souza@exemplo.com", "envia código de 6 dígitos e mostra o e-mail mascarado");
+ok(!JSON.stringify(db.codigos).includes(cod), "o código não fica guardado em texto");
+r = await chamar({ acao: "codigo_entrar", cpf: "12345678909", nascimento: "1960-05-01", codigo: cod === "000000" ? "111111" : "000000" });
+ok(r.s === 401 && r.j.restantes === 4, "código errado: avisa tentativas restantes");
+r = await chamar({ acao: "codigo_entrar", cpf: "12345678909", nascimento: "1960-05-01", codigo: cod });
+ok(r.s === 200 && r.j.sessao && db.sessoes.at(-1).owner_id === DR, "código certo: entra (sessão do médico da clínica)");
+const S2 = r.j.sessao; r = await chamar({ acao: "inicio", sessao: S2 }); ok(r.s === 200 && r.j.nome === "Maria", "a sessão aberta pelo código funciona");
+r = await chamar({ acao: "codigo_entrar", cpf: "12345678909", nascimento: "1960-05-01", codigo: cod }); ok(r.s === 401 && r.j.erro === "codigo_expirado", "código só vale uma vez");
+await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" }); await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" });
+r = await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" }); ok(r.s === 429, "no máximo 3 códigos por hora");
+for (let i = 0; i < 5; i++) r = await chamar({ acao: "codigo_entrar", cpf: "12345678909", nascimento: "1960-05-01", codigo: "999999" });
+const codOk = (emails.at(-1).texto.match(/\b(\d{6})\b/) || [])[1];
+r = await chamar({ acao: "codigo_entrar", cpf: "12345678909", nascimento: "1960-05-01", codigo: codOk }); ok(r.s === 401, "depois de 5 erros, nem o código certo entra");
+AGORA += 11 * 60_000; db.codigos = []; await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" }); const c3 = (emails.at(-1).texto.match(/\b(\d{6})\b/) || [])[1];
+AGORA += 11 * 60_000; r = await chamar({ acao: "codigo_entrar", cpf: "12345678909", nascimento: "1960-05-01", codigo: c3 }); ok(r.s === 401, "código vence em 10 minutos");
+db.pacientes.p3 = { id: "p3", nome: "Duplicada", data_nascimento: "1960-05-01", cpf: "12345678909", email: "x@y.com" };
+r = await chamar({ acao: "codigo_pedir", cpf: "12345678909", nascimento: "1960-05-01" }); ok(r.s === 409, "cadastro duplicado não entra (evita abrir o paciente errado)");
 console.log(falhas ? falhas + " falha(s)" : "tudo certo"); process.exit(falhas ? 1 : 0);

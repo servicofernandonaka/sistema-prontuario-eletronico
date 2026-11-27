@@ -83,13 +83,14 @@ function gravarSessao(v) { try { if (v) localStorage.setItem(CHAVE, v); else loc
 function chamar(acao, extra) { var corpo = { acao: acao, sessao: lerSessao() }; for (var k in (extra || {})) corpo[k] = extra[k];
   return fetch(FUNC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) })
     .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
-    .then(function (r) { if (r.s === 401 && acao !== "entrar") { gravarSessao(""); fim("Seu acesso terminou", "Este aparelho foi desconectado ou o acesso venceu. Peça um novo link ao consultório."); throw new Error("sessao"); } return r; }); }
+    .then(function (r) { if (r.s === 401 && !/^(entrar|codigo_pedir|codigo_entrar)$/.test(acao)) { gravarSessao(""); fim("Seu acesso terminou", "Este aparelho foi desconectado ou o acesso venceu. Entre de novo abaixo ou peça um novo link ao consultório."); throw new Error("sessao"); } return r; }); }
 function dt(iso) { var p = iso.split("-"); return new Date(+p[0], +p[1] - 1, +p[2], 12); }
 function dataLonga(iso) { var d = dt(iso); return SEML[d.getDay()] + ", " + d.getDate() + " de " + MESL[d.getMonth()]; }
 function dataCurta(iso) { var d = dt(iso); return d.getDate() + " " + MES[d.getMonth()] + " " + d.getFullYear(); }
 function quando(isoTs) { var d = new Date(isoTs); return d.toLocaleDateString("pt-BR") + " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
 function titulo(a, b, erro) { document.getElementById("t1").textContent = a; document.getElementById("t2").textContent = b || ""; document.getElementById("top").className = "top" + (erro ? " err" : ""); }
-function fim(t, txt) { abas.hidden = true; titulo(t, "", true); limpa(bd); bd.appendChild(el("p", txt)); }
+function fim(t, txt, semVoltar) { abas.hidden = true; titulo(t, "", true); limpa(bd); bd.appendChild(el("p", txt));
+  if (!semVoltar) { var b = el("button", "Entrar com CPF e código por e-mail", "sec"); b.onclick = function () { history.replaceState(null, "", location.pathname); telaLogin(); }; bd.appendChild(b); } }
 function semRede() { alert("Sem conexão. Verifique a internet e tente de novo."); }
 
 // ---------- entrada com convite ----------
@@ -119,6 +120,62 @@ function telaEntrar(convite) {
       if (r.j.erro === "dados_nao_conferem") { msg.textContent = "Os dados não conferem com o cadastro. Tentativas restantes: " + r.j.restantes + "."; return; }
       if (r.j.erro === "convite_bloqueado") { fim("Link bloqueado", "Houve muitas tentativas com dados errados. Por segurança, este link foi bloqueado. Peça um novo ao consultório."); return; }
       fim("Link inválido", "Este link já foi usado, venceu ou não existe. Peça um novo link ao consultório.");
+    }).catch(function () { b.disabled = false; semRede(); });
+  };
+}
+
+// ---------- entrada pela página aberta: CPF + nascimento + código por e-mail ----------
+function mascaraData(i) { i.addEventListener("input", function () { var d = i.value.replace(/\D/g, "").slice(0, 8); i.value = d.length > 4 ? d.slice(0, 2) + "/" + d.slice(2, 4) + "/" + d.slice(4) : d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d; }); }
+function mascaraCpf(i) { i.addEventListener("input", function () { var d = i.value.replace(/\D/g, "").slice(0, 11); i.value = d.length > 9 ? d.slice(0, 3) + "." + d.slice(3, 6) + "." + d.slice(6, 9) + "-" + d.slice(9) : d.length > 6 ? d.slice(0, 3) + "." + d.slice(3, 6) + "." + d.slice(6) : d.length > 3 ? d.slice(0, 3) + "." + d.slice(3) : d; }); }
+function campoF(f, id, rot, ph, max, modo) { var l = el("label", rot, "f"); l.htmlFor = id; f.appendChild(l); var i = el("input", null, "f"); i.id = id; i.placeholder = ph; i.maxLength = max; i.inputMode = modo || "numeric"; i.autocomplete = "off"; f.appendChild(i); return i; }
+var ERR_LOGIN = { nao_encontrado: "Não encontramos um cadastro com esse CPF e essa data de nascimento. Confira os números ou fale com o consultório.",
+  sem_email: "Seu cadastro não tem e-mail. Peça ao consultório para incluir o seu e-mail ou para enviar o link de acesso pelo WhatsApp.",
+  muitos_codigos: "Você já pediu 3 códigos na última hora. Espere um pouco e tente de novo.", cadastro_duplicado: "Encontramos mais de um cadastro com esses dados. Fale com o consultório para corrigir.",
+  email_nao_configurado: "O envio de e-mail do consultório não está ativo. Peça o link de acesso pelo WhatsApp.", email_falhou: "Não consegui enviar o e-mail agora. Tente de novo em alguns minutos.",
+  portal_indisponivel: "O portal ainda não está disponível. Fale com o consultório." };
+function telaLogin() {
+  abas.hidden = true; titulo("Portal do paciente", "Entre para ver suas consultas e documentos"); limpa(bd);
+  bd.appendChild(el("p", "Digite seu CPF e sua data de nascimento. Vamos enviar um código de 6 números para o e-mail do seu cadastro."));
+  var f = el("form"); f.noValidate = true;
+  var cpf = campoF(f, "l-cpf", "CPF", "000.000.000-00", 14); mascaraCpf(cpf);
+  var nasc = campoF(f, "l-nasc", "Data de nascimento", "dd/mm/aaaa", 10); mascaraData(nasc);
+  var msg = el("div", "", "msg"); f.appendChild(msg);
+  var b = el("button", "Receber código por e-mail"); b.type = "submit"; f.appendChild(b);
+  bd.appendChild(f);
+  bd.appendChild(el("p", "Ainda não é paciente? Use o link de agendamento do consultório para marcar sua primeira consulta.", "nota"));
+  f.onsubmit = function (ev) {
+    ev.preventDefault(); msg.textContent = "";
+    var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(nasc.value), c = cpf.value.replace(/\D/g, "");
+    if (c.length !== 11) { msg.textContent = "Digite o CPF completo (11 números)."; cpf.focus(); return; }
+    if (!m) { msg.textContent = "Digite a data completa, por exemplo 05/03/1960."; nasc.focus(); return; }
+    var dados0 = { cpf: c, nascimento: m[3] + "-" + m[2] + "-" + m[1] };
+    b.disabled = true;
+    chamar("codigo_pedir", dados0).then(function (r) { b.disabled = false;
+      if (r.s === 200 && r.j.ok) telaCodigo(dados0, r.j.email); else msg.textContent = ERR_LOGIN[r.j.erro] || "Não foi possível agora. Tente de novo.";
+    }).catch(function () { b.disabled = false; semRede(); });
+  };
+}
+function telaCodigo(dados0, email) {
+  limpa(bd); titulo("Portal do paciente", "Digite o código que enviamos");
+  bd.appendChild(el("p", "Enviamos um código de 6 números para " + email + ". Ele vale por 10 minutos. Confira também a caixa de spam."));
+  var f = el("form"); f.noValidate = true;
+  var cod = campoF(f, "l-cod", "Código", "000000", 6); cod.autocomplete = "one-time-code"; cod.style.fontSize = "26px"; cod.style.letterSpacing = ".3em"; cod.style.textAlign = "center";
+  cod.addEventListener("input", function () { cod.value = cod.value.replace(/\D/g, "").slice(0, 6); });
+  var msg = el("div", "", "msg"); f.appendChild(msg);
+  var b = el("button", "Entrar"); b.type = "submit"; f.appendChild(b);
+  var nv = el("button", "Pedir outro código", "sec"); nv.type = "button"; f.appendChild(nv);
+  bd.appendChild(f); setTimeout(function () { cod.focus(); }, 50);
+  nv.onclick = function () { nv.disabled = true; chamar("codigo_pedir", dados0).then(function (r) { nv.disabled = false;
+    msg.textContent = r.s === 200 ? "Enviamos um novo código. Use o mais recente." : (ERR_LOGIN[r.j.erro] || "Não foi possível agora."); }).catch(function () { nv.disabled = false; semRede(); }); };
+  f.onsubmit = function (ev) {
+    ev.preventDefault(); msg.textContent = "";
+    if (cod.value.length !== 6) { msg.textContent = "O código tem 6 números."; return; }
+    b.disabled = true;
+    chamar("codigo_entrar", { cpf: dados0.cpf, nascimento: dados0.nascimento, codigo: cod.value }).then(function (r) { b.disabled = false;
+      if (r.s === 200 && r.j.ok) { gravarSessao(r.j.sessao); carregar(); return; }
+      if (r.j.erro === "codigo_errado") msg.textContent = r.j.restantes ? "Código errado. Tentativas restantes: " + r.j.restantes + "." : "Código errado. Peça um novo código.";
+      else if (r.j.erro === "codigo_expirado") msg.textContent = "Este código venceu ou já foi usado. Peça um novo.";
+      else msg.textContent = ERR_LOGIN[r.j.erro] || "Não foi possível agora. Tente de novo.";
     }).catch(function () { b.disabled = false; semRede(); });
   };
 }
@@ -232,14 +289,14 @@ function abaAcessos() {
   bd.appendChild(box); bd.appendChild(sair());
 }
 function sair() { var b = el("button", "Desconectar este aparelho", "sec"); b.onclick = function () {
-  if (!confirm("Desconectar este aparelho? Para entrar de novo, você vai precisar de um novo link do consultório.")) return;
-  chamar("sair").catch(function () {}).then(function () { gravarSessao(""); fim("Aparelho desconectado", "Você saiu do portal. Para entrar de novo, peça um novo link ao consultório."); }); }; return b; }
+  if (!confirm("Desconectar este aparelho? Para entrar de novo, você vai precisar do código por e-mail ou de um novo link do consultório.")) return;
+  chamar("sair").catch(function () {}).then(function () { gravarSessao(""); fim("Aparelho desconectado", "Você saiu do portal. Para entrar de novo, use o seu CPF e o código por e-mail, ou peça um novo link ao consultório."); }); }; return b; }
 
 // ---------- início da página ----------
 var mh = /^#c=([A-Za-z0-9_-]{20,80})$/.exec(location.hash || "");
 if (mh) telaEntrar(mh[1]);
 else if (lerSessao()) carregar();
-else fim("Portal do paciente", "Para entrar, use o link que o consultório enviou para você pelo WhatsApp.");
+else telaLogin();
 </script>
 </body>
 </html>

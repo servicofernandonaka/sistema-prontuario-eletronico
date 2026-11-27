@@ -377,6 +377,24 @@
     .sidebar.open{transform:none;box-shadow:0 0 40px rgba(0,0,0,.5)}
     .menu-btn{display:inline-flex!important}
   }
+  .portas{position:relative;z-index:1;width:100%;max-width:440px;display:flex;flex-direction:column;gap:12px}
+  .portas-topo{text-align:center;margin-bottom:6px}.portas-topo .brand-mark{display:inline-block;width:56px;height:56px}.portas-topo .brand-mark svg{width:56px;height:56px}
+  .portas-topo h1{font-size:26px;margin:6px 0 0;font-weight:600;letter-spacing:-.02em}.portas-topo h1 b{color:#1a7fcf;font-weight:800}.portas-topo p{margin:2px 0 0;color:var(--muted)}
+  .porta{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:16px 18px;border-radius:18px;border:1px solid rgba(255,255,255,.8);background:rgba(255,255,255,.82);
+    backdrop-filter:blur(18px);box-shadow:0 10px 30px -14px rgba(15,40,70,.35);color:var(--ink,#13293f);text-decoration:none;font:inherit;cursor:pointer;transition:transform .15s,box-shadow .15s}
+  .porta:hover{transform:translateY(-2px);box-shadow:0 16px 36px -14px rgba(15,40,70,.45)}
+  .porta .pe{font-size:28px;width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:#eef5fc;flex:0 0 48px}
+  .porta b{display:block;font-size:16.5px}.porta small{display:block;color:var(--muted);font-size:13px;line-height:1.35;margin-top:2px}
+  .porta .ps{margin-left:auto;font-size:26px;color:var(--muted)}
+  .porta.off{opacity:.55;pointer-events:none}
+  .pl-tit{display:flex;gap:12px;align-items:center;margin-bottom:14px}.pl-tit>span{font-size:26px;width:46px;height:46px;display:grid;place-items:center;border-radius:14px;background:#eef5fc}
+  .pl-tit b{display:block;font-size:17px}.pl-tit small{color:var(--muted);font-size:13px}
+  .pl-msg{color:#c62828;font-size:13.5px;text-align:center;margin-top:10px;min-height:1em}
+  .pl-info{font-size:13.5px;color:var(--muted);margin:0 0 10px}
+  .pl-nota{font-size:12px;color:var(--muted);text-align:center;margin:12px 0 0}
+  .li-voltar{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;cursor:pointer;padding:0;margin:-6px 0 8px}
+  html[data-tema="escuro"] .porta{background:rgba(17,30,49,.82);border-color:rgba(120,160,210,.18);color:#e6eef8}
+  html[data-tema="escuro"] .porta .pe{background:rgba(255,255,255,.06)}
   .li-ou{display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--muted);font-size:12px}
   .li-ou::before,.li-ou::after{content:"";flex:1;height:1px;background:var(--line)}
   .btn-google{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f2937;border:1px solid #d8e3ef;font-weight:600}
@@ -910,7 +928,32 @@ textarea.voz-ouvindo{border-color:var(--err)!important;box-shadow:0 0 0 4px colo
 
 <!-- ================= LOGIN ================= -->
 <div id="view-login" class="hidden">
-  <div class="login-card">
+  <div class="portas" id="portas">
+    <div class="portas-topo"><span class="brand-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="1" y="1" width="46" height="46" rx="12" fill="#1a7fcf"/><rect x="13" y="8.5" width="22" height="31" rx="4.5" fill="#fff"/><g fill="#0a6fbd"><rect x="21.6" y="12.6" width="4.8" height="13" rx="1.7"/><rect x="17.5" y="16.6" width="13" height="4.8" rx="1.7"/></g></svg></span>
+      <h1><b>PEP</b> Clínico</h1><p>Como podemos ajudar?</p></div>
+    <a class="porta" id="porta-marcar" href="#"><span class="pe">📅</span><span><b>Marcar consulta</b><small>Escolha um horário livre. Não precisa de cadastro nem senha.</small></span><span class="ps">›</span></a>
+    <button class="porta" type="button" id="porta-pac"><span class="pe">👤</span><span><b>Sou paciente</b><small>Minhas consultas, documentos e pré-consulta. Entre com CPF e código por e-mail.</small></span><span class="ps">›</span></button>
+    <button class="porta" type="button" id="porta-prof"><span class="pe">🩺</span><span><b>Sou profissional</b><small>Acesso ao prontuário eletrônico (restrito à equipe).</small></span><span class="ps">›</span></button>
+  </div>
+  <div class="login-card" id="pac-card" hidden>
+    <button type="button" class="li-voltar" id="pl-voltar">‹ Outras opções</button>
+    <div class="pl-tit"><span>👤</span><div><b>Área do paciente</b><small>Consultas, documentos e pré-consulta</small></div></div>
+    <div id="pl-passo1">
+      <div class="field"><label>CPF</label><input id="pl-cpf" class="f" inputmode="numeric" maxlength="14" placeholder="000.000.000-00" autocomplete="off"></div>
+      <div class="field"><label>Data de nascimento</label><input id="pl-nasc" class="f" inputmode="numeric" maxlength="10" placeholder="dd/mm/aaaa" autocomplete="off"></div>
+      <button id="pl-pedir" class="btn primary block" type="button">Receber código por e-mail</button>
+    </div>
+    <div id="pl-passo2" hidden>
+      <p class="pl-info" id="pl-info"></p>
+      <div class="field"><label>Código</label><input id="pl-cod" class="f" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" style="font-size:24px;letter-spacing:.3em;text-align:center"></div>
+      <button id="pl-entrar" class="btn primary block" type="button">Entrar</button>
+      <button id="pl-outro" class="btn ghost block" type="button" style="margin-top:8px">Pedir outro código</button>
+    </div>
+    <div class="pl-msg" id="pl-msg"></div>
+    <p class="pl-nota">Seus acessos ficam registrados para a sua segurança. Ainda não é paciente? Volte e use <b>Marcar consulta</b>.</p>
+  </div>
+  <div class="login-card" id="login-card" hidden>
+    <button type="button" class="li-voltar" id="li-voltar">‹ Outras opções</button>
     <div class="brand hero"><span class="brand-mark"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f93d8"/><stop offset="1" stop-color="#0a5c9e"/></linearGradient><filter id="sB" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0.6" stdDeviation="0.7" flood-color="#06365c" flood-opacity="0.35"/></filter></defs><rect x="1" y="1" width="46" height="46" rx="12" fill="url(#gB)"/><rect x="13" y="8.5" width="22" height="31" rx="4.5" fill="#fff" filter="url(#sB)"/><g fill="#0a6fbd"><rect x="21.6" y="12.6" width="4.8" height="13" rx="1.7"/><rect x="17.5" y="16.6" width="13" height="4.8" rx="1.7"/></g><rect x="17.5" y="28.6" width="13" height="1.3" rx="0.65" fill="#0a6fbd" opacity="0.22"/><path d="M17.5 33.6 H21 L22.4 31 L24 36 L25.6 32 L26.9 33.6 H30.5" fill="none" stroke="#0a6fbd" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="brand-txt"><span class="nm"><b>PEP</b> Clínico</span><span class="tg">Prontuário eletrônico · acesso restrito</span></span></div>
     <div id="cfg" class="cfg hidden"></div>
     <div class="field"><label>E-mail</label><input id="li-email" class="f" type="email" autocomplete="username"></div>
@@ -2545,7 +2588,54 @@ function ligarBotaoInstalar(){
 }
 
 // ---------- boot/auth ----------
-function show(v){ $('view-login').classList.toggle('hidden', v!=='login'); $('view-app').classList.toggle('hidden', v!=='app'); }
+function show(v){ $('view-login').classList.toggle('hidden', v!=='login'); $('view-app').classList.toggle('hidden', v!=='app'); if(v==='login') mostrarPortas(); }
+// ---------- página de entrada: três portas (marcar consulta, paciente, profissional) ----------
+let portasProntas=false;
+function mostrarPortas(){
+  let prof=/[?&#]prof\b/.test(location.search+location.hash); try{ if(localStorage.getItem('pep_porta')==='prof') prof=true; }catch(e){}
+  $('portas').hidden=prof; $('login-card').hidden=!prof; $('pac-card').hidden=true;
+  if(portasProntas) return; portasProntas=true;
+  $('porta-prof').onclick=()=>{ try{ localStorage.setItem('pep_porta','prof'); }catch(e){} $('portas').hidden=true; $('login-card').hidden=false; setTimeout(()=>$('li-email').focus(),30); };
+  $('li-voltar').onclick=()=>{ try{ localStorage.removeItem('pep_porta'); }catch(e){} $('login-card').hidden=true; $('portas').hidden=false; };
+  // área do paciente na própria página de entrada (mesma função do portal; a sessão vale para o portal.html)
+  try{ if(localStorage.getItem('pep_portal_sessao')){ const pp=$('porta-pac'); pp.querySelector('small').textContent='Você já está conectado neste aparelho. Toque para abrir o seu portal.'; } }catch(e){}
+  $('porta-pac').onclick=()=>{ let tem=false; try{ tem=!!localStorage.getItem('pep_portal_sessao'); }catch(e){}
+    if(tem){ location.href='portal.html'; return; }
+    $('portas').hidden=true; $('pac-card').hidden=false; $('pl-passo1').hidden=false; $('pl-passo2').hidden=true; $('pl-msg').textContent=''; setTimeout(()=>$('pl-cpf').focus(),30); };
+  $('pl-voltar').onclick=()=>{ $('pac-card').hidden=true; $('portas').hidden=false; };
+  $('pl-cpf').addEventListener('input',e=>{ const d=e.target.value.replace(/\D/g,'').slice(0,11); e.target.value=d.length>9?d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6,9)+'-'+d.slice(9):d.length>6?d.slice(0,3)+'.'+d.slice(3,6)+'.'+d.slice(6):d.length>3?d.slice(0,3)+'.'+d.slice(3):d; });
+  $('pl-nasc').addEventListener('input',e=>{ const d=e.target.value.replace(/\D/g,'').slice(0,8); e.target.value=d.length>4?d.slice(0,2)+'/'+d.slice(2,4)+'/'+d.slice(4):d.length>2?d.slice(0,2)+'/'+d.slice(2):d; });
+  $('pl-cod').addEventListener('input',e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,6); });
+  const ERR={nao_encontrado:'Não encontramos um cadastro com esse CPF e essa data de nascimento. Confira ou fale com o consultório.',
+    sem_email:'Seu cadastro não tem e-mail. Peça ao consultório para incluir o e-mail ou enviar o link de acesso pelo WhatsApp.',
+    muitos_codigos:'Você já pediu 3 códigos na última hora. Espere um pouco.',cadastro_duplicado:'Há mais de um cadastro com esses dados. Fale com o consultório.',
+    email_nao_configurado:'O envio de e-mail do consultório não está ativo. Peça o link pelo WhatsApp.',email_falhou:'Não consegui enviar o e-mail agora. Tente de novo.',
+    portal_indisponivel:'O portal ainda não está disponível.',codigo_expirado:'Este código venceu ou já foi usado. Peça um novo.'};
+  const fn=(corpo)=>fetch(SUPABASE_URL+'/functions/v1/portal-paciente',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(corpo)}).then(r=>r.json().then(j=>({s:r.status,j})));
+  let dadosPac=null;
+  const pedir=async(btn)=>{ $('pl-msg').textContent=''; const c=$('pl-cpf').value.replace(/\D/g,''), m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec($('pl-nasc').value);
+    if(c.length!==11){ $('pl-msg').textContent='Digite o CPF completo (11 números).'; return; }
+    if(!m){ $('pl-msg').textContent='Digite a data completa, por exemplo 05/03/1960.'; return; }
+    dadosPac={cpf:c,nascimento:m[3]+'-'+m[2]+'-'+m[1]}; btn.disabled=true;
+    try{ const r=await fn(Object.assign({acao:'codigo_pedir'},dadosPac));
+      if(r.s===200&&r.j.ok){ $('pl-passo1').hidden=true; $('pl-passo2').hidden=false; $('pl-info').textContent='Enviamos um código de 6 números para '+r.j.email+'. Ele vale por 10 minutos (confira também o spam).'; $('pl-cod').value=''; setTimeout(()=>$('pl-cod').focus(),30); }
+      else $('pl-msg').textContent=ERR[r.j.erro]||'Não foi possível agora. Tente de novo.'; }
+    catch(e){ $('pl-msg').textContent='Sem conexão. Tente de novo.'; } finally{ btn.disabled=false; } };
+  $('pl-pedir').onclick=()=>pedir($('pl-pedir'));
+  $('pl-outro').onclick=async()=>{ await pedir($('pl-outro')); if(!$('pl-msg').textContent) $('pl-msg').textContent=''; };
+  $('pl-entrar').onclick=async()=>{ const b=$('pl-entrar'); $('pl-msg').textContent=''; const cod=$('pl-cod').value;
+    if(cod.length!==6){ $('pl-msg').textContent='O código tem 6 números.'; return; } b.disabled=true;
+    try{ const r=await fn(Object.assign({acao:'codigo_entrar',codigo:cod},dadosPac));
+      if(r.s===200&&r.j.ok){ try{ localStorage.setItem('pep_portal_sessao',r.j.sessao); }catch(e){} location.href='portal.html'; return; }
+      $('pl-msg').textContent=r.j.erro==='codigo_errado'?(r.j.restantes?'Código errado. Tentativas restantes: '+r.j.restantes+'.':'Código errado. Peça um novo código.'):(ERR[r.j.erro]||'Não foi possível agora.'); }
+    catch(e){ $('pl-msg').textContent='Sem conexão. Tente de novo.'; } finally{ b.disabled=false; } };
+  [['pl-cpf','pl-pedir'],['pl-nasc','pl-pedir'],['pl-cod','pl-entrar']].forEach(([i,bt])=>$(i).addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); $(bt).click(); } }));
+  const pm=$('porta-marcar'); pm.classList.add('off');
+  fetch(SUPABASE_URL+'/functions/v1/portal-paciente',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'agenda_link'})})
+    .then(r=>r.json()).then(j=>{ if(j&&j.slug){ pm.href='agendar.html?m='+encodeURIComponent(j.slug); pm.classList.remove('off'); }
+      else pm.querySelector('small').textContent='O agendamento online está desligado no momento. Fale com o consultório.'; })
+    .catch(()=>{ pm.querySelector('small').textContent='Sem conexão agora. Tente de novo em instantes.'; });
+}
 function boot(){
   if(!window.supabase||!window.supabase.createClient){ show('login'); toast('Falha ao carregar o Supabase',true); return; }
   if(!SUPABASE_ANON_KEY||SUPABASE_ANON_KEY.startsWith('COLE_')){ show('login'); $('cfg').classList.remove('hidden'); $('cfg').textContent='Configure SUPABASE_URL e SUPABASE_ANON_KEY.'; $('li-btn').disabled=true; return; }
@@ -4076,7 +4166,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-27.4 · portal do paciente';
+const VERSAO='2026-11-27.5 · página de entrada';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);

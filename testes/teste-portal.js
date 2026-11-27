@@ -59,7 +59,7 @@ const shot=(pg,n,full=true)=>pg.screenshot({path:path.join(os.tmpdir(),n+'.png')
     route.fulfill({status:r.status,headers:Object.fromEntries(r.headers),body:await r.text()}); });
   await pac.route('**/testes/doc-falso.pdf',r=>r.fulfill({status:200,headers:{'content-type':'application/pdf','content-disposition':'attachment; filename=r.pdf'},body:'%PDF-1.4'}));
   await pac.goto('http://localhost:8769/portal.html'); await pac.waitForTimeout(300);
-  ok((await pac.textContent('#bd')).includes('use o link'),'sem convite nem sessão: pede o link');
+  ok(await pac.isVisible('#l-cpf'),'sem convite nem sessão: pede CPF e data');
   await pac.goto('about:blank'); await pac.goto('http://localhost:8769/portal.html#c='+conv); await pac.waitForTimeout(400);
   await shot(pac,'portal-entrar');
   await pac.fill('#nasc','01051960'); await pac.fill('#cpf4','1234'); await pac.click('button:has-text("Entrar")'); await pac.waitForTimeout(500);

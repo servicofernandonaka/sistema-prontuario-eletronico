@@ -2,7 +2,10 @@
 // O paciente entra com um CONVITE de uso único (enviado pelo médico) + data de nascimento + 4 últimos dígitos do CPF.
 // Depois disso o aparelho recebe uma SESSÃO (token aleatório; só o hash fica no banco) que vale 90 dias e é renovada a cada uso.
 // Ações (POST JSON):
-//   entrar   {convite, nascimento, cpf4}            → {sessao}
+//   entrar   {convite, nascimento, cpf4}            → {sessao}             (convite enviado pelo médico no WhatsApp)
+//   codigo_pedir  {cpf, nascimento}                 → envia um código de 6 dígitos ao e-mail do cadastro
+//   codigo_entrar {cpf, nascimento, codigo}         → {sessao}             (entrada pela página aberta)
+//   agenda_link   {}                                → {slug} do agendamento online ativo (para a página de entrada)
 //   inicio   {sessao}                               → nome, consultas, documentos, acessos, agendamento
 //   consulta {sessao, id, op: confirmar|cancelar}   → confirma ou cancela uma consulta DELE
 //   preconsulta {sessao, id, respostas, aceite}     → envia a pré-consulta de uma consulta DELE
@@ -17,6 +20,8 @@ export type Convite = { id: string; owner_id: string; paciente_id: string; expir
 export type Sessao = { id: string; owner_id: string; paciente_id: string; expira_em: string; ultimo_uso: string; revogada: boolean };
 export type Consulta = { id: string; profissional_id: string | null; paciente_id: string | null; data: string; hora: string | null; duracao_min: number | null;
   status: string; tipo: string | null; preconsulta_em: string | null };
+export type PacienteBusca = { id: string; nome: string | null; cpf: string | null; email: string | null; owner: string | null };
+export type Codigo = { id: string; expira_em: string; usado_em: string | null; tentativas: number; codigo_hash: string };
 export type Deps = {
   env: { ALLOWED_ORIGIN?: string };
   agora: () => number;
@@ -38,6 +43,15 @@ export type Deps = {
   configPorOwner: (owner: string) => Promise<{ slug: string; config: unknown } | null>;
   ocupados: (owner: string, de: string, ate: string) => Promise<{ data: string; hora: string | null; duracao_min: number | null }[]>;
   inserirConsulta: (row: Record<string, unknown>) => Promise<{ ok: true } | { ok: false; conflito: boolean }>;
+  // entrada pela página aberta
+  pacientesPorNascimento: (nasc: string) => Promise<PacienteBusca[]>;
+  ownerPadrao: () => Promise<string | null>;                                 // o médico da agenda online ativa (clínica de um médico só)
+  contarCodigos: (paciente: string, desde: string) => Promise<number>;
+  salvarCodigo: (row: Record<string, unknown>) => Promise<void>;
+  ultimoCodigo: (paciente: string) => Promise<Codigo | null>;
+  atualizarCodigo: (id: string, patch: Record<string, unknown>) => Promise<void>;
+  enviarEmail: (para: string, assunto: string, texto: string) => Promise<"ok" | "nao_configurado" | "falhou">;
+  slugAtivo: () => Promise<string | null>;
 };
 
 const ATIVAS = ["solicitada", "marcada", "confirmada"];
@@ -60,6 +74,17 @@ export function resumoAparelho(ua: string | null): string {
   const so = /iPhone|iPad/.test(u) ? "iPhone/iPad" : /Android/.test(u) ? "Android" : /Windows/.test(u) ? "Windows" : /Mac OS X/.test(u) ? "Mac" : /Linux/.test(u) ? "Linux" : "aparelho";
   const nav = /EdgA?\//.test(u) ? "Edge" : /SamsungBrowser/.test(u) ? "Samsung Internet" : /Firefox|FxiOS/.test(u) ? "Firefox" : /Chrome|CriOS/.test(u) ? "Chrome" : /Safari/.test(u) ? "Safari" : "navegador";
   return so + " · " + nav;
+}
+
+export const mascararEmail = (e: string) => { const [u, dom] = String(e).split("@"); if (!dom) return "***"; return (u.length <= 2 ? u[0] + "*" : u.slice(0, 2) + "*".repeat(Math.min(6, u.length - 2))) + "@" + dom; };
+const emailOK = (e: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || "").trim());
+// acha o paciente pelo CPF completo + data de nascimento (os dois precisam bater)
+async function acharPaciente(d: Deps, cpf: unknown, nasc: unknown): Promise<PacienteBusca | null | "duplicado"> {
+  const c = digitos(cpf), n = isoData(nasc);
+  if (c.length !== 11 || !n) return null;
+  const achados = (await d.pacientesPorNascimento(n)).filter((p) => digitos(p.cpf) === c);
+  if (achados.length > 1) return "duplicado";
+  return achados[0] || null;
 }
 
 export async function handle(req: Request, d: Deps): Promise<Response> {
@@ -91,6 +116,45 @@ export async function handle(req: Request, d: Deps): Promise<Response> {
       criado_em: agoraISO, ultimo_uso: agoraISO, expira_em: new Date(agoraMs + SESSAO_DIAS * DIA).toISOString() });
     await d.atualizarConvite(c.id, { usado_em: agoraISO });
     await d.registrar({ owner_id: c.owner_id, paciente_id: c.paciente_id, sessao_id: sid, acao: "conectou um aparelho", detalhe: aparelho });
+    return json(d, 200, { ok: true, sessao: token, nome: primeiroNome(p.nome) });
+  }
+
+  // ---------- página de entrada: qual é o link de agendamento ----------
+  if (acao === "agenda_link") return json(d, 200, { ok: true, slug: await d.slugAtivo() });
+
+  // ---------- entrada pela página aberta: código por e-mail ----------
+  if (acao === "codigo_pedir" || acao === "codigo_entrar") {
+    const p = await acharPaciente(d, b?.cpf, b?.nascimento);
+    if (p === "duplicado") return json(d, 409, { erro: "cadastro_duplicado" });
+    if (!p) return json(d, 404, { erro: "nao_encontrado" });
+    const owner = p.owner || await d.ownerPadrao();
+    if (!owner) return json(d, 503, { erro: "portal_indisponivel" });
+    if (acao === "codigo_pedir") {
+      if (!emailOK(p.email)) return json(d, 422, { erro: "sem_email" });
+      if ((await d.contarCodigos(p.id, new Date(agoraMs - 3600_000).toISOString())) >= 3) return json(d, 429, { erro: "muitos_codigos" });
+      const n = d.aleatorio(4); const codigo = String(((n[0] << 24 >>> 0) + (n[1] << 16) + (n[2] << 8) + n[3]) % 1000000).padStart(6, "0");
+      await d.salvarCodigo({ owner_id: owner, paciente_id: p.id, codigo_hash: await sha256(p.id + ":" + codigo), criado_em: agoraISO, expira_em: new Date(agoraMs + 10 * 60_000).toISOString() });
+      const r = await d.enviarEmail(String(p.email).trim(), "Seu código de acesso: " + codigo,
+        "Olá, " + primeiroNome(p.nome) + ".\n\nSeu código para entrar no Portal do Paciente é:\n\n    " + codigo + "\n\nEle vale por 10 minutos. Se não foi você que pediu, ignore esta mensagem: ninguém entra sem este código.\n\nPEP Clínico");
+      if (r !== "ok") return json(d, 503, { erro: r === "nao_configurado" ? "email_nao_configurado" : "email_falhou" });
+      await d.registrar({ owner_id: owner, paciente_id: p.id, sessao_id: null, acao: "pediu código de acesso por e-mail" });
+      return json(d, 200, { ok: true, email: mascararEmail(String(p.email).trim()) });
+    }
+    // codigo_entrar
+    const cod = digitos(b?.codigo);
+    const c = await d.ultimoCodigo(p.id);
+    if (!c || c.usado_em || Date.parse(c.expira_em) < agoraMs || c.tentativas >= MAX_TENTATIVAS) return json(d, 401, { erro: "codigo_expirado" });
+    if (cod.length !== 6 || (await sha256(p.id + ":" + cod)) !== c.codigo_hash) {
+      const t = c.tentativas + 1;
+      await d.atualizarCodigo(c.id, { tentativas: t });
+      if (t >= MAX_TENTATIVAS) await d.registrar({ owner_id: owner, paciente_id: p.id, sessao_id: null, acao: "código bloqueado por tentativas erradas" });
+      return json(d, 401, { erro: "codigo_errado", restantes: Math.max(0, MAX_TENTATIVAS - t) });
+    }
+    await d.atualizarCodigo(c.id, { usado_em: agoraISO });
+    const token = b64url(d.aleatorio(32)), aparelho = resumoAparelho(req.headers.get("user-agent"));
+    const sid = await d.criarSessao({ owner_id: owner, paciente_id: p.id, token_hash: await sha256(token), aparelho,
+      criado_em: agoraISO, ultimo_uso: agoraISO, expira_em: new Date(agoraMs + SESSAO_DIAS * DIA).toISOString() });
+    await d.registrar({ owner_id: owner, paciente_id: p.id, sessao_id: sid, acao: "conectou um aparelho (código por e-mail)", detalhe: aparelho });
     return json(d, 200, { ok: true, sessao: token, nome: primeiroNome(p.nome) });
   }
 

@@ -26,4 +26,28 @@ Deno.serve((req) => handle(req, {
   configPorOwner: async (owner) => (await admin.from("pep_agenda_config").select("slug,config").eq("owner_id", owner).maybeSingle()).data,
   ocupados: async (owner, de, ate) => (await admin.from("pep_agenda").select("data,hora,duracao_min").eq("profissional_id", owner).gte("data", de).lte("data", ate).in("status", ATIVAS_E_FEITAS)).data ?? [],
   inserirConsulta: async (row) => { const { error } = await admin.from("pep_agenda").insert(row); return error ? { ok: false, conflito: error.code === "23505" } : { ok: true }; },
+  // entrada pela página aberta
+  pacientesPorNascimento: async (nasc) => ((await admin.from("pep_pacientes").select("*").eq("data_nascimento", nasc).limit(50)).data ?? [])
+    .map((p: any) => ({ id: p.id, nome: p.nome, cpf: p.cpf, email: p.email ?? null, owner: p.owner_id ?? p.user_id ?? p.profissional_id ?? null })),
+  ownerPadrao: async () => { const { data } = await admin.from("pep_agenda_config").select("owner_id,config"); const at = (data ?? []).filter((x: any) => x.config?.ativo === true);
+    return at.length === 1 ? at[0].owner_id : (data?.length === 1 ? data[0].owner_id : null); },
+  contarCodigos: async (pac, desde) => (await admin.from("pep_portal_codigos").select("id", { count: "exact", head: true }).eq("paciente_id", pac).gte("criado_em", desde)).count ?? 0,
+  salvarCodigo: async (row) => { const { error } = await admin.from("pep_portal_codigos").insert(row); if (error) throw error; },
+  ultimoCodigo: async (pac) => (await admin.from("pep_portal_codigos").select("id,expira_em,usado_em,tentativas,codigo_hash").eq("paciente_id", pac).order("criado_em", { ascending: false }).limit(1).maybeSingle()).data,
+  atualizarCodigo: async (id, patch) => { await admin.from("pep_portal_codigos").update(patch).eq("id", id); },
+  enviarEmail: async (para, assunto, texto) => {
+    const chave = Deno.env.get("EMAIL_API_KEY"), de = Deno.env.get("EMAIL_FROM");
+    if (!chave || !de) return "nao_configurado";
+    const nome = Deno.env.get("EMAIL_FROM_NAME") || "PEP Clínico";
+    const resend = (Deno.env.get("EMAIL_PROVIDER") || "brevo").toLowerCase() === "resend";
+    const r = resend
+      ? await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: "Bearer " + chave, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: `${nome} <${de}>`, to: [para], subject: assunto, text: texto }) })
+      : await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "api-key": chave, "Content-Type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ sender: { email: de, name: nome }, to: [{ email: para }], subject: assunto, textContent: texto }) });
+    if (!r.ok) { console.error("e-mail recusado", r.status); return "falhou"; }
+    return "ok";
+  },
+  slugAtivo: async () => { const { data } = await admin.from("pep_agenda_config").select("slug,config"); const at = (data ?? []).filter((x: any) => x.config?.ativo === true);
+    return at.length === 1 ? at[0].slug : null; },
 }));
