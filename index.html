@@ -1095,6 +1095,11 @@ textarea.voz-ouvindo{border-color:var(--err)!important;box-shadow:0 0 0 4px colo
   <div class="mf"><button class="btn ghost" id="mod-salvar">Salvar o SOAP atual como modelo</button><button class="btn primary" data-close>Fechar</button></div>
 </div></div>
 
+<div class="overlay" id="m-dup"><div class="modal" style="max-width:520px">
+  <div class="mh"><span>Este paciente já está cadastrado?</span><button class="x" data-close>✕</button></div>
+  <div class="mb"><div class="muted" style="margin-bottom:10px" id="dup-txt"></div><div id="dup-lista" class="ag-resultados" style="max-height:300px"></div></div>
+  <div class="mf"><button class="btn ghost" data-close>Cancelar</button><button class="btn primary" id="dup-novo">Não é nenhum destes: cadastrar novo</button></div>
+</div></div>
 <div class="overlay" id="m-preconsulta"><div class="modal" style="max-width:560px">
   <div class="mh"><span id="pcm-tit">Pré-consulta</span><button class="x" data-close>✕</button></div>
   <div class="mb" id="pcm-corpo"></div>
@@ -2191,9 +2196,7 @@ async function renderPedidos(c){
     :'<div class="empty">Ninguém marcado para amanhã.</div>';
   box.innerHTML=h;
   ligarChipsPC(box,pedidos.concat(lembr));
-  box.querySelectorAll('[data-cadastrar]').forEach(b=>b.onclick=()=>{ const a=pedidos.concat(lembr).find(x=>x.id===b.dataset.cadastrar); if(!a) return;
-    abrirModalPaciente(null,a.id); $('np-nome').value=a.nome||''; $('np-tel').value=formatarTel(a.telefone||'');
-    toast('Complete o cadastro (CPF, nascimento e e-mail liberam o portal do paciente)'); });
+  box.querySelectorAll('[data-cadastrar]').forEach(b=>b.onclick=()=>cadastrarDaConsulta(pedidos.concat(lembr).find(x=>x.id===b.dataset.cadastrar)));
   const achar=id=>pedidos.concat(lembr).find(x=>x.id===id);
   const prof=()=>(typeof profCache!=='undefined'&&profCache&&profCache.nome)||'';
   box.querySelectorAll('[data-aprovar]').forEach(b=>b.onclick=async()=>{
@@ -2336,6 +2339,26 @@ async function renderAgOnline(c){
     }catch(e){ $('ao-prevtx').textContent='Não consegui verificar a página pública agora (sem internet ou função fora do ar).'; }
   }
   desenharLink();
+}
+
+// ---------- cadastrar o paciente de um pedido online (procura duplicados antes) ----------
+function abrirCadastroDaConsulta(a){
+  abrirModalPaciente(null,a.id); $('np-nome').value=a.nome||''; $('np-tel').value=formatarTel(a.telefone||'');
+  toast('Complete o cadastro (CPF, nascimento e e-mail liberam o portal do paciente)'); }
+async function cadastrarDaConsulta(a){
+  if(!a) return;
+  const dups=await possiveisDuplicados({nome:a.nome,telefone:a.telefone});
+  if(!dups.length){ abrirCadastroDaConsulta(a); return; }
+  $('dup-txt').textContent='Encontrei cadastros parecidos com "'+(a.nome||'')+'"'+(a.telefone?' ('+formatarTel(a.telefone)+')':'')+'. Se for a mesma pessoa, ligue a consulta ao cadastro que já existe.';
+  $('dup-lista').innerHTML=dups.map(d=>'<button class="ag-opt" data-dupv="'+esc(d.p.id)+'"><b>'+esc(d.p.nome)+'</b>'+
+    ' <span class="muted">· '+esc([d.p.data_nascimento?idade(d.p.data_nascimento):'',d.p.telefone?formatarTel(d.p.telefone):''].filter(Boolean).join(' · '))+'</span>'+
+    '<br><span class="chip" style="background:#fff4e0;color:#8a5a00">'+esc(d.motivos.join(', '))+'</span> <span style="color:#0a6fbd;font-weight:700">Vincular a este ›</span></button>').join('');
+  $('dup-lista').querySelectorAll('[data-dupv]').forEach(bt=>bt.onclick=async()=>{
+    const {error}=await sb.from('pep_agenda').update({paciente_id:bt.dataset.dupv,nome:null}).eq('id',a.id);
+    if(error){ toast('Não consegui vincular: '+error.message,true); return; }
+    closeM('m-dup'); toast('Consulta ligada ao cadastro existente ✓'); renderMain(); });
+  $('dup-novo').onclick=()=>{ closeM('m-dup'); abrirCadastroDaConsulta(a); };
+  openM('m-dup');
 }
 
 // ---------- pré-consulta (respondida pelo paciente no link pessoal) ----------
@@ -2753,6 +2776,26 @@ async function todosPacientes(forcar){
   pacCache=l; pacCacheEm=Date.now(); return l;
 }
 const soDigitos=v=>String(v==null?'':v).replace(/\D/g,'');
+// ---------- possíveis duplicados (sem depender de CPF) ----------
+const normNome=n=>String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z ]/g,' ').replace(/\b(de|da|do|das|dos|e)\b/g,' ').replace(/\s+/g,' ').trim();
+function nomesParecidos(a,b){ a=normNome(a); b=normNome(b); if(!a||!b) return false; if(a===b) return true;
+  const ta=a.split(' '), tb=b.split(' ');
+  if(ta.length>=2&&tb.length>=2&&ta[0]===tb[0]&&ta[ta.length-1]===tb[tb.length-1]) return true;      // mesmo primeiro e último nome
+  const [curto,longo]=ta.length<=tb.length?[ta,tb]:[tb,ta];
+  return curto.length>=2&&curto.every(t=>longo.includes(t));                                        // um nome contém o outro
+}
+// devolve [{p, motivos:[...]}] dos cadastros que parecem a mesma pessoa
+async function possiveisDuplicados({nome,telefone,nasc,excluirId}){
+  let lista=[]; try{ lista=await todosPacientes(); }catch(e){ return []; }
+  const tel8=soDigitos(telefone).slice(-8), out=[];
+  for(const p of lista){ if(excluirId&&p.id===excluirId) continue; const m=[];
+    if(tel8.length===8&&soDigitos(p.telefone).slice(-8)===tel8) m.push('mesmo celular');
+    if(nasc&&p.data_nascimento&&String(p.data_nascimento).slice(0,10)===nasc&&nomesParecidos(nome,p.nome)) m.push('mesmo nome e data de nascimento');
+    else if(nomesParecidos(nome,p.nome)) m.push('nome parecido');
+    if(m.length) out.push({p,motivos:m}); }
+  const peso=x=>(x.motivos.includes('mesmo nome e data de nascimento')?4:0)+(x.motivos.includes('mesmo celular')?2:0)+(x.motivos.includes('nome parecido')?1:0);
+  return out.sort((a,b)=>peso(b)-peso(a)).slice(0,8);
+}
 const cpfOk=v=>{ v=soDigitos(v); if(v.length!==11||/^(\d)\1+$/.test(v)) return false;
   const c=n=>{ let s=0; for(let i=0;i<n;i++) s+=+v[i]*(n+1-i); const r=(s*10)%11; return r===10?0:r; }; return c(9)===+v[9]&&c(10)===+v[10]; };
 const cnsOk=v=>{ v=soDigitos(v); if(v.length!==15) return false;
@@ -2824,6 +2867,10 @@ $('np-save').onclick=async()=>{
     const cpfD=soDigitos($('np-cpf').value), cnsD=soDigitos($('np-cns').value);
     const rep=outros.find(x=>(cpfD&&soDigitos(x.cpf)===cpfD)||(cnsD&&soDigitos(x.cns)===cnsD));
     if(rep&&!confirm('Já existe um paciente com este CPF/CNS: '+rep.nome+'.\n\nSalvar mesmo assim?')) return;
+    if(!rep){ const dups=(await possiveisDuplicados({nome,telefone:$('np-tel').value,nasc:nasc0,excluirId:pacEditando&&pacEditando.id}))
+        .filter(d=>d.motivos.some(m=>m!=='nome parecido')||!pacEditando);
+      if(dups.length&&!confirm('Parece que este paciente já está cadastrado:\n\n'+dups.slice(0,4).map(d=>'• '+d.p.nome+(d.p.data_nascimento?' ('+dataBRsimples(d.p.data_nascimento)+')':'')+' — '+d.motivos.join(', ')).join('\n')+
+        '\n\nSalvar mesmo assim como um cadastro novo?')) return; }
     if(cpfD&&!cpfOk(cpfD)&&!confirm('CPF com dígitos verificadores inválidos.\n\nSalvar mesmo assim? (só aceitável para dados fictícios)')) return;
     if(cnsD&&!cnsOk(cnsD)&&!confirm('CNS inválido (15 dígitos com dígito verificador).\n\nSalvar mesmo assim?')) return;
   }catch(e){ /* sem a lista (offline sem espelho): segue sem a checagem de duplicidade */ }
@@ -4173,7 +4220,7 @@ const GRUPOS_SIGTAP=[
   ['0209','Endoscopia',9],['0210','Radiologia intervencionista',10],
   ['0211','Métodos diagnósticos em especialidades',11],['0212','Hemoterapia e genética',12]
 ];
-const VERSAO='2026-11-27.6 · cadastrar pelo pedido';
+const VERSAO='2026-11-28.1 · controle de duplicados';
 const rotuloTabela=co=>String(co||'').length===10?'SIGTAP':'TUSS';
 function grupoDe(co){
   const c=String(co||''), pre=c.slice(0,4), p2=c.slice(0,2);

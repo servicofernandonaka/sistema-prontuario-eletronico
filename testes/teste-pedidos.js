@@ -52,6 +52,20 @@ const srv=http.createServer((q,r)=>{let f=path.join(ROOT,decodeURIComponent(q.ur
   ok(novoP&&a4.paciente_id===novoP.id&&a4.nome===null,'consulta ligada ao paciente recém-cadastrado');
   await page.click('#btn-novo-pac'); await page.waitForTimeout(200); await page.fill('#np-nome','Outro Paciente'); await page.click('#np-save'); await page.waitForTimeout(900);
   ok(db.pep_agenda.filter(x=>x.paciente_id&&x.paciente_id===(db.pep_pacientes.find(y=>y.nome==='Outro Paciente')||{}).id).length===0,'cadastro comum não mexe em consulta nenhuma');
+  // duplicados: pedido online de quem já é paciente (mesmo celular) → oferece vincular
+  db.pep_agenda.push({id:'a7',profissional_id:db.pep_agenda[0].profissional_id,nome:'Maria A Souza',telefone:'11988887777',data:db.pep_agenda[0].data,hora:'11:30',duracao_min:30,status:'solicitada',origem:'publico'});
+  await page.click('#btn-agconsultas'); await page.click('#btn-pedidos'); await page.waitForTimeout(800);
+  await page.click('[data-cadastrar="a7"]'); await page.waitForTimeout(500);
+  ok(await page.isVisible('#m-dup')&&(await page.textContent('#dup-lista')).includes('Maria Aparecida Souza')&&(await page.textContent('#dup-lista')).includes('mesmo celular'),'Cadastrar acha o paciente existente pelo celular');
+  await page.click('[data-dupv="p1"]'); await page.waitForTimeout(600);
+  ok(db.pep_agenda.find(x=>x.id==='a7').paciente_id==='p1','vincula ao cadastro existente em vez de duplicar');
+  // cadastro manual com mesmo nome e nascimento → pede confirmação
+  await page.evaluate(()=>{ window._conf=[]; window.confirm=m=>{ window._conf.push(m); return false; }; });
+  await page.click('#btn-novo-pac'); await page.waitForTimeout(200); await page.fill('#np-nome','Maria Aparecida de Souza'); await page.fill('#np-nasc','1960-05-01');
+  const nAntes=db.pep_pacientes.length; await page.click('#np-save'); await page.waitForTimeout(700);
+  const cf=await page.evaluate(()=>window._conf.join('|'));
+  ok(cf.includes('já está cadastrado')&&cf.includes('mesmo nome e data de nascimento')&&db.pep_pacientes.length===nAntes,'cadastro novo com mesmo nome e nascimento: avisa e não salva se cancelar');
+  await page.evaluate(()=>{ window.confirm=()=>true; closeM('m-pac'); });
   // navegação nas páginas do paciente
   for(const pg of ['agendar.html?m=xxxxxxxx','consulta.html#tokenFalsoTokenFalsoTokenFalso','portal.html']){ const p2=await ctx.newPage(); await p2.goto('http://localhost:8765/'+pg); await p2.waitForTimeout(300);
     ok(await p2.isVisible('a[href="./"]'),pg.split(/[?#]/)[0]+' tem link para a página inicial'); await p2.close(); }
