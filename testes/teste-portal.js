@@ -17,6 +17,7 @@ const shot=(pg,n,full=true)=>pg.screenshot({path:path.join(os.tmpdir(),n+'.png')
   const {db,log}=await instalar(med);
   db.pep_agenda_config=[{owner_id:USER.id,slug:'slugteste01',config:{ativo:true,nome_publico:'Dr. Teste',modo:'aprovar',duracao_min:30,antecedencia_horas:0,janela_dias:14,
     dias:{0:[['08:00','18:00']],1:[['08:00','18:00']],2:[['08:00','18:00']],3:[['08:00','18:00']],4:[['08:00','18:00']],5:[['08:00','18:00']],6:[['08:00','18:00']]}}}];
+  { const a6=db.pep_agenda.find(x=>x.id==='a6'); a6.data=new Date(Date.now()-864e5).toISOString().slice(0,10); }   // consulta já passada, independente da hora do teste
   await med.goto('http://localhost:8769/index.html'); await med.waitForTimeout(1800);
   await med.evaluate(()=>abrirPacientePorId('p1',false)); await med.waitForTimeout(1200);
   ok((await med.textContent('#card-portal')).includes('sem acesso'),'ficha mostra o quadro do portal (sem acesso)');
